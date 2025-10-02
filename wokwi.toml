@@ -1,0 +1,8 @@
+[wokwi]
+version = 1
+firmware = '.pio\build\wokwi\firmware.bin'
+elf = '.pio\build\wokwi\firmware.elf'
+rfc2217ServerPort = 4000
+
+[board]
+id = "esp32-s3-devkitc-1"
