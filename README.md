@@ -92,14 +92,15 @@ _Goal: Get a beautiful, accurate, and self-sufficient clock running._
 
 - [x] **Hardware:** Integrate the MSP3521 display with the ESP32-S3 using the `TFT_eSPI` library.
 - [x] **Timekeeping:** Integrate the DS3231 RTC to keep time without power.
-- [ ] **Connectivity:**
-  - [ ] Connect to Wi-Fi
+- [x] **Connectivity:**
+  - [x] Connect to Wi-Fi
   - [x] Perform an initial time sync with an NTP server.
   - [x] Perform time sync every day at 3 AM
 - [ ] **Display Logic:**
   - [x] Display the current time and date.
-  - [ ] Implement the "click to switch views" logic.
-  - [ ] Display temperature and humidity from the BME280.
+  - [x] Display temperature and humidity from the BME280.
+- [ ] **Web Server:** Build the core `ESPAsyncWebServer` UI.
+  - [ ] **Wi-Fi Setup:** Create the initial Access Point for setting Wi-Fi credentials.
 - [ ] **System:** Set up Over-the-Air (OTA) updates to make future development easier.
 
 ---
@@ -122,13 +123,13 @@ _Goal: Add comprehensive alarm functionality._
 
 _Goal: Make the clock fully configurable without needing to re-flash._
 
-- [ ] **Web Server:** Build the core `ESPAsyncWebServer` UI.
-- [ ] **Wi-Fi Setup:** Create the initial Access Point for setting Wi-Fi credentials.
 - [ ] **Configuration Pages:**
   - [ ] Set and manage alarms through the Web UI.
   - [ ] Configure timezone and DST settings.
   - [ ] Change time/temp format and other display preferences.
   - [ ] Add an option to disable auto-dimming.
 - [ ] **Persistence:** Save all user settings (Wi-Fi, alarms, preferences) to the ESP32's flash memory.
+- [ ] **Display Logic:**
+  - [ ] Implement the "click to switch views" logic.
 
 ---
