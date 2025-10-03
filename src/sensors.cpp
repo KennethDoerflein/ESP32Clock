@@ -3,18 +3,20 @@
 #include "sensors.h" // Include the header file
 
 // Define the sensor objects
-Adafruit_BME280 bme;
-RTC_DS3231 RTC;
+//Adafruit_BME280 bme;
+// RTC_DS3231 RTC; // Uncomment for real hardware RTC
+
+RTC_DS1307 RTC; // Testing with Wokwi DS1307 module
 
 void setupSensors()
 {
   // Initialize sensors here
-  if (!bme.begin(0x76))
-  { // I2C address can be 0x77 or 0x76
-    Serial.println("Could not find a valid BME280 sensor, check wiring!");
-    while (1)
-      ;
-  }
+  // if (!bme.begin(0x76))
+  // { // I2C address can be 0x77 or 0x76
+  //   Serial.println("Could not find a valid BME280 sensor, check wiring!");
+  //   while (1)
+  //     ;
+  // }
 
   if (!RTC.begin())
   {
