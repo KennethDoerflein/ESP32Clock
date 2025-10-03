@@ -1,18 +1,30 @@
-#ifndef DISPLAY_H
-#define DISPLAY_H
+#pragma once
 
 #include <TFT_eSPI.h>
 
-// Expose global tft object if you want one instance
-extern TFT_eSPI tft;
+class Display
+{
+public:
+  static Display &getInstance()
+  {
+    static Display instance;
+    return instance;
+  }
 
-// Setup and init
-void setupDisplay();
+  void begin();
+  void drawClock(const char *timeStr);
+  void drawDate(const char *dateStr);
+  void drawDayOfWeek(const char *dayStr);
+  void drawSensors(float temp, float humidity);
 
-// Drawing functions
-void drawClock(const char *timeStr);
-void drawDate(const char *dateStr);
-void drawDayOfWeek(const char *dayStr);
-void drawSensors(float temp, float humidity);
+private:
+  Display() {} // Private constructor for singleton
 
-#endif
+  TFT_eSPI tft;
+  TFT_eSprite sprClock{&tft};
+  TFT_eSprite sprDate{&tft};
+  TFT_eSprite sprDay{&tft};
+  TFT_eSprite sprSensor{&tft};
+
+  void setupSprites();
+};

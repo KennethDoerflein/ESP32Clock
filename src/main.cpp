@@ -9,28 +9,26 @@
 #include "config.h"
 #include "sensors.h"
 #include "display.h"
-#include "utils.h" // Assuming monthNames and RTC object are defined here or in config.h
+#include "TimeManager.h"
 #include "ntp.h"
 
-// --- Configuration ---
-const bool USE_24_HOUR_FORMAT = false; // Set to true for 24-hour, false for 12-hour
-
-// --- Globals for timers ---
-unsigned long prevClockMillis = 0;
-unsigned long prevSensorMillis = 0;
-const unsigned long CLOCK_UPDATE_INTERVAL = 1000;   // 1 second
+// Constants
 const unsigned long SENSOR_UPDATE_INTERVAL = 10000; // 10 seconds
-bool hasSyncedToday = false;                        // Flag to track daily NTP sync
+
+// Local variables
+unsigned long prevSensorMillis = 0;
 
 void setup()
 {
   Serial.begin(115200);
   setupSensors();
-  setupDisplay();
 
-  // Display a loading message on the screen so the user knows it's working
-  drawClock("Setup");
-  drawDate("Connecting WiFi");
+  auto &display = Display::getInstance();
+  display.begin();
+
+  // Display a loading message on the screen
+  display.drawClock("Setup");
+  display.drawDate("Connecting WiFi");
 
   WiFi.begin("Wokwi-GUEST", "", 6);
   Serial.print("Connecting to WiFi");
@@ -40,83 +38,36 @@ void setup()
     Serial.print(".");
   }
   Serial.println("\nWiFi connected!");
-  Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
   // Update the on-screen message before syncing
-  drawDate("Syncing Time");
+  display.drawDate("Syncing Time");
 
-  // Sync time once after connecting to WiFi
-  syncTime();
+  // Initialize time management
+  TimeManager::getInstance().begin();
 }
 
 void loop()
 {
   unsigned long now = millis();
+  auto &timeManager = TimeManager::getInstance();
+  auto &display = Display::getInstance();
 
-  // --- Clock Update Logic ---
-  // Reads from the RTC every second to update the display
-  if (now - prevClockMillis >= CLOCK_UPDATE_INTERVAL)
-  {
-    prevClockMillis = now;
+  // Update time management
+  timeManager.update();
 
-    // Now we read the time from the RTC, which has been correctly set
-    DateTime t = RTC.now();
-
-    // --- Daily NTP Sync Logic ---
-    // At 3 AM, if we haven't synced for the day, call the sync function.
-    if (t.hour() == 3 && !hasSyncedToday)
-    {
-      Serial.println("Performing daily 3 AM time sync...");
-      syncTime();
-      hasSyncedToday = true; // Mark as synced to prevent multiple calls
-    }
-
-    // Reset the flag once the 3 AM hour has passed.
-    // This makes it ready for the next day.
-    if (t.hour() == 4)
-    {
-      hasSyncedToday = false;
-    }
-
-    char timeStr[12]; // Increased size for "HH:MM:SS AM"
-    if (USE_24_HOUR_FORMAT)
-    {
-      // 24-Hour Format
-      sprintf(timeStr, "%02d:%02d:%02d", t.hour(), t.minute(), t.second());
-    }
-    else
-    {
-      // 12-Hour Format
-      int hour12 = t.hour() % 12;
-      if (hour12 == 0)
-      {
-        hour12 = 12; // Handle midnight (0) and noon (12)
-      }
-      const char *ampm = t.hour() < 12 ? "AM" : "PM";
-      // Note: "%2d" prints the hour without a leading zero. Use "%02d" if you prefer one.
-      sprintf(timeStr, "%2d:%02d:%02d %s", hour12, t.minute(), t.second(), ampm);
-    }
-    drawClock(timeStr);
-
-    // Get the day of the week from the DateTime object and draw it
-    // The dayOfTheWeek() function returns a number (0=Sun, 1=Mon, etc.)
-    // which we use as an index for our dayNames array.
-    drawDayOfWeek(dayNames[t.dayOfTheWeek()]);
-
-    char dateStr[20];
-    // Ensure monthNames array is accessible here
-    sprintf(dateStr, "%s-%d", monthNames[t.month() - 1], t.day());
-    drawDate(dateStr);
-  }
+  // Update display with current time
+  display.drawClock(timeManager.getFormattedTime().c_str());
+  display.drawDate(timeManager.getFormattedDate().c_str());
+  display.drawDayOfWeek(timeManager.getDayOfWeek().c_str());
 
   // --- Sensor Update Logic ---
   // Runs every 10 seconds
   if (now - prevSensorMillis >= SENSOR_UPDATE_INTERVAL)
   {
     prevSensorMillis = now;
-    // float temp = readTemperature();
-    // float hum = readHumidity();
-    // drawSensors(temp, hum);
+    float temp = readTemperature();
+    float hum = readHumidity();
+    display.drawSensors(temp, hum);
   }
 }

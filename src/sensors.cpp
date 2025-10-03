@@ -3,20 +3,21 @@
 #include "sensors.h" // Include the header file
 
 // Define the sensor objects
-//Adafruit_BME280 bme;
-// RTC_DS3231 RTC; // Uncomment for real hardware RTC
+Adafruit_BME280 BME; // Global BME280 instance
 
-RTC_DS1307 RTC; // Testing with Wokwi DS1307 module
+RTC_Type RTC; // Defined using alias from sensors.h
 
 void setupSensors()
 {
   // Initialize sensors here
-  // if (!bme.begin(0x76))
-  // { // I2C address can be 0x77 or 0x76
-  //   Serial.println("Could not find a valid BME280 sensor, check wiring!");
-  //   while (1)
-  //     ;
-  // }
+#ifndef WOKWI
+  if (!BME.begin(0x76))
+  { // I2C address can be 0x77 or 0x76
+    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    while (1)
+      ;
+  }
+#endif
 
   if (!RTC.begin())
   {
@@ -28,9 +29,8 @@ void setupSensors()
 
 void printBME280Data()
 {
-  // Read the actual sensor values
-  float temperature = bme.readTemperature();
-  float humidity = bme.readHumidity();
+  float temperature = readTemperature();
+  float humidity = readHumidity();
 
   Serial.print("Temperature = ");
   Serial.print(temperature);
@@ -41,4 +41,24 @@ void printBME280Data()
   Serial.println(" %");
 
   Serial.println();
+}
+
+float readTemperature()
+{
+// For simulation, return a reasonable temperature
+#ifdef WOKWI
+  return 22.5 + (random(-20, 21) / 10.0);
+#else
+  return BME.readTemperature();
+#endif
+}
+
+float readHumidity()
+{
+// For simulation, return a reasonable humidity
+#ifdef WOKWI
+  return 45.0 + (random(-50, 51) / 10.0);
+#else
+  return BME.readHumidity();
+#endif
 }

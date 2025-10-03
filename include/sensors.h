@@ -7,10 +7,19 @@
 #include <Adafruit_BME280.h>
 
 // Declare the sensor objects so other files know they exist
-extern Adafruit_BME280 bme;
-// extern RTC_DS3231 RTC;
-extern RTC_DS1307 RTC; // Testing with Wokwi DS1307 module
+extern Adafruit_BME280 BME;
+
+// RTC type differs between simulator (Wokwi uses DS1307) and hardware (DS3231).
+#ifdef WOKWI
+using RTC_Type = RTC_DS1307;
+#else
+using RTC_Type = RTC_DS3231;
+#endif
+
+extern RTC_Type RTC; // Single extern declaration using alias
 
 // Declare the functions
 void setupSensors();
 void printBME280Data();
+float readTemperature();
+float readHumidity();

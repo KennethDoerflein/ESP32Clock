@@ -90,11 +90,14 @@ This project is broken down into phases to prioritize a functional base clock be
 
 _Goal: Get a beautiful, accurate, and self-sufficient clock running._
 
-- [ ] **Hardware:** Integrate the MSP3521 display with the ESP32-S3 using the `TFT_eSPI` library.
-- [ ] **Timekeeping:** Integrate the DS3231 RTC to keep time without power. (interrupt driven?)
-- [ ] **Connectivity:** Connect to Wi-Fi and perform an initial time sync with an NTP server.
+- [x] **Hardware:** Integrate the MSP3521 display with the ESP32-S3 using the `TFT_eSPI` library.
+- [x] **Timekeeping:** Integrate the DS3231 RTC to keep time without power.
+- [ ] **Connectivity:**
+  - [ ] Connect to Wi-Fi
+  - [x] Perform an initial time sync with an NTP server.
+  - [x] Perform time sync every day at 3 AM
 - [ ] **Display Logic:**
-  - [ ] Display the current time and date.
+  - [x] Display the current time and date.
   - [ ] Implement the "click to switch views" logic.
   - [ ] Display temperature and humidity from the BME280.
 - [ ] **System:** Set up Over-the-Air (OTA) updates to make future development easier.

@@ -1,6 +1,6 @@
 // ntp.cpp
 #include "ntp.h"
-#include <sensors.h>
+#include "sensors.h"
 
 const char *NTP_SERVER = "time.nist.gov";
 const char *BACKUP_NTP_SERVER = "time.cloudflare.com";
