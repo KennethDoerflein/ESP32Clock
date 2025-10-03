@@ -6,6 +6,7 @@
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite sprClock = TFT_eSprite(&tft);
 TFT_eSprite sprDate = TFT_eSprite(&tft);
+TFT_eSprite sprDay = TFT_eSprite(&tft);
 TFT_eSprite sprSensor = TFT_eSprite(&tft);
 
 void setupDisplay()
@@ -19,6 +20,11 @@ void setupDisplay()
   sprClock.loadFont(DSEG14ModernBold40);
   sprClock.setTextDatum(MC_DATUM);
   sprClock.setTextColor(TFT_SKYBLUE, TFT_BLACK);
+
+  sprDay.createSprite(tft.width(), 30);
+  sprDay.loadFont(DSEG14ModernBold24);
+  sprDay.setTextDatum(MC_DATUM);
+  sprDay.setTextColor(TFT_ORANGE, TFT_BLACK);
 
   sprDate.createSprite(tft.width(), 30);
   sprDate.loadFont(DSEG14ModernBold24);
@@ -38,11 +44,18 @@ void drawClock(const char *timeStr)
   sprClock.pushSprite(0, 0);
 }
 
+void drawDayOfWeek(const char *dayStr)
+{
+  sprDay.fillSprite(TFT_BLACK);
+  sprDay.drawString(dayStr, sprDay.width() / 2, sprDay.height() / 2);
+  sprDay.pushSprite(0, 80); // Position it below the clock
+}
+
 void drawDate(const char *dateStr)
 {
   sprDate.fillSprite(TFT_BLACK);
   sprDate.drawString(dateStr, sprDate.width() / 2, sprDate.height() / 2);
-  sprDate.pushSprite(0, 85); // below clock
+  sprDate.pushSprite(0, 110); // below the day of the week
 }
 
 void drawSensors(float temp, float humidity)
@@ -52,5 +65,5 @@ void drawSensors(float temp, float humidity)
 
   sprSensor.fillSprite(TFT_BLACK);
   sprSensor.drawString(buf, sprSensor.width() / 2, sprSensor.height() / 2);
-  sprSensor.pushSprite(0, 120); // below date
+  sprSensor.pushSprite(0, 150); // below the date
 }

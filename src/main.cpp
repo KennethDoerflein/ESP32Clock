@@ -99,6 +99,11 @@ void loop()
     }
     drawClock(timeStr);
 
+    // Get the day of the week from the DateTime object and draw it
+    // The dayOfTheWeek() function returns a number (0=Sun, 1=Mon, etc.)
+    // which we use as an index for our dayNames array.
+    drawDayOfWeek(dayNames[t.dayOfTheWeek()]);
+
     char dateStr[20];
     // Ensure monthNames array is accessible here
     sprintf(dateStr, "%s-%d", monthNames[t.month() - 1], t.day());

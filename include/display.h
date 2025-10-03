@@ -12,6 +12,7 @@ void setupDisplay();
 // Drawing functions
 void drawClock(const char *timeStr);
 void drawDate(const char *dateStr);
+void drawDayOfWeek(const char *dayStr);
 void drawSensors(float temp, float humidity);
 
 #endif
