@@ -29,7 +29,7 @@ void setup()
   // Display a loading message on the screen
   display.drawStatusMessage("Connecting to WiFi...");
 
-  WiFi.begin("Wokwi-GUEST", "", 6);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD, 6);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED)
   {
