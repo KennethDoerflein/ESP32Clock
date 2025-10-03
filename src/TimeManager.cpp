@@ -5,6 +5,7 @@
 void TimeManager::begin()
 {
   // RTC initialization is handled in setupSensors()
+  // Initial sync attempt; only mark successful sync inside syncWithNTP
   syncWithNTP();
 }
 
@@ -22,8 +23,15 @@ void TimeManager::update()
 
 void TimeManager::syncWithNTP()
 {
-  syncTime(); // Using existing NTP sync function
-  hasSyncedToday = true;
+  // Call syncTime() which now returns bool indicating success
+  if (syncTime())
+  {
+    DateTime now = RTC.now();
+    // Compose YYYYMMDD integer using 32-bit arithmetic
+    uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
+    lastSyncDate = ymd;
+    Serial.printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
+  }
 }
 
 String TimeManager::getFormattedTime() const
@@ -69,15 +77,14 @@ String TimeManager::getDayOfWeek() const
 void TimeManager::checkDailySync()
 {
   DateTime now = RTC.now();
-
-  // Sync at 3 AM if not already synced today
-  if (now.hour() == 3 && !hasSyncedToday)
+  // Sync at 3 AM if not already synced for this calendar date
+  if (now.hour() == 3)
   {
-    syncWithNTP();
-  }
-  // Reset flag at 4 AM
-  else if (now.hour() == 4)
-  {
-    hasSyncedToday = false;
+    uint32_t today = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
+    if (lastSyncDate != today)
+    {
+      Serial.println("Performing daily 3 AM time sync...");
+      syncWithNTP();
+    }
   }
 }

@@ -14,4 +14,5 @@ extern const char *TZ_INFO;
 
 // Declare the functions
 bool getNTPData(struct tm &timeinfo);
-void syncTime();
+// Sync time with NTP servers. Returns true on success, false on failure.
+bool syncTime();

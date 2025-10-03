@@ -18,7 +18,7 @@ bool getNTPData(struct tm &timeinfo)
   return getLocalTime(&timeinfo);
 }
 
-void syncTime()
+bool syncTime()
 {
   const int maxRetries = 10;
   struct tm timeinfo; // Declare struct once to hold the time info
@@ -60,7 +60,7 @@ void syncTime()
               adjustedTime.minute(),
               adjustedTime.second());
       Serial.println(timeStr);
-      return; // Exit the function on success
+      return true; // Exit the function on success
     }
 
     // If it failed and it's not the last attempt, wait before the next retry.
@@ -73,4 +73,5 @@ void syncTime()
 
   // If the loop completes without a successful sync
   Serial.println("Failed to sync time with NTP server after all retries.");
+  return false;
 }

@@ -26,7 +26,10 @@ private:
   TimeManager() {} // Private constructor for singleton
 
   bool use24HourFormat = false;
-  bool hasSyncedToday = false;
+  // Stores the last successful sync date in YYYYMMDD form. 0 = never synced.
+  // Use an unsigned 32-bit integer to avoid sign issues and make the
+  // range explicit (YYYYMMDD fits well within 32 bits).
+  uint32_t lastSyncDate = 0;
   unsigned long lastUpdate = 0;
   static constexpr unsigned long UPDATE_INTERVAL = 1000; // 1 second
 
