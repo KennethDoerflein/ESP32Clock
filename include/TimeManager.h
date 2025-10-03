@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "config.h"
 #include <RTClib.h>
 
 class TimeManager
@@ -26,7 +27,11 @@ public:
 private:
   TimeManager() {} // Private constructor for singleton
 
-  bool use24HourFormat = false;
+  // Initialize from macro in config.h to allow compile-time default
+#ifndef USE_24_HOUR
+#define USE_24_HOUR false
+#endif
+  bool use24HourFormat = USE_24_HOUR;
   // Stores the last successful sync date in YYYYMMDD form. 0 = never synced.
   // Use an unsigned 32-bit integer to avoid sign issues and make the
   // range explicit (YYYYMMDD fits well within 32 bits).
