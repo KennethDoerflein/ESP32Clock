@@ -15,7 +15,7 @@ public:
   void drawClock(const char *timeStr, const char *todStr);
   void drawDate(const char *dateStr);
   void drawDayOfWeek(const char *dayStr);
-  void drawTemperature(float temp);
+  void drawTemperature(float temp, bool isCelsius);
   void drawHumidity(float humidity);
   void drawStatusMessage(const char *message);
   void drawLayout();

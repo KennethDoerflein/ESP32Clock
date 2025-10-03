@@ -137,10 +137,11 @@ void Display::drawDate(const char *dateStr)
   updateSprite(sprDate, dateStr, tft.width() / 2, dateY);
 }
 
-void Display::drawTemperature(float temp)
+void Display::drawTemperature(float temp, bool isCelsius)
 {
   char buf[16];
-  snprintf(buf, sizeof(buf), "%.0fC", temp);
+  char unit = isCelsius ? 'C' : 'F';
+  snprintf(buf, sizeof(buf), "%.0f%c", temp, unit);
   updateSprite(sprTemp, buf, MARGIN, sensorY);
 }
 

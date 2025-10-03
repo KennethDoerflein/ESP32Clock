@@ -1,6 +1,7 @@
 // sensors.cpp
 
 #include "sensors.h" // Include the header file
+#include "config.h"
 
 // Define the sensor objects
 Adafruit_BME280 BME; // Global BME280 instance
@@ -27,14 +28,16 @@ void setupSensors()
   }
 }
 
-void printBME280Data()
+void printBME280Data(bool useCelsius)
 {
-  float temperature = readTemperature();
+  float temperature = readTemperature(useCelsius);
   float humidity = readHumidity();
+  char unit = useCelsius ? 'C' : 'F';
 
   Serial.print("Temperature = ");
   Serial.print(temperature);
-  Serial.println(" °C");
+  Serial.print(" °");
+  Serial.println(unit);
 
   Serial.print("Humidity = ");
   Serial.print(humidity);
@@ -43,14 +46,21 @@ void printBME280Data()
   Serial.println();
 }
 
-float readTemperature()
+float readTemperature(bool useCelsius)
 {
+  float temperature;
 // For simulation, return a reasonable temperature
 #ifdef WOKWI
-  return 22.5 + (random(-20, 21) / 10.0);
+  temperature = 22.5 + (random(-20, 21) / 10.0);
 #else
-  return BME.readTemperature();
+  temperature = BME.readTemperature();
 #endif
+
+  if (!useCelsius)
+  {
+    temperature = (temperature * 9.0 / 5.0) + 32.0;
+  }
+  return temperature;
 }
 
 float readHumidity()

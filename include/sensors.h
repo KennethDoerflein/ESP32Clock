@@ -20,6 +20,6 @@ extern RTC_Type RTC; // Single extern declaration using alias
 
 // Declare the functions
 void setupSensors();
-void printBME280Data();
-float readTemperature();
+void printBME280Data(bool useCelsius);
+float readTemperature(bool useCelsius);
 float readHumidity();

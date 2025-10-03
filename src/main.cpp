@@ -69,9 +69,9 @@ void loop()
   if (now - prevSensorMillis >= SENSOR_UPDATE_INTERVAL)
   {
     prevSensorMillis = now;
-    float temp = readTemperature();
+    float temp = readTemperature(USE_CELSIUS);
     float hum = readHumidity();
-    display.drawTemperature(temp);
+    display.drawTemperature(temp, USE_CELSIUS);
     display.drawHumidity(hum);
   }
 }
