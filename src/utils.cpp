@@ -2,12 +2,13 @@
 
 #include "utils.h" // Include the header file
 
-// Define the string arrays
-String daysNames[] = {
-    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-String monthsNames[] = {
-    "-", "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"};
+// Define the char arrays
+const char *dayNames[] = {
+    "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+
+const char *monthNames[] = {
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
 
 void printChipInfo()
 {
