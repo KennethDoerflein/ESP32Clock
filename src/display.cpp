@@ -1,69 +1,161 @@
+// display.cpp
+
 #include "display.h"
-#include "DSEG14ModernBold40.h"
-#include "DSEG14ModernBold24.h"
+#include "DSEG7ModernBold72.h"
+#include "DSEG14ModernBold32.h"
+#include "DSEG14ModernBold16.h"
+#include <Arduino.h>
+
+#define MARGIN 10
 
 void Display::begin()
 {
   tft.init();
   tft.setRotation(3);
   tft.fillScreen(TFT_BLACK);
+  setupLayout();
   setupSprites();
+}
+
+void Display::setupLayout()
+{
+  int screenHeight = tft.height();
+
+  tft.loadFont(DSEG14ModernBold32);
+  int fontHeight = tft.fontHeight();
+
+  clockY = MARGIN;
+  dateY = screenHeight - (fontHeight * 2 + MARGIN + 15);
+  sensorY = screenHeight - (fontHeight + MARGIN + 5);
+}
+
+void Display::drawLayout()
+{
+  tft.fillScreen(TFT_BLACK);
 }
 
 void Display::setupSprites()
 {
   // Setup clock sprite
-  sprClock.createSprite(tft.width(), 80);
-  sprClock.loadFont(DSEG14ModernBold40);
+  sprClock.createSprite(280, 90);
+  sprClock.loadFont(DSEG7ModernBold72);
   sprClock.setTextDatum(MC_DATUM);
   sprClock.setTextColor(TFT_SKYBLUE, TFT_BLACK);
 
   // Setup day sprite
-  sprDay.createSprite(tft.width(), 30);
-  sprDay.loadFont(DSEG14ModernBold24);
-  sprDay.setTextDatum(MC_DATUM);
-  sprDay.setTextColor(TFT_ORANGE, TFT_BLACK);
+  sprTOD.createSprite(35, 50);
+  sprTOD.loadFont(DSEG14ModernBold16);
+  sprTOD.setTextDatum(TR_DATUM);
+  sprTOD.setTextColor(TFT_SKYBLUE, TFT_BLACK);
+
+  // Setup day of week sprite
+  sprDayOfWeek.createSprite(tft.width() / 2 - MARGIN, 50);
+  sprDayOfWeek.loadFont(DSEG14ModernBold32);
+  sprDayOfWeek.setTextDatum(ML_DATUM);
+  sprDayOfWeek.setTextColor(TFT_WHITE, TFT_BLACK);
 
   // Setup date sprite
-  sprDate.createSprite(tft.width(), 30);
-  sprDate.loadFont(DSEG14ModernBold24);
-  sprDate.setTextDatum(MC_DATUM);
-  sprDate.setTextColor(TFT_YELLOW, TFT_BLACK);
+  sprDate.createSprite(tft.width() / 2 - MARGIN, 50);
+  sprDate.loadFont(DSEG14ModernBold32);
+  sprDate.setTextDatum(MR_DATUM);
+  sprDate.setTextColor(TFT_WHITE, TFT_BLACK);
 
-  // Setup sensor sprite
-  sprSensor.createSprite(tft.width(), 40);
-  sprSensor.loadFont(DSEG14ModernBold24);
-  sprSensor.setTextDatum(MC_DATUM);
-  sprSensor.setTextColor(TFT_GREEN, TFT_BLACK);
+  // Setup temp sprite
+  sprTemp.createSprite(tft.width() / 2 - MARGIN, 50);
+  sprTemp.loadFont(DSEG14ModernBold32);
+  sprTemp.setTextDatum(ML_DATUM);
+  sprTemp.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  // Setup humidity sprite
+  sprHumidity.createSprite(tft.width() / 2 - MARGIN, 50);
+  sprHumidity.loadFont(DSEG14ModernBold32);
+  sprHumidity.setTextDatum(MR_DATUM);
+  sprHumidity.setTextColor(TFT_WHITE, TFT_BLACK);
 }
 
-void Display::drawClock(const char *timeStr)
+void Display::drawClock(const char *timeStr, const char *todStr)
 {
   sprClock.fillSprite(TFT_BLACK);
   sprClock.drawString(timeStr, sprClock.width() / 2, sprClock.height() / 2);
-  sprClock.pushSprite(0, 0);
+
+  bool is24Hour = (strlen(todStr) == 0);
+  int clockX;
+
+  if (is24Hour)
+  {
+    clockX = (tft.width() - sprClock.width()) / 2;
+  }
+  else
+  {
+    int totalWidth = sprClock.width() + sprTOD.width();
+    clockX = (tft.width() - totalWidth) / 2;
+  }
+
+  clockX -= 20;
+  if (clockX < 0)
+    clockX = 0;
+
+  sprClock.pushSprite(clockX, clockY);
+
+  if (String(todStr) != lastTOD)
+  {
+    sprTOD.fillSprite(TFT_BLACK);
+    sprTOD.drawString(todStr, sprTOD.width(), 0);
+    int todX = clockX + sprClock.width();
+    sprTOD.pushSprite(todX, clockY + 10);
+    lastTOD = todStr;
+  }
+}
+
+void Display::updateSprite(TFT_eSprite &sprite, const char *text, int x, int y)
+{
+  sprite.fillSprite(TFT_BLACK);
+
+  if (sprite.getTextDatum() == ML_DATUM)
+  {
+    sprite.drawString(text, 0, sprite.height() / 2);
+  }
+  else if (sprite.getTextDatum() == MR_DATUM)
+  {
+    sprite.drawString(text, sprite.width(), sprite.height() / 2);
+  }
+  else
+  {
+    sprite.drawString(text, sprite.width() / 2, sprite.height() / 2);
+  }
+
+  sprite.pushSprite(x, y);
 }
 
 void Display::drawDayOfWeek(const char *dayStr)
 {
-  sprDay.fillSprite(TFT_BLACK);
-  sprDay.drawString(dayStr, sprDay.width() / 2, sprDay.height() / 2);
-  sprDay.pushSprite(0, 80); // Position it below the clock
+  updateSprite(sprDayOfWeek, dayStr, MARGIN, dateY);
 }
 
 void Display::drawDate(const char *dateStr)
 {
-  sprDate.fillSprite(TFT_BLACK);
-  sprDate.drawString(dateStr, sprDate.width() / 2, sprDate.height() / 2);
-  sprDate.pushSprite(0, 110); // below the day of the week
+  updateSprite(sprDate, dateStr, tft.width() / 2, dateY);
 }
 
-void Display::drawSensors(float temp, float humidity)
+void Display::drawTemperature(float temp)
 {
-  char buf[32];
-  snprintf(buf, sizeof(buf), "%.1fC  %.0f%%", temp, humidity);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.0fC", temp);
+  updateSprite(sprTemp, buf, MARGIN, sensorY);
+}
 
-  sprSensor.fillSprite(TFT_BLACK);
-  sprSensor.drawString(buf, sprSensor.width() / 2, sprSensor.height() / 2);
-  sprSensor.pushSprite(0, 150); // below the date
+void Display::drawHumidity(float humidity)
+{
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.0f%%", humidity);
+  updateSprite(sprHumidity, buf, tft.width() / 2, sensorY);
+}
+
+void Display::drawStatusMessage(const char *message)
+{
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextDatum(MC_DATUM);
+  tft.loadFont(DSEG14ModernBold16);
+  tft.drawString(message, tft.width() / 2, tft.height() / 2);
 }

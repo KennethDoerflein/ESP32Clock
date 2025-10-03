@@ -37,19 +37,18 @@ void TimeManager::syncWithNTP()
 String TimeManager::getFormattedTime() const
 {
   DateTime now = RTC.now();
-  char timeStr[12];
+  char timeStr[6]; // HH:MM
 
   if (use24HourFormat)
   {
-    sprintf(timeStr, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+    sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
   }
   else
   {
     int hour12 = now.hour() % 12;
     if (hour12 == 0)
       hour12 = 12;
-    const char *ampm = now.hour() < 12 ? "AM" : "PM";
-    sprintf(timeStr, "%2d:%02d:%02d %s", hour12, now.minute(), now.second(), ampm);
+    sprintf(timeStr, "%d:%02d", hour12, now.minute());
   }
   return String(timeStr);
 }
@@ -58,11 +57,21 @@ String TimeManager::getFormattedDate() const
 {
   DateTime now = RTC.now();
   static const char *monthNames[] = {
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-  char dateStr[20];
-  sprintf(dateStr, "%s %d, %d", monthNames[now.month() - 1], now.day(), now.year());
+      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+  char dateStr[12];
+  snprintf(dateStr, sizeof(dateStr), "%s %d", monthNames[now.month() - 1], now.day());
   return String(dateStr);
+}
+
+String TimeManager::getTOD() const
+{
+  if (use24HourFormat)
+  {
+    return "";
+  }
+  DateTime now = RTC.now();
+  return (now.hour() < 12) ? "AM" : "PM";
 }
 
 String TimeManager::getDayOfWeek() const

@@ -27,8 +27,7 @@ void setup()
   display.begin();
 
   // Display a loading message on the screen
-  display.drawClock("Setup");
-  display.drawDate("Connecting WiFi");
+  display.drawStatusMessage("Connecting to WiFi...");
 
   WiFi.begin("Wokwi-GUEST", "", 6);
   Serial.print("Connecting to WiFi");
@@ -41,14 +40,18 @@ void setup()
   Serial.println(WiFi.localIP());
 
   // Update the on-screen message before syncing
-  display.drawDate("Syncing Time");
+  display.drawStatusMessage("Syncing Time...");
 
   // Initialize time management
   TimeManager::getInstance().begin();
+
+  // Draw the main layout
+  display.drawLayout();
 }
 
 void loop()
 {
+  delay(10);
   unsigned long now = millis();
   auto &timeManager = TimeManager::getInstance();
   auto &display = Display::getInstance();
@@ -57,7 +60,7 @@ void loop()
   timeManager.update();
 
   // Update display with current time
-  display.drawClock(timeManager.getFormattedTime().c_str());
+  display.drawClock(timeManager.getFormattedTime().c_str(), timeManager.getTOD().c_str());
   display.drawDate(timeManager.getFormattedDate().c_str());
   display.drawDayOfWeek(timeManager.getDayOfWeek().c_str());
 
@@ -68,6 +71,7 @@ void loop()
     prevSensorMillis = now;
     float temp = readTemperature();
     float hum = readHumidity();
-    display.drawSensors(temp, hum);
+    display.drawTemperature(temp);
+    display.drawHumidity(hum);
   }
 }

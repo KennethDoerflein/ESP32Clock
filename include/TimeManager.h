@@ -18,6 +18,7 @@ public:
   String getFormattedTime() const;
   String getFormattedDate() const;
   String getDayOfWeek() const;
+  String getTOD() const; // Time of Day (AM/PM)
 
   bool is24HourFormat() const { return use24HourFormat; }
   void set24HourFormat(bool use24Hour) { use24HourFormat = use24Hour; }
