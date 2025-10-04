@@ -20,8 +20,13 @@ bool getNTPData(struct tm &timeinfo)
 
 bool syncTime()
 {
-  const int maxRetries = 10;
-  struct tm timeinfo; // Declare struct once to hold the time info
+  const int maxRetries = 25;
+  const unsigned long baseDelayMs = 1000; // Start with a 1-second base delay
+  const unsigned long maxDelayMs = 30000; // Cap the delay at 30 seconds
+  const int jitterMaxMs = 1000;           // Add up to 1 second of random jitter
+
+  unsigned long currentDelay = baseDelayMs; // Initialize delay for the first retry
+  struct tm timeinfo;                       // Declare struct to hold the time info
 
   for (int i = 1; i <= maxRetries; i++)
   {
@@ -39,19 +44,15 @@ bool syncTime()
           timeinfo.tm_min,
           timeinfo.tm_sec);
 
-      // The small delay between receiving the NTP packet and setting the RTC can
-      // cause the clock to be nearly a full second behind.
-      // A common and effective solution is to add a 1-second compensation
-      // to ensure the RTC is set for the second that is about to begin.
-      TimeSpan compensation(1); // Create a TimeSpan of exactly 1 second
+      // Add 1-second compensation for processing delay
+      TimeSpan compensation(1);
       DateTime adjustedTime = receivedTime + compensation;
 
-      // Success! Set the RTC with the precisely compensated time.
+      // Success! Set the RTC.
       RTC.adjust(adjustedTime);
 
       Serial.print("RTC synchronized with NTP time (compensated): ");
       char timeStr[20];
-      // Use the adjustedTime object to print what was actually set
       sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
               adjustedTime.year(),
               adjustedTime.month(),
@@ -60,18 +61,30 @@ bool syncTime()
               adjustedTime.minute(),
               adjustedTime.second());
       Serial.println(timeStr);
-      return true; // Exit the function on success
+      return true; // Exit successfully
     }
 
     // If it failed and it's not the last attempt, wait before the next retry.
     if (i < maxRetries)
     {
-      Serial.println("Failed to obtain time. Retrying in 5 seconds...");
-      delay(5000); // Wait for 5 seconds
+      // Add random jitter to the current delay
+      unsigned long jitter = random(jitterMaxMs + 1); // random(0, 1000)
+      unsigned long totalDelay = currentDelay + jitter;
+
+      Serial.printf("Failed to obtain time. Retrying in %.2f seconds...\n", totalDelay / 1000.0);
+      delay(totalDelay);
+
+      // Double the delay for the next attempt (exponential backoff)
+      currentDelay *= 2;
+
+      // Cap the delay at the defined maximum
+      if (currentDelay > maxDelayMs)
+      {
+        currentDelay = maxDelayMs;
+      }
     }
   }
 
-  // If the loop completes without a successful sync
   Serial.println("Failed to sync time with NTP server after all retries.");
   return false;
 }
