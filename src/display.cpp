@@ -8,8 +8,17 @@
 
 #define MARGIN 10
 
+// LEDC constants for backlight control
+#define BACKLIGHT_CHANNEL 0
+#define BACKLIGHT_FREQ 5000
+#define BACKLIGHT_RESOLUTION 8
+
 void Display::begin()
 {
+  // Setup backlight PWM
+  ledcSetup(BACKLIGHT_CHANNEL, BACKLIGHT_FREQ, BACKLIGHT_RESOLUTION);
+  ledcAttachPin(TFT_BL, BACKLIGHT_CHANNEL);
+
   tft.init();
   tft.setRotation(3);
   tft.fillScreen(TFT_BLACK);
@@ -159,4 +168,19 @@ void Display::drawStatusMessage(const char *message)
   tft.setTextDatum(MC_DATUM);
   tft.loadFont(DSEG14ModernBold16);
   tft.drawString(message, tft.width() / 2, tft.height() / 2);
+}
+
+void Display::setBrightness(uint8_t hour)
+{
+  int dutyCycle;
+  // Full brightness from 7 AM to 9 PM (21:00)
+  if (hour >= 7 && hour < 21)
+  {
+    dutyCycle = 255; // Max brightness
+  }
+  else
+  {
+    dutyCycle = 85; // Dim brightness (about 33%)
+  }
+  ledcWrite(BACKLIGHT_CHANNEL, dutyCycle);
 }

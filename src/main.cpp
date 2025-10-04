@@ -71,6 +71,9 @@ void loop()
   // Update time management
   timeManager.update();
 
+  // Update brightness based on the hour
+  display.setBrightness(timeManager.getHour());
+
   // Update display with current time
   display.drawClock(timeManager.getFormattedTime().c_str(), timeManager.getTOD().c_str());
   display.drawDate(timeManager.getFormattedDate().c_str());

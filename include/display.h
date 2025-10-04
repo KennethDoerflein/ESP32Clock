@@ -19,6 +19,7 @@ public:
   void drawHumidity(float humidity);
   void drawStatusMessage(const char *message);
   void drawLayout();
+  void setBrightness(uint8_t hour);
 
 private:
   Display() {} // Private constructor for singleton

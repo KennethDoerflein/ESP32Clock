@@ -83,6 +83,12 @@ String TimeManager::getDayOfWeek() const
   return String(dayNames[now.dayOfTheWeek()]);
 }
 
+uint8_t TimeManager::getHour() const
+{
+  DateTime now = RTC.now();
+  return now.hour();
+}
+
 void TimeManager::checkDailySync()
 {
   DateTime now = RTC.now();
