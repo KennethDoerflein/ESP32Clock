@@ -1,9 +1,9 @@
 // display.cpp
 
 #include "display.h"
-#include "DSEG7ModernBold72.h"
-#include "DSEG14ModernBold32.h"
-#include "DSEG14ModernBold16.h"
+#include "fonts/DSEG7ModernBold72.h"
+#include "fonts/DSEG14ModernBold32.h"
+#include "fonts/DSEG14ModernBold16.h"
 #include <Arduino.h>
 
 #define MARGIN 10
