@@ -2,6 +2,7 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <WiFi.h>
+#include <WiFiManager.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
 
@@ -26,16 +27,27 @@ void setup()
   auto &display = Display::getInstance();
   display.begin();
 
-  // Display a loading message on the screen
   display.drawStatusMessage("Connecting to WiFi...");
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD, 6);
-  Serial.print("Connecting to WiFi");
+#ifndef WOKWI
+  // Use WiFiManager to connect to WiFi. If it fails to connect,
+  // it will start a configuration portal with the name "ESP32-Clock-Setup".
+  WiFiManager wm;
+  if (!wm.autoConnect("ESP32-Clock-Setup"))
+  {
+    Serial.println("Failed to connect and hit timeout");
+    display.drawStatusMessage("Config Failed. Restarting...");
+    delay(3000);
+    ESP.restart();
+  }
+#else
+  WiFi.begin("Wokwi-GUEST", "");
   while (WiFi.status() != WL_CONNECTED)
   {
-    delay(250);
+    delay(500);
     Serial.print(".");
   }
+#endif
   Serial.println("\nWiFi connected!");
   Serial.println(WiFi.localIP());
 

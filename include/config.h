@@ -13,13 +13,4 @@
 // Set to true for 24-hour display, false for 12-hour (AM/PM)
 #define USE_24_HOUR false
 
-// --- WiFi credentials ---
-// Defaults. For production, override with environment-specific values
-// or a local private header to avoid checking secrets into source control.
-#ifndef WIFI_SSID
-#define WIFI_SSID "Wokwi-GUEST"
-#endif
-
-#ifndef WIFI_PASSWORD
-#define WIFI_PASSWORD ""
-#endif
+// WiFi credentials have been removed in favor of WiFiManager.
