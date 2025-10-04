@@ -1,6 +1,8 @@
 // display.cpp
 
 #include "display.h"
+#include "ConfigManager.h"
+#include "TimeManager.h"
 #include "fonts/DSEG7ModernBold72.h"
 #include "fonts/DSEG14ModernBold32.h"
 #include "fonts/DSEG14ModernBold16.h"
@@ -170,17 +172,27 @@ void Display::drawStatusMessage(const char *message)
   tft.drawString(message, tft.width() / 2, tft.height() / 2);
 }
 
-void Display::setBrightness(uint8_t hour)
+void Display::updateBrightness()
 {
+  auto &config = ConfigManager::getInstance();
   int dutyCycle;
-  // Full brightness from 7 AM to 9 PM (21:00)
-  if (hour >= 7 && hour < 21)
+
+  if (config.isAutoBrightness())
   {
-    dutyCycle = 255; // Max brightness
+    uint8_t hour = TimeManager::getInstance().getHour();
+    // Full brightness from 7 AM to 9 PM (21:00)
+    if (hour >= 7 && hour < 21)
+    {
+      dutyCycle = 255; // Max brightness
+    }
+    else
+    {
+      dutyCycle = 85; // Dim brightness (about 33%)
+    }
   }
   else
   {
-    dutyCycle = 85; // Dim brightness (about 33%)
+    dutyCycle = config.getBrightness();
   }
   ledcWrite(BACKLIGHT_CHANNEL, dutyCycle);
 }

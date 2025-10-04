@@ -1,7 +1,6 @@
 // sensors.cpp
 
 #include "sensors.h" // Include the header file
-#include "config.h"
 
 // Define the sensor objects
 Adafruit_BME280 BME; // Global BME280 instance

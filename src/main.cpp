@@ -7,7 +7,7 @@
 #include <AsyncTCP.h>
 
 // Include custom files
-#include "config.h"
+#include "ConfigManager.h"
 #include "sensors.h"
 #include "display.h"
 #include "TimeManager.h"
@@ -22,11 +22,13 @@ unsigned long prevSensorMillis = 0;
 void setup()
 {
   Serial.begin(115200);
+  ConfigManager::getInstance().begin();
   setupSensors();
 
   auto &display = Display::getInstance();
   display.begin();
 
+  // Display a loading message on the screen
   display.drawStatusMessage("Connecting to WiFi...");
 
 #ifndef WOKWI
@@ -71,8 +73,8 @@ void loop()
   // Update time management
   timeManager.update();
 
-  // Update brightness based on the hour
-  display.setBrightness(timeManager.getHour());
+  // Update brightness
+  display.updateBrightness();
 
   // Update display with current time
   display.drawClock(timeManager.getFormattedTime().c_str(), timeManager.getTOD().c_str());
@@ -84,9 +86,10 @@ void loop()
   if (now - prevSensorMillis >= SENSOR_UPDATE_INTERVAL)
   {
     prevSensorMillis = now;
-    float temp = readTemperature(USE_CELSIUS);
+    bool useCelsius = ConfigManager::getInstance().isCelsius();
+    float temp = readTemperature(useCelsius);
     float hum = readHumidity();
-    display.drawTemperature(temp, USE_CELSIUS);
+    display.drawTemperature(temp, useCelsius);
     display.drawHumidity(hum);
   }
 }

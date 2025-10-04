@@ -1,6 +1,7 @@
 #include "TimeManager.h"
 #include "ntp.h"
 #include "sensors.h"
+#include "ConfigManager.h"
 
 void TimeManager::begin()
 {
@@ -39,7 +40,7 @@ String TimeManager::getFormattedTime() const
   DateTime now = RTC.now();
   char timeStr[6]; // HH:MM
 
-  if (use24HourFormat)
+  if (is24HourFormat())
   {
     sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
   }
@@ -66,7 +67,7 @@ String TimeManager::getFormattedDate() const
 
 String TimeManager::getTOD() const
 {
-  if (use24HourFormat)
+  if (is24HourFormat())
   {
     return "";
   }
@@ -81,6 +82,11 @@ String TimeManager::getDayOfWeek() const
       "SUN", "MON", "TUE", "WED",
       "THU", "FRI", "SAT"};
   return String(dayNames[now.dayOfTheWeek()]);
+}
+
+bool TimeManager::is24HourFormat() const
+{
+  return ConfigManager::getInstance().is24HourFormat();
 }
 
 uint8_t TimeManager::getHour() const
