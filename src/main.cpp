@@ -57,6 +57,15 @@ void setup()
   display.begin();
   display.drawStatusMessage("Initializing...");
 
+  // Set a unique hostname based on the last 3 bytes of the MAC address.
+  // This ensures that each device has a unique identifier on the network.
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  char hostname[18]; // "ESP32Clock_" + 6 hex chars + null terminator
+  sprintf(hostname, "ESP32Clock_%02X%02X%02X", mac[3], mac[4], mac[5]);
+  WiFi.setHostname(hostname);
+  Serial.printf("Hostname set to: %s\n", hostname);
+
   // --- WiFi Connection Logic ---
   String ssid = ConfigManager::getInstance().getWifiSSID();
   String password = ConfigManager::getInstance().getWifiPassword();
