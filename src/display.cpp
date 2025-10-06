@@ -86,6 +86,11 @@ void Display::setupSprites()
 
 void Display::drawClock(const char *timeStr, const char *todStr)
 {
+  if (String(timeStr) == lastTime && String(todStr) == lastTOD)
+  {
+    return; // No change, no need to redraw
+  }
+
   sprClock.fillSprite(TFT_BLACK);
   sprClock.drawString(timeStr, sprClock.width() / 2, sprClock.height() / 2);
 
@@ -107,6 +112,7 @@ void Display::drawClock(const char *timeStr, const char *todStr)
     clockX = 0;
 
   sprClock.pushSprite(clockX, clockY);
+  lastTime = timeStr;
 
   if (String(todStr) != lastTOD)
   {
@@ -140,12 +146,20 @@ void Display::updateSprite(TFT_eSprite &sprite, const char *text, int x, int y)
 
 void Display::drawDayOfWeek(const char *dayStr)
 {
-  updateSprite(sprDayOfWeek, dayStr, MARGIN, dateY);
+  if (String(dayStr) != lastDayOfWeek)
+  {
+    updateSprite(sprDayOfWeek, dayStr, MARGIN, dateY);
+    lastDayOfWeek = dayStr;
+  }
 }
 
 void Display::drawDate(const char *dateStr)
 {
-  updateSprite(sprDate, dateStr, tft.width() / 2, dateY);
+  if (String(dateStr) != lastDate)
+  {
+    updateSprite(sprDate, dateStr, tft.width() / 2, dateY);
+    lastDate = dateStr;
+  }
 }
 
 void Display::drawTemperature(float temp, bool isCelsius)

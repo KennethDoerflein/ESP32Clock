@@ -39,6 +39,9 @@ private:
   void updateSprite(TFT_eSprite &sprite, const char *text, int x, int y);
 
   // --- Layout variables ---
+  String lastTime = "";
+  String lastDate = "";
+  String lastDayOfWeek = "";
   String lastTOD = "--";
 
   int clockY;
