@@ -7,30 +7,34 @@
 
 void TimeManager::begin()
 {
-  // RTC initialization is handled in setupSensors()
-  // Initial sync attempt; only mark successful sync inside syncWithNTP
+  // Note: RTC hardware initialization is handled externally in setupSensors()
+  // to group all I2C device setups together.
+  // Perform an initial NTP sync attempt at startup.
   syncWithNTP();
 }
 
 void TimeManager::update()
 {
+  // Use a non-blocking delay to run the update logic approximately once per second.
   unsigned long currentMillis = millis();
   if (currentMillis - lastUpdate < UPDATE_INTERVAL)
   {
-    return;
+    return; // Not time to update yet
   }
   lastUpdate = currentMillis;
 
+  // Perform routine checks, like the daily time sync.
   checkDailySync();
 }
 
 void TimeManager::syncWithNTP()
 {
-  // Call syncTime() which now returns bool indicating success
+  // Call the global syncTime() function, which handles the NTP communication.
   if (syncTime())
   {
+    // If the sync was successful, update the last sync date.
     DateTime now = RTC.now();
-    // Compose YYYYMMDD integer using 32-bit arithmetic
+    // Store the date as a single integer (e.g., 20231026) for easy comparison.
     uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;
     Serial.printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
@@ -40,17 +44,19 @@ void TimeManager::syncWithNTP()
 String TimeManager::getFormattedTime() const
 {
   DateTime now = RTC.now();
-  char timeStr[6]; // HH:MM
+  char timeStr[6]; // Buffer for "HH:MM"
 
+  // Format the time based on the user's preference (12/24 hour).
   if (is24HourFormat())
   {
     sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
   }
   else
   {
+    // Convert 24-hour time to 12-hour format.
     int hour12 = now.hour() % 12;
     if (hour12 == 0)
-      hour12 = 12;
+      hour12 = 12; // 0 o'clock is 12 AM.
     sprintf(timeStr, "%d:%02d", hour12, now.minute());
   }
   return String(timeStr);
@@ -59,40 +65,48 @@ String TimeManager::getFormattedTime() const
 String TimeManager::getFormattedDate() const
 {
   DateTime now = RTC.now();
+  // Array of month abbreviations for a compact date format.
   static const char *monthNames[] = {
       "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
       "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
   char dateStr[12];
+  // Format as "MON DAY" (e.g., "OCT 26").
   snprintf(dateStr, sizeof(dateStr), "%s %d", monthNames[now.month() - 1], now.day());
   return String(dateStr);
 }
 
 String TimeManager::getTOD() const
 {
+  // Return an empty string if in 24-hour mode, as AM/PM is not needed.
   if (is24HourFormat())
   {
     return "";
   }
   DateTime now = RTC.now();
+  // Determine AM or PM based on the hour.
   return (now.hour() < 12) ? "AM" : "PM";
 }
 
 String TimeManager::getDayOfWeek() const
 {
   DateTime now = RTC.now();
+  // Array of day abbreviations.
   static const char *dayNames[] = {
       "SUN", "MON", "TUE", "WED",
       "THU", "FRI", "SAT"};
+  // The dayOfTheWeek() method returns an index (0=Sun, 1=Mon, etc.).
   return String(dayNames[now.dayOfTheWeek()]);
 }
 
 bool TimeManager::is24HourFormat() const
 {
+  // Delegate the check to the ConfigManager to centralize settings access.
   return ConfigManager::getInstance().is24HourFormat();
 }
 
 uint8_t TimeManager::getHour() const
 {
+  // Return the raw hour (0-23) from the RTC.
   DateTime now = RTC.now();
   return now.hour();
 }
@@ -100,10 +114,12 @@ uint8_t TimeManager::getHour() const
 void TimeManager::checkDailySync()
 {
   DateTime now = RTC.now();
-  // Sync at 3 AM if not already synced for this calendar date
+  // Trigger a daily sync at a specific time (e.g., 3 AM) when the network is likely quiet.
   if (now.hour() == 3)
   {
+    // Create a YYYYMMDD integer for the current date.
     uint32_t today = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
+    // Only sync if the last sync was on a different day.
     if (lastSyncDate != today)
     {
       Serial.println("Performing daily 3 AM time sync...");

@@ -3,7 +3,19 @@
 #ifndef PAGES_H
 #define PAGES_H
 
-// Common header for all pages, includes Bootstrap 5 from a CDN
+/**
+ * @file pages.h
+ * @brief Contains the HTML, CSS, and JavaScript for the web interface.
+ *
+ * All content is stored as C-style string literals in PROGMEM to conserve RAM.
+ * The pages use a simple template system where placeholders like %VAR% are
+ * replaced by dynamic content in the main C++ code.
+ */
+
+/**
+ * @brief Common HTML head content, including Bootstrap 5 CSS and basic styling.
+ * This is injected into every page using the `%HEAD%` placeholder.
+ */
 const char BOOTSTRAP_HEAD[] PROGMEM = R"rawliteral(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -13,6 +25,10 @@ const char BOOTSTRAP_HEAD[] PROGMEM = R"rawliteral(
 </style>
 )rawliteral";
 
+/**
+ * @brief The main index page (Control Panel).
+ * Provides navigation to the other configuration pages.
+ */
 const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -37,6 +53,11 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+/**
+ * @brief The WiFi Configuration page.
+ * Displays available networks and provides a form to enter credentials.
+ * Contains a placeholder `%NETWORKS%` which is replaced by the list of scanned networks.
+ */
 const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -78,6 +99,11 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+/**
+ * @brief The Firmware Update page.
+ * Provides two update methods: manual upload and a one-click GitHub update.
+ * Includes JavaScript to handle the file upload progress bar and the AJAX request for the GitHub update.
+ */
 const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -176,6 +202,11 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+/**
+ * @brief The Clock Settings page.
+ * Contains a form to adjust settings like brightness, time format, and temperature unit.
+ * Placeholders like `%AUTO_BRIGHTNESS_CHECKED%` are replaced with current setting values.
+ */
 const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
