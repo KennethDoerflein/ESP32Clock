@@ -1,3 +1,5 @@
+// ConfigManager.cpp
+
 #include "ConfigManager.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
@@ -6,26 +8,20 @@
 
 void ConfigManager::begin()
 {
-  if (!LittleFS.begin())
+  // Attempt to mount LittleFS. The `true` parameter formats if mount fails.
+  if (!LittleFS.begin(true))
   {
-    Serial.println("An error occurred while mounting LittleFS. Formatting...");
-    if (LittleFS.format())
-    {
-      Serial.println("LittleFS formatted successfully.");
-      LittleFS.begin(); // Retry mounting
-    }
-    else
-    {
-      Serial.println("Formatting failed. Halting.");
-      while (1)
-        ; // Halt
-    }
+    Serial.println("An error occurred while mounting LittleFS. Halting.");
+    while (1)
+      ; // Halt
   }
   load();
 }
 
 void ConfigManager::setDefaults()
 {
+  wifiSSID = "";
+  wifiPassword = "";
   autoBrightness = true;
   brightness = 128;
   use24HourFormat = false;
@@ -64,6 +60,8 @@ void ConfigManager::load()
   }
 
   // Load settings, using defaults if a key is missing
+  wifiSSID = doc["wifiSSID"] | "";
+  wifiPassword = doc["wifiPassword"] | "";
   autoBrightness = doc["autoBrightness"] | true;
   brightness = doc["brightness"] | 128;
   use24HourFormat = doc["use24HourFormat"] | false;
@@ -82,6 +80,8 @@ bool ConfigManager::save()
   }
 
   JsonDocument doc;
+  doc["wifiSSID"] = wifiSSID;
+  doc["wifiPassword"] = wifiPassword;
   doc["autoBrightness"] = autoBrightness;
   doc["brightness"] = brightness;
   doc["use24HourFormat"] = use24HourFormat;

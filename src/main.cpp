@@ -1,10 +1,10 @@
+// main.cpp
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
+#include "WebServer.h"
 #include <WiFi.h>
-#include <WiFiManager.h>
-#include <ESPAsyncWebServer.h>
-#include <AsyncTCP.h>
 
 // Include custom files
 #include "ConfigManager.h"
@@ -15,9 +15,12 @@
 
 // Constants
 const unsigned long SENSOR_UPDATE_INTERVAL = 10000; // 10 seconds
+const char *AP_SSID = "ESP32-Clock-Setup";
 
 // Local variables
 unsigned long prevSensorMillis = 0;
+WebServer webServer;
+bool isWifiConnected = false;
 
 void setup()
 {
@@ -27,40 +30,59 @@ void setup()
 
   auto &display = Display::getInstance();
   display.begin();
+  display.drawStatusMessage("Initializing...");
 
-  // Display a loading message on the screen
-  display.drawStatusMessage("Connecting to WiFi...");
+  // --- WiFi Connection ---
+  String ssid = ConfigManager::getInstance().getWifiSSID();
+  String password = ConfigManager::getInstance().getWifiPassword();
 
-#ifndef WOKWI
-  // Use WiFiManager to connect to WiFi. If it fails to connect,
-  // it will start a configuration portal with the name "ESP32-Clock-Setup".
-  WiFiManager wm;
-  if (!wm.autoConnect("ESP32-Clock-Setup"))
+  if (ssid.length() > 0)
   {
-    Serial.println("Failed to connect and hit timeout");
-    display.drawStatusMessage("Config Failed. Restarting...");
-    delay(3000);
-    ESP.restart();
+    display.drawStatusMessage("Connecting to WiFi...");
+    WiFi.begin(ssid.c_str(), password.c_str());
+
+    unsigned long startTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 15000)
+    { // 15-second timeout
+      delay(500);
+      Serial.print(".");
+    }
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      isWifiConnected = true;
+      Serial.println("\nWiFi connected!");
+      Serial.print("IP Address: ");
+      Serial.println(WiFi.localIP());
+      display.drawStatusMessage(("IP: " + WiFi.localIP().toString()).c_str());
+      delay(2000);
+    }
   }
-#else
-  WiFi.begin("Wokwi-GUEST", "");
-  while (WiFi.status() != WL_CONNECTED)
+
+  if (!isWifiConnected)
   {
-    delay(500);
-    Serial.print(".");
+    Serial.println("\nStarting AP mode.");
+    WiFi.softAP(AP_SSID);
+    IPAddress apIP = WiFi.softAPIP();
+    Serial.print("AP IP address: ");
+    Serial.println(apIP);
+    display.drawStatusMessage(("Setup AP: " + String(AP_SSID)).c_str());
   }
-#endif
-  Serial.println("\nWiFi connected!");
-  Serial.println(WiFi.localIP());
 
-  // Update the on-screen message before syncing
-  display.drawStatusMessage("Syncing Time...");
+  // Start the web server regardless of connection mode
+  webServer.begin();
 
-  // Initialize time management
-  TimeManager::getInstance().begin();
-
-  // Draw the main layout
-  display.drawLayout();
+  if (isWifiConnected)
+  {
+    display.drawStatusMessage("Syncing Time...");
+    TimeManager::getInstance().begin();
+    display.drawLayout();
+  }
+  else
+  {
+    // If not connected, show a message and don't draw the full clock
+    display.drawStatusMessage("Connect to AP & set WiFi");
+  }
 }
 
 void loop()
@@ -70,26 +92,28 @@ void loop()
   auto &timeManager = TimeManager::getInstance();
   auto &display = Display::getInstance();
 
-  // Update time management
-  timeManager.update();
-
-  // Update brightness
-  display.updateBrightness();
-
-  // Update display with current time
-  display.drawClock(timeManager.getFormattedTime().c_str(), timeManager.getTOD().c_str());
-  display.drawDate(timeManager.getFormattedDate().c_str());
-  display.drawDayOfWeek(timeManager.getDayOfWeek().c_str());
-
-  // --- Sensor Update Logic ---
-  // Runs every 10 seconds
-  if (now - prevSensorMillis >= SENSOR_UPDATE_INTERVAL)
+  if (isWifiConnected)
   {
-    prevSensorMillis = now;
-    bool useCelsius = ConfigManager::getInstance().isCelsius();
-    float temp = readTemperature(useCelsius);
-    float hum = readHumidity();
-    display.drawTemperature(temp, useCelsius);
-    display.drawHumidity(hum);
+    // Update time management
+    timeManager.update();
+
+    // Update brightness
+    display.updateBrightness();
+
+    // Update display with current time
+    display.drawClock(timeManager.getFormattedTime().c_str(), timeManager.getTOD().c_str());
+    display.drawDate(timeManager.getFormattedDate().c_str());
+    display.drawDayOfWeek(timeManager.getDayOfWeek().c_str());
+
+    // --- Sensor Update Logic ---
+    if (now - prevSensorMillis >= SENSOR_UPDATE_INTERVAL)
+    {
+      prevSensorMillis = now;
+      bool useCelsius = ConfigManager::getInstance().isCelsius();
+      float temp = readTemperature(useCelsius);
+      float hum = readHumidity();
+      display.drawTemperature(temp, useCelsius);
+      display.drawHumidity(hum);
+    }
   }
 }
