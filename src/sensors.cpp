@@ -1,10 +1,15 @@
 // sensors.cpp
 
 #include "sensors.h" // Include the header file
+#include "ConfigManager.h"
+#include "display.h"
 
 // Instantiate the global sensor objects declared in the header.
 Adafruit_BME280 BME; // Global BME280 instance for temperature/humidity.
 RTC_Type RTC;        // Global RTC instance, with type determined at compile time.
+
+/// @brief Stores the timestamp of the last sensor update for interval timing.
+static unsigned long prevSensorMillis = 0;
 
 void setupSensors()
 {
@@ -65,4 +70,26 @@ float readHumidity()
 {
   // Read the real humidity from the BME280 sensor.
   return BME.readHumidity();
+}
+
+void handleSensorUpdates()
+{
+  unsigned long now = millis();
+  // Check if the defined interval has passed since the last update.
+  if (now - prevSensorMillis >= SENSOR_UPDATE_INTERVAL)
+  {
+    prevSensorMillis = now; // Reset the timer.
+
+    // Get the current temperature unit setting.
+    bool useCelsius = ConfigManager::getInstance().isCelsius();
+
+    // Read sensor data.
+    float temp = readTemperature(useCelsius);
+    float hum = readHumidity();
+
+    // Update the display with the new sensor readings.
+    auto &display = Display::getInstance();
+    display.drawTemperature(temp, useCelsius);
+    display.drawHumidity(hum);
+  }
 }

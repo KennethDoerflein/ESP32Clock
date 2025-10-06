@@ -32,6 +32,18 @@ extern RTC_Type RTC;
  */
 void setupSensors();
 
+/// @brief The interval for reading sensor data, in milliseconds.
+const unsigned long SENSOR_UPDATE_INTERVAL = 10000; // 10 seconds
+
+/**
+ * @brief Handles periodic reading of sensor data.
+ *
+ * This function checks if the update interval has passed and, if so,
+ * reads the latest data from the sensors and updates the display.
+ * It is designed to be called continuously from the main loop.
+ */
+void handleSensorUpdates();
+
 /**
  * @brief Prints the current BME280 sensor data to the Serial monitor.
  * @param useCelsius True to print temperature in Celsius, false for Fahrenheit.
