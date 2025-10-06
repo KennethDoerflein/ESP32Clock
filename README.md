@@ -1,43 +1,33 @@
-# ESP32-S3 Smart Alarm Clock
+# ESP32-S3 WiFi Clock
 
-A feature-rich, Wi-Fi connected smart alarm clock powered by the ESP32-S3 microcontroller. This project leverages the performance of the S3 and its ample PSRAM to drive a large, 3.5" color display and a modern web-based interface for easy setup.
-
-<!-- ![Project Photo Placeholder](https://via.placeholder.com/600x400.png?text=ESP32-S3+Smart+Clock) -->
-
----
+This repository contains the firmware for a feature-rich, Wi-Fi connected smart clock powered by an ESP32-S3 microcontroller. It features a large 3.5" color TFT display, a web-based interface for easy configuration, automatic time synchronization, and environmental sensing.
 
 ## Features
 
-- **High-Performance Graphics:** A smooth, custom GUI on a 3.5" 480x320 color TFT display.
-- **Web-Based Configuration:** Fully configurable via a mobile-friendly Web UI. No need to re-flash the firmware to change settings.
-- **Automatic Time Sync:** Onboard Real-Time Clock (DS3231) with battery backup keeps perfect time, synchronized daily with NTP internet servers for ultimate accuracy.
-- **Multiple Alarms:** Set and manage multiple alarms, each with its own schedule.
-- **Progressive Wake-Up:** Gentle wake-up option with a progressively louder alarm sound.
-- **Environment Sensing:** Live temperature and humidity display from a BME280 sensor.
-- **Smart Dimming:** Display automatically dims based on the time of day to be easy on the eyes at night.
-- **Over-the-Air (OTA) Updates:** Update the clock's firmware over Wi-Fi without ever needing a USB cable.
-- **Persistent Storage:** Alarms, Wi-Fi credentials, and user settings are saved to the 16MB of onboard flash.
+- **Large Color Display**: A 3.5" 480x320 color TFT display provides a clear and vibrant user interface.
+- **Web-Based Configuration**: A mobile-friendly web UI allows for easy setup and configuration without needing to re-flash the firmware.
+- **WiFi & AP Mode**: Connects to your local WiFi network or starts its own Access Point (`ESP32-Clock-Setup`) if credentials are not set.
+- **Automatic Time Sync**: An onboard Real-Time Clock (DS3231) with battery backup keeps accurate time, synchronized daily with NTP internet servers.
+- **Environment Sensing**: A BME280 sensor provides live temperature and humidity readings on the display.
+- **Smart Brightness Control**: The display backlight can be controlled manually via the web UI or set to an automatic day/night schedule.
+- **Over-the-Air (OTA) Updates**: Update the clock's firmware directly from the web interface, either by uploading a binary file or pulling the latest release directly from GitHub.
+- **Persistent Storage**: All settings (WiFi credentials, display preferences) are saved to the ESP32's internal flash storage using LittleFS.
 
 ---
 
-## Hardware
+## Hardware Requirements
 
-This project is built with the following specific components:
+| Component           | Description                                                          |
+| ------------------- | -------------------------------------------------------------------- |
+| **Microcontroller** | **ESP32-S3-WROOM-1 N16R8** Development Board (16MB Flash, 8MB PSRAM) |
+| **Display**         | **3.5" ILI9488 TFT LCD** Display Module (480x320) with SPI interface |
+| **Real-Time Clock** | **DS3231** RTC Module with a CR2032 battery for backup               |
+| **Sensor**          | **BME280** Temperature, Humidity, and Pressure Sensor Module (I2C)   |
+| **Power Supply**    | A reliable 5V USB-C power supply                                     |
 
-- **Microcontroller:** **ESP32-S3-WROOM-1 N16R8** Development Board. This powerful module features:
-  - 16MB of Flash for storing the application, web files, and fonts.
-  - 8MB of PSRAM, critical for high-performance graphics buffering.
-  - Integrated Wi-Fi and Bluetooth LE.
-- **Display:** **3.5" MSP3521 TFT LCD Touch Display Module (480x320)**, using an ILI9488 driver.
-- **Real-Time Clock:** **DS3231** RTC Module with a CR2032 battery for backup.
-- **Sensor:** **BME280** Temperature, Humidity, and Pressure Sensor Module.
-- **Input:** Pushbutton(s) for physical interaction (snooze, dismiss, cycle views).
-- **Audio:** A small buzzer or speaker for the alarm sound.
-- **Power Supply:** A reliable 5V USB-C power supply.
+## Wiring
 
----
-
-## Wiring Diagram
+The components are connected using the I2C and SPI buses.
 
 | Component                  | Pin       | ESP32-S3 GPIO | Notes                 |
 | -------------------------- | --------- | ------------- | --------------------- |
@@ -47,7 +37,7 @@ This project is built with the following specific components:
 |                            | RST       | GPIO 11       | Reset                 |
 |                            | DC        | GPIO 12       | Data/Command          |
 |                            | MOSI      | GPIO 13       | Data In               |
-|                            | MISO      | GPIO 21       | Data OUT              |
+|                            | MISO      | GPIO 21       | Data Out              |
 |                            | SCK       | GPIO 14       | Clock                 |
 |                            | LED       | GPIO 2        | Backlight (PWM)       |
 | **DS3231 & BME280 (I2C)**  | VCC       | 3.3V          | Shared 3.3V           |
@@ -59,26 +49,63 @@ This project is built with the following specific components:
 | **Stop/Snooze Button**     | One leg   | GPIO 5        | Use INPUT_PULLUP mode |
 |                            | Other leg | GND           | Common ground         |
 
-## Software & Setup
+## Software Setup
 
-This project is developed using PlatformIO.
+This project is developed using **PlatformIO**.
 
-### Required Libraries:
+### Libraries
 
-- **`TFT_eSPI by Bodmer`**
-- `ESPAsyncWebServer`
-- `AsyncTCP`
-- `ArduinoJson`
-- `RTClib by Adafruit`
-- `Adafruit BME280 Library`
+The following libraries are required and are automatically managed by PlatformIO via the `platformio.ini` file:
 
-<!-- ### Configuration
+- `bodmer/TFT_eSPI`
+- `bblanchon/ArduinoJson`
+- `adafruit/RTClib`
+- `adafruit/Adafruit BME280 Library`
+- `esphome/ESPAsyncWebServer-esphome`
+- `esphome/AsyncTCP-esphom`
 
-1.  On first boot, the clock will start a Wi-Fi Access Point (AP).
-2.  Connect to the "ESP32-Clock-Setup" Wi-Fi network.
-3.  Navigate to `192.168.4.1` in your browser.
-4.  From the web UI, provide your home Wi-Fi credentials.
-5.  The clock will restart, connect to your network, and begin normal operation. All further configuration can be done by accessing the clock's IP address on your local network. -->
+### Build Instructions
+
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/your-username/your-repo-name.git
+    cd your-repo-name
+    ```
+2.  **Open in PlatformIO**: Open the project folder in VS Code with the PlatformIO extension installed.
+3.  **Build & Upload**: Use the PlatformIO "Build" and "Upload" commands to compile and flash the firmware to your ESP32-S3.
+
+---
+
+## Usage Guide
+
+### First-Time Setup
+
+1.  On the first boot, or if WiFi credentials are not configured, the clock will start a Wi-Fi Access Point (AP). The SSID will be **`ESP32-Clock-Setup`**.
+2.  Connect to this network from your phone or computer.
+3.  Open a web browser and navigate to the clock's static IP address, which is **`http://192.168.4.1`**. This address is fixed when the clock is in AP mode.
+
+### Web Interface
+
+The web interface provides access to all the clock's settings.
+
+#### 1. WiFi Configuration
+
+- A list of available WiFi networks is automatically scanned and displayed.
+- Click on a network name to populate the SSID field.
+- Enter the password for the selected network and click **"Save & Connect"**.
+- The device will save the credentials and restart to connect to your WiFi network. On success, the display will show the new IP address assigned by your router. You can now access the web interface from this new IP address on your local network.
+
+#### 2. Clock Settings
+
+- **Auto Brightness**: Check this box to enable a time-based schedule (bright during the day, dim at night).
+- **Manual Brightness**: If Auto Brightness is disabled, use this slider to set a fixed brightness level.
+- **24-Hour Format**: Switch the clock display between 12-hour (with AM/PM) and 24-hour format.
+- **Use Celsius (°C)**: Switch the temperature display between Celsius and Fahrenheit.
+
+#### 3. Firmware Update
+
+- **Manual Upload**: Click "Choose File" to select a `firmware.bin` file from your computer and click "Upload" to start the update.
+- **GitHub Update**: Click the "Check for Updates from GitHub" button to automatically fetch and install the latest firmware release from this repository.
 
 ---
 
@@ -96,14 +123,12 @@ _Goal: Get a beautiful, accurate, and self-sufficient clock running._
   - [x] Connect to Wi-Fi
   - [x] Perform an initial time sync with an NTP server.
   - [x] Perform time sync every day at 3 AM
-- [ ] **Display Logic:**
+- [x] **Display Logic:**
   - [x] Display the current time and date.
   - [x] Display temperature and humidity from the BME280.
-- [ ] **Web Server:** Build the core `ESPAsyncWebServer` UI.
-  - [ ] **Wi-Fi Setup:** Create the initial Access Point for setting Wi-Fi credentials.
-- [ ] **System:** Set up Over-the-Air (OTA) updates to make future development easier.
-
----
+- [x] **Web Server:** Build the core `ESPAsyncWebServer` UI.
+  - [x] **Wi-Fi Setup:** Create the initial Access Point for setting Wi-Fi credentials.
+- [x] **System:** Set up Over-the-Air (OTA) updates to make future development easier.
 
 ### Phase 2: Alarms & User Interaction
 
@@ -117,8 +142,6 @@ _Goal: Add comprehensive alarm functionality._
   - [ ] Allow multiple alarms.
   - [ ] Implement progressive (ramping) alarm volume.
 
----
-
 ### Phase 3: Web Interface & Configuration
 
 _Goal: Make the clock fully configurable without needing to re-flash._
@@ -126,10 +149,8 @@ _Goal: Make the clock fully configurable without needing to re-flash._
 - [ ] **Configuration Pages:**
   - [ ] Set and manage alarms through the Web UI.
   - [ ] Configure timezone and DST settings.
-  - [ ] Change time/temp format and other display preferences.
-  - [ ] Add an option to disable auto-dimming.
-- [ ] **Persistence:** Save all user settings (Wi-Fi, alarms, preferences) to the ESP32's flash memory.
+  - [x] Change time/temp format and other display preferences.
+  - [x] Add an option to disable auto-dimming.
+- [x] **Persistence:** Save all user settings (Wi-Fi, alarms, preferences) to the ESP32's flash memory.
 - [ ] **Display Logic:**
   - [ ] Implement the "click to switch views" logic.
-
----
