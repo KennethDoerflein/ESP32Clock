@@ -11,20 +11,14 @@
  * @brief Manages hardware sensors like the BME280 and the RTC.
  *
  * This file declares the global sensor objects and the functions used to
- * initialize them and read data from them. It includes conditional compilation
- * to support different RTC modules for simulation (Wokwi) and physical hardware.
+ * initialize them and read data from them.
  */
 
 /// @brief Global instance of the BME280 sensor driver.
 extern Adafruit_BME280 BME;
 
-// Conditionally define the RTC type based on the build environment.
-// Wokwi's simulator uses a DS1307, while the physical hardware uses a DS3231.
-#ifdef WOKWI
-using RTC_Type = RTC_DS1307;
-#else
+// Define the RTC type for the physical hardware (DS3231).
 using RTC_Type = RTC_DS3231;
-#endif
 
 /// @brief Global instance of the RTC driver, using the conditionally defined type.
 extern RTC_Type RTC;
