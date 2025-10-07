@@ -62,7 +62,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-  <title>WiFi Configuration</title>
+  <title>%WIFI_PAGE_TITLE%</title>
   %HEAD%
   <script>
     function selectNetwork(ssid) {
@@ -74,7 +74,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
   <div class="container mt-5">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h1 class="card-title text-center mb-4">Configure WiFi</h1>
+        <h1 class="card-title text-center mb-4">%WIFI_PAGE_TITLE%</h1>
         <form action="/wifi/save" method="POST">
           <div class="mb-3">
             <input type="text" class="form-control" id="ssid" name="ssid" placeholder="SSID" required>
@@ -89,7 +89,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
         <hr class="my-4">
         <h2 class="h4 text-center">Available Networks</h2>
         <div id="networks" class="list-group">%NETWORKS%</div>
-        <div class="d-grid mt-4">
+        <div class="d-grid mt-4 %BACK_BUTTON_CLASS%">
           <a href="/" class="btn btn-secondary">Back to Menu</a>
         </div>
       </div>

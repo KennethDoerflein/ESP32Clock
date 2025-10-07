@@ -2,8 +2,10 @@
 
 #include "WiFiManager.h"
 #include <WiFi.h>
+#include <DNSServer.h>
 #include "ConfigManager.h"
 #include "display.h"
+#include "ClockWebServer.h" // For access to the web server
 
 // --- Static Member Initialization ---
 const char *WiFiManager::AP_SSID = "ESP32-Clock-Setup";
@@ -19,7 +21,7 @@ WiFiManager &WiFiManager::getInstance()
  * @brief Private constructor for the WiFiManager.
  * Initializes the connection status to false.
  */
-WiFiManager::WiFiManager() : _isConnected(false) {}
+WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr) {}
 
 // --- Public Methods ---
 /**
@@ -27,7 +29,7 @@ WiFiManager::WiFiManager() : _isConnected(false) {}
  *
  * Sets a unique hostname, then attempts to connect to the WiFi network using
  * credentials stored in the ConfigManager. If the SSID is not configured or
- * the connection fails, it starts an Access Point (AP) with a default SSID.
+ * the connection fails, it launches a captive portal for configuration.
  * It also provides visual feedback on the display during this process.
  */
 void WiFiManager::begin()
@@ -70,12 +72,19 @@ void WiFiManager::begin()
 
   if (!_isConnected)
   {
-    Serial.println("\nStarting AP mode.");
-    WiFi.softAP(AP_SSID);
-    IPAddress apIP = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
-    Serial.println(apIP);
-    display.drawStatusMessage(("Setup AP: " + String(AP_SSID)).c_str());
+    startCaptivePortal();
+  }
+}
+
+/**
+ * @brief Handles DNS requests when the captive portal is active.
+ * This should be called repeatedly in the main loop.
+ */
+void WiFiManager::handleDns()
+{
+  if (_dnsServer)
+  {
+    _dnsServer->processNextRequest();
   }
 }
 
@@ -86,4 +95,38 @@ void WiFiManager::begin()
 bool WiFiManager::isConnected() const
 {
   return _isConnected;
+}
+
+/**
+ * @brief Checks if the captive portal is currently active.
+ * @return True if the captive portal is running, false otherwise.
+ */
+bool WiFiManager::isCaptivePortal() const
+{
+  return _dnsServer != nullptr;
+}
+
+// --- Private Methods ---
+
+/**
+ * @brief Starts the Access Point and DNS server for the captive portal.
+ */
+void WiFiManager::startCaptivePortal()
+{
+  auto &display = Display::getInstance();
+  Serial.println("\nStarting Captive Portal.");
+  display.drawStatusMessage(("Setup AP: " + String(AP_SSID)).c_str());
+
+  // Start AP
+  WiFi.softAP(AP_SSID);
+  IPAddress apIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(apIP);
+
+  // Start DNS Server
+  _dnsServer.reset(new DNSServer());
+  _dnsServer->start(53, "*", apIP);
+
+  // Let the web server know we are in captive portal mode
+  ClockWebServer::getInstance().enableCaptivePortal();
 }

@@ -74,6 +74,9 @@ void loop()
 {
   delay(10); // Small delay to yield to other tasks.
 
+  // Handle DNS requests for the captive portal if it's active.
+  WiFiManager::getInstance().handleDns();
+
   // Only run the main clock logic if WiFi is connected.
   if (WiFiManager::getInstance().isConnected())
   {

@@ -11,14 +11,31 @@
  * @brief Manages the ESP32's web server for configuration and updates.
  *
  * This class encapsulates the setup and handling of all web-related
- * functionalities. It is implemented as a singleton.
+ * functionalities. It is implemented as a singleton. It can operate in a
+ * normal mode or a captive portal mode for initial WiFi setup.
  */
 class ClockWebServer
 {
 public:
+  /**
+   * @brief Returns the singleton instance of the ClockWebServer.
+   */
   static ClockWebServer &getInstance();
 
+  /**
+   * @brief Starts the web server.
+   *
+   * Sets up routes based on whether captive portal mode is enabled.
+   */
   void begin();
+
+  /**
+   * @brief Enables captive portal mode.
+   *
+   * This method should be called before `begin()`. It configures the server
+   * to respond to all requests with the WiFi setup page.
+   */
+  void enableCaptivePortal();
 
   // Delete copy constructor and assignment operator.
   ClockWebServer(const ClockWebServer &) = delete;
@@ -28,8 +45,10 @@ private:
   // Private constructor.
   ClockWebServer();
 
-  // The actual server instance.
+  /// The actual server instance.
   AsyncWebServer server;
+  /// Flag indicating if the server is in captive portal mode.
+  bool _captivePortalActive;
 };
 
 #endif // CLOCK_WEBSERVER_H

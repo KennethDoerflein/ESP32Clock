@@ -8,6 +8,7 @@
 #include <ArduinoJson.h>
 #include "pages.h"
 #include "ConfigManager.h"
+#include "WiFiManager.h"
 
 // --- GitHub OTA Configuration ---
 #define GITHUB_REPO "KennethDoerflein/ESP32_Clock"
@@ -26,6 +27,7 @@ static void onUpdateRequest(AsyncWebServerRequest *request);
 static void onUpdateUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
 static void onGithubUpdate(AsyncWebServerRequest *request);
 static void onSettingsRequest(AsyncWebServerRequest *request);
+static void onCaptivePortalRequest(AsyncWebServerRequest *request);
 
 // --- Singleton Implementation ---
 ClockWebServer &ClockWebServer::getInstance()
@@ -35,37 +37,57 @@ ClockWebServer &ClockWebServer::getInstance()
 }
 
 // --- Constructor ---
-ClockWebServer::ClockWebServer() : server(80) {}
+ClockWebServer::ClockWebServer() : server(80), _captivePortalActive(false) {}
 
 // --- Public Methods ---
+
+/**
+ * @brief Enables captive portal mode.
+ * Sets a flag that modifies the server's behavior on `begin()`.
+ */
+void ClockWebServer::enableCaptivePortal()
+{
+  _captivePortalActive = true;
+}
+
 /**
  * @brief Initializes and starts the asynchronous web server.
  *
  * This method sets up all the URL routes (endpoints) for the web interface
- * and starts the server. It should be called once during the application setup.
+ * and starts the server. The behavior changes if captive portal mode is active.
  */
 void ClockWebServer::begin()
 {
-  // Register all URL handlers.
-  server.on("/", HTTP_GET, onRootRequest);
-  server.on("/wifi", HTTP_GET, onWifiRequest);
+  // Always handle saving WiFi credentials.
   server.on("/wifi/save", HTTP_POST, onWifiSaveRequest);
-  server.on("/update", HTTP_GET, onUpdateRequest);
-  server.on("/update/upload", HTTP_POST, [](AsyncWebServerRequest *request) {}, onUpdateUpload);
-  server.on("/update/github", HTTP_GET, onGithubUpdate);
-  server.on("/settings", HTTP_GET, onSettingsRequest);
 
-  // Settings save handler can remain a lambda as it doesn't need templating.
-  server.on("/settings/save", HTTP_POST, [](AsyncWebServerRequest *request)
-            {
-        if (isUpdating) return;
-        auto &config = ConfigManager::getInstance();
-        config.setAutoBrightness(request->hasParam("autoBrightness"));
-        config.setBrightness(request->arg("brightness").toInt());
-        config.set24HourFormat(request->hasParam("use24HourFormat"));
-        config.setCelsius(request->hasParam("useCelsius"));
-        config.save();
-        request->send(200, "text/plain", "Settings saved successfully!"); });
+  if (_captivePortalActive)
+  {
+    // In captive portal mode, all other requests serve the setup page.
+    server.onNotFound(onCaptivePortalRequest);
+  }
+  else
+  {
+    // In normal mode, register all standard application routes.
+    server.on("/", HTTP_GET, onRootRequest);
+    server.on("/wifi", HTTP_GET, onWifiRequest);
+    server.on("/update", HTTP_GET, onUpdateRequest);
+    server.on("/update/upload", HTTP_POST, [](AsyncWebServerRequest *request) {}, onUpdateUpload);
+    server.on("/update/github", HTTP_GET, onGithubUpdate);
+    server.on("/settings", HTTP_GET, onSettingsRequest);
+
+    // Settings save handler can remain a lambda as it doesn't need templating.
+    server.on("/settings/save", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+          if (isUpdating) return;
+          auto &config = ConfigManager::getInstance();
+          config.setAutoBrightness(request->hasParam("autoBrightness"));
+          config.setBrightness(request->arg("brightness").toInt());
+          config.set24HourFormat(request->hasParam("use24HourFormat"));
+          config.setCelsius(request->hasParam("useCelsius"));
+          config.save();
+          request->send(200, "text/plain", "Settings saved successfully!"); });
+  }
 
   server.begin();
 }
@@ -95,6 +117,17 @@ static String processor(const String &var)
       networks_html += "</a>";
     }
     return networks_html;
+  }
+
+  // Captive Portal specific placeholders
+  bool isCaptive = WiFiManager::getInstance().isCaptivePortal();
+  if (var == "WIFI_PAGE_TITLE")
+  {
+    return isCaptive ? "WiFi Setup" : "Configure WiFi";
+  }
+  if (var == "BACK_BUTTON_CLASS")
+  {
+    return isCaptive ? "d-none" : "";
   }
 
   auto &config = ConfigManager::getInstance();
@@ -313,4 +346,16 @@ static void onGithubUpdate(AsyncWebServerRequest *request)
     isUpdating = false;
   }
   http.end();
+}
+
+/**
+ * @brief Handles all requests when in captive portal mode.
+ * Serves the WiFi configuration page, which is dynamically adapted by the processor.
+ * @param request The incoming web request.
+ */
+static void onCaptivePortalRequest(AsyncWebServerRequest *request)
+{
+  if (isUpdating)
+    return;
+  request->send_P(200, "text/html", WIFI_CONFIG_HTML, processor);
 }

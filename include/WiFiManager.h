@@ -4,14 +4,18 @@
 #define WIFIMANAGER_H
 
 #include <Arduino.h>
+#include <memory>
+
+// Forward declaration
+class DNSServer;
 
 /**
  * @class WiFiManager
  * @brief Manages WiFi connectivity for the ESP32.
  *
  * This singleton class handles connecting to a saved WiFi network or, if
- * unsuccessful, launching an Access Point for configuration. It tracks the
- * connection status and provides a central point for all WiFi operations.
+ * unsuccessful, launching an Access Point with a captive portal for configuration.
+ * It tracks the connection status and provides a central point for all WiFi operations.
  */
 class WiFiManager
 {
@@ -26,15 +30,29 @@ public:
    * @brief Initializes WiFi and attempts to connect.
    *
    * Tries to connect to the configured WiFi network. If it fails or if no
-   * network is configured, it starts a soft Access Point (AP).
+   * network is configured, it starts a soft Access Point (AP) and a captive portal.
    */
   void begin();
+
+  /**
+   * @brief Handles captive portal DNS requests.
+   *
+   * This method should be called in the main loop to process DNS requests
+   * when the captive portal is active.
+   */
+  void handleDns();
 
   /**
    * @brief Checks if the device is currently connected to a WiFi network.
    * @return True if connected, false otherwise.
    */
   bool isConnected() const;
+
+  /**
+   * @brief Checks if the captive portal is currently active.
+   * @return True if the captive portal is running, false otherwise.
+   */
+  bool isCaptivePortal() const;
 
   // Delete copy constructor and assignment operator for singleton pattern.
   WiFiManager(const WiFiManager &) = delete;
@@ -46,10 +64,19 @@ private:
    */
   WiFiManager();
 
+  /**
+   * @brief Starts the captive portal.
+   *
+   * Sets up the AP, DNS server, and web server routes for configuration.
+   */
+  void startCaptivePortal();
+
   /// @brief The SSID for the Access Point mode, used for initial configuration.
   static const char *AP_SSID;
   /// @brief Flag indicating the current WiFi connection status.
   bool _isConnected;
+  /// @brief Pointer to the DNS server instance for the captive portal.
+  std::unique_ptr<DNSServer> _dnsServer;
 };
 
 #endif // WIFIMANAGER_H
