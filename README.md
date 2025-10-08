@@ -68,8 +68,8 @@ The following libraries are required and are automatically managed by PlatformIO
 
 1.  **Clone the Repository**:
     ```bash
-    git clone https://github.com/your-username/your-repo-name.git
-    cd your-repo-name
+    git clone https://github.com/KennethDoerflein/ESP32Clock.git
+    cd ESP32Clock
     ```
 2.  **Open in PlatformIO**: Open the project folder in VS Code with the PlatformIO extension installed.
 3.  **Build & Upload**: Use the PlatformIO "Build" and "Upload" commands to compile and flash the firmware to your ESP32-S3.
@@ -113,44 +113,55 @@ The web interface provides access to all the clock's settings.
 
 This project is broken down into phases to prioritize a functional base clock before implementing more complex features.
 
-### Phase 1: Core Clock & Display
+### Phase 1: Core Functionality
 
-_Goal: Get a beautiful, accurate, and self-sufficient clock running._
-
-- [x] **Hardware:** Integrate the MSP3521 display with the ESP32-S3 using the `TFT_eSPI` library.
-- [x] **Timekeeping:** Integrate the DS3231 RTC to keep time without power.
-- [x] **Connectivity:**
-  - [x] Connect to Wi-Fi
-  - [x] Perform an initial time sync with an NTP server.
-  - [x] Perform time sync every day at 3 AM
-- [x] **Display Logic:**
-  - [x] Display the current time and date.
-  - [x] Display temperature and humidity from the BME280.
-- [x] **Web Server:** Build the core `ESPAsyncWebServer` UI.
-  - [x] **Wi-Fi Setup:** Create the initial Access Point for setting Wi-Fi credentials.
-- [x] **System:** Set up Over-the-Air (OTA) updates to make future development easier.
-
-### Phase 2: Alarms & User Interaction
-
-_Goal: Add comprehensive alarm functionality._
-
-- [ ] **Core Alarm Logic:**
-  - [ ] Allow a single alarm to be set in the code.
-  - [ ] Push button to snooze.
-  - [ ] Hold button to disable alarm until the next day.
-- [ ] **Advanced Alarms:**
-  - [ ] Allow multiple alarms.
-  - [ ] Implement progressive (ramping) alarm volume.
-
-### Phase 3: Web Interface & Configuration
-
-_Goal: Make the clock fully configurable without needing to re-flash._
-
-- [ ] **Configuration Pages:**
-  - [ ] Set and manage alarms through the Web UI.
-  - [ ] Configure timezone and DST settings.
-  - [x] Change time/temp format and other display preferences.
-  - [x] Add an option to disable auto-dimming.
-- [x] **Persistence:** Save all user settings (Wi-Fi, alarms, preferences) to the ESP32's flash memory.
+- [x] **Hardware Integration:** Connect ESP32-S3 with ILI9488 display, DS3231 RTC, and BME280 sensor.
 - [ ] **Display Logic:**
-  - [ ] Implement the "click to switch views" logic.
+  - [ ] Render time, date, day of the week.
+  - [ ] Render temperature and humidity.
+  - [ ] Implement basic status messages.
+- [x] **Timekeeping:**
+  - [x] Initialize RTC and keep time accurately.
+  - [x] Connect to Wi-Fi and sync time with an NTP server on startup.
+  - [x] Implement a daily automatic time sync.
+- [ ] **Basic Configuration:**
+  - [ ] Store and retrieve settings from LittleFS.
+  - [ ] Set up initial Wi-Fi credentials via a captive portal.
+
+### Phase 2: Web Interface & Advanced Configuration
+
+- [ ] **UI/UX Enhancements:**
+  - [ ] Create a single-page application (SPA) feel for the web UI.
+  - [ ] Add a "Reboot Device" button to the web interface.
+- [ ] **Settings Management:**
+  - [ ] **Display Options:**
+    - [ ] Toggle between 12/24-hour format.
+    - [ ] Toggle between Celsius/Fahrenheit.
+    - [ ] Control manual brightness via a slider.
+    - [ ] Enable/disable automatic brightness scheduling.
+  - [ ] **Timezone Configuration:**
+    - [ ] Add a dropdown to select the timezone.
+- [ ] **Firmware Updates:**
+  - [ ] Provide OTA updates via file upload.
+  - [ ] Provide OTA updates directly from GitHub releases.
+
+### Phase 3: Alarms & User Interaction
+
+- [ ] **Alarm Management:**
+  - [ ] **Backend:**
+    - [ ] Define a data structure to store multiple alarms.
+    - [ ] Save and load alarms from persistent storage.
+    - [ ] Implement logic to trigger an alarm at the set time.
+  - [ ] **Web Interface:**
+    - [ ] Create a UI to add, edit, and delete alarms.
+    - [ ] Allow setting the time for each alarm.
+    - [ ] Allow setting which days of the week an alarm repeats.
+  - [ ] **Hardware Interaction:**
+    - [ ] Use a physical button to snooze a ringing alarm.
+    - [ ] Use a long-press on the physical button to permanently dismiss a ringing alarm for the day.
+- [ ] **Audio Feedback:**
+  - [ ] Implement progressive alarm volume (ramping).
+  - [ ] Add different sound options for the alarm.
+- [ ] **Display Feedback:**
+  - [ ] Show a visual indicator on the display when an alarm is set.
+  - [ ] Show a "ringing" screen when an alarm is active.
