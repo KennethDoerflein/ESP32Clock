@@ -113,37 +113,37 @@ The web interface provides access to all the clock's settings.
 
 This project is broken down into phases to prioritize a functional base clock before implementing more complex features.
 
-### Phase 1: Core Functionality
+### Phase 1: Core Functionality (Untested)
 
 - [x] **Hardware Integration:** Connect ESP32-S3 with ILI9488 display, DS3231 RTC, and BME280 sensor.
-- [ ] **Display Logic:**
-  - [ ] Render time, date, day of the week.
-  - [ ] Render temperature and humidity.
-  - [ ] Implement basic status messages.
+- [x] **Display Logic:**
+  - [x] Render time, date, day of the week.
+  - [x] Render temperature and humidity.
+  - [x] Implement basic status messages.
 - [x] **Timekeeping:**
   - [x] Initialize RTC and keep time accurately.
   - [x] Connect to Wi-Fi and sync time with an NTP server on startup.
   - [x] Implement a daily automatic time sync.
-- [ ] **Basic Configuration:**
-  - [ ] Store and retrieve settings from LittleFS.
-  - [ ] Set up initial Wi-Fi credentials via a captive portal.
+- [x] **Basic Configuration:**
+  - [x] Store and retrieve settings from LittleFS.
+  - [x] Set up initial Wi-Fi credentials via a captive portal.
 
-### Phase 2: Web Interface & Advanced Configuration
+### Phase 2: Web Interface & Advanced Configuration (Untested)
 
-- [ ] **UI/UX Enhancements:**
-  - [ ] Create a single-page application (SPA) feel for the web UI.
-  - [ ] Add a "Reboot Device" button to the web interface.
+- [x] **UI/UX Enhancements:**
+  - [x] Create a single-page application (SPA) feel for the web UI.
+  - [x] Add a "Reboot Device" button to the web interface.
 - [ ] **Settings Management:**
-  - [ ] **Display Options:**
-    - [ ] Toggle between 12/24-hour format.
-    - [ ] Toggle between Celsius/Fahrenheit.
-    - [ ] Control manual brightness via a slider.
-    - [ ] Enable/disable automatic brightness scheduling.
+  - [x] **Display Options:**
+    - [x] Toggle between 12/24-hour format.
+    - [x] Toggle between Celsius/Fahrenheit.
+    - [x] Control manual brightness via a slider.
+    - [x] Enable/disable automatic brightness scheduling.
   - [ ] **Timezone Configuration:**
     - [ ] Add a dropdown to select the timezone.
-- [ ] **Firmware Updates:**
-  - [ ] Provide OTA updates via file upload.
-  - [ ] Provide OTA updates directly from GitHub releases.
+- [x] **Firmware Updates:**
+  - [x] Provide OTA updates via file upload.
+  - [x] Provide OTA updates directly from GitHub releases.
 
 ### Phase 3: Alarms & User Interaction
 
