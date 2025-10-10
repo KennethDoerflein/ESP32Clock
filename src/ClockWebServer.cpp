@@ -35,13 +35,17 @@ void ClockWebServer::begin()
   // Bind class methods to web server routes
   if (_captivePortalActive)
   {
-    server.onNotFound(std::bind(&ClockWebServer::onCaptivePortalRequest, this, std::placeholders::_1));
+    server.onNotFound([this](AsyncWebServerRequest *request)
+                      { onCaptivePortalRequest(request); });
   }
   else
   {
-    server.on("/", HTTP_GET, std::bind(&ClockWebServer::onRootRequest, this, std::placeholders::_1));
-    server.on("/wifi", HTTP_GET, std::bind(&ClockWebServer::onWifiRequest, this, std::placeholders::_1));
-    server.on("/settings", HTTP_GET, std::bind(&ClockWebServer::onSettingsRequest, this, std::placeholders::_1));
+    server.on("/", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onRootRequest(request); });
+    server.on("/wifi", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onWifiRequest(request); });
+    server.on("/settings", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onSettingsRequest(request); });
 
     // Lambda for settings save; it's simple enough not to need a full method.
     server.on("/settings/save", HTTP_POST, [](AsyncWebServerRequest *request)
@@ -63,10 +67,12 @@ void ClockWebServer::begin()
   }
 
   // This route is shared between normal and captive portal modes.
-  server.on("/wifi/save", HTTP_POST, std::bind(&ClockWebServer::onWifiSaveRequest, this, std::placeholders::_1));
+  server.on("/wifi/save", HTTP_POST, [this](AsyncWebServerRequest *request)
+            { onWifiSaveRequest(request); });
 
   // Initialize and register OTA manager routes, passing the processor function.
-  OtaManager::getInstance().begin(server, std::bind(&ClockWebServer::processor, this, std::placeholders::_1));
+  OtaManager::getInstance().begin(server, [this](const String &var)
+                                  { return processor(var); });
 
   server.begin();
 }
@@ -82,7 +88,8 @@ void ClockWebServer::onRootRequest(AsyncWebServerRequest *request)
     request->send(503, "text/plain", "Update in progress");
     return;
   }
-  request->send_P(200, "text/html", INDEX_HTML, std::bind(&ClockWebServer::processor, this, std::placeholders::_1));
+  request->send_P(200, "text/html", INDEX_HTML, [this](const String &var)
+                  { return processor(var); });
 }
 
 void ClockWebServer::onWifiRequest(AsyncWebServerRequest *request)
@@ -92,7 +99,8 @@ void ClockWebServer::onWifiRequest(AsyncWebServerRequest *request)
     request->send(503, "text/plain", "Update in progress");
     return;
   }
-  request->send_P(200, "text/html", WIFI_CONFIG_HTML, std::bind(&ClockWebServer::processor, this, std::placeholders::_1));
+  request->send_P(200, "text/html", WIFI_CONFIG_HTML, [this](const String &var)
+                  { return processor(var); });
 }
 
 void ClockWebServer::onSettingsRequest(AsyncWebServerRequest *request)
@@ -102,7 +110,8 @@ void ClockWebServer::onSettingsRequest(AsyncWebServerRequest *request)
     request->send(503, "text/plain", "Update in progress");
     return;
   }
-  request->send_P(200, "text/html", SETTINGS_PAGE_HTML, std::bind(&ClockWebServer::processor, this, std::placeholders::_1));
+  request->send_P(200, "text/html", SETTINGS_PAGE_HTML, [this](const String &var)
+                  { return processor(var); });
 }
 
 void ClockWebServer::onWifiSaveRequest(AsyncWebServerRequest *request)
@@ -130,7 +139,8 @@ void ClockWebServer::onCaptivePortalRequest(AsyncWebServerRequest *request)
     request->send(503, "text/plain", "Update in progress");
     return;
   }
-  request->send_P(200, "text/html", WIFI_CONFIG_HTML, std::bind(&ClockWebServer::processor, this, std::placeholders::_1));
+  request->send_P(200, "text/html", WIFI_CONFIG_HTML, [this](const String &var)
+                  { return processor(var); });
 }
 
 // --- Template Processor ---

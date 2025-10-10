@@ -32,7 +32,8 @@ void OtaManager::begin(AsyncWebServer &server, TplProcessor processor)
 {
   _processor = processor;
 
-  server.on("/update", HTTP_GET, std::bind(&OtaManager::onUpdateRequest, this, std::placeholders::_1));
+  server.on("/update", HTTP_GET, [this](AsyncWebServerRequest *request)
+            { onUpdateRequest(request); });
   server.on(
       "/update/upload", HTTP_POST,
       [this](AsyncWebServerRequest *request)
@@ -40,8 +41,12 @@ void OtaManager::begin(AsyncWebServer &server, TplProcessor processor)
         // This is called after the upload is complete.
         // The 'final' flag in onUpdateUpload handles the response.
       },
-      std::bind(&OtaManager::onUpdateUpload, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
-  server.on("/update/github", HTTP_GET, std::bind(&OtaManager::onGithubUpdate, this, std::placeholders::_1));
+      [this](AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final)
+      {
+        onUpdateUpload(request, filename, index, data, len, final);
+      });
+  server.on("/update/github", HTTP_GET, [this](AsyncWebServerRequest *request)
+            { onGithubUpdate(request); });
 }
 
 // --- Private Methods ---
