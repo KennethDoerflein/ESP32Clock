@@ -139,6 +139,16 @@ void ClockWebServer::onCaptivePortalRequest(AsyncWebServerRequest *request)
     request->send(503, "text/plain", "Update in progress");
     return;
   }
+
+  // Captive portal detection logic for modern OSes.
+  // This handles the OS's connectivity check and keeps the portal open.
+  if (!request->host().equals(WiFi.softAPIP().toString()) && !request->url().equals("/"))
+  {
+    String redirectUrl = "http://" + WiFi.softAPIP().toString() + "/wifi";
+    request->redirect(redirectUrl);
+    return;
+  }
+
   request->send_P(200, "text/html", WIFI_CONFIG_HTML, [this](const String &var)
                   { return processor(var); });
 }
