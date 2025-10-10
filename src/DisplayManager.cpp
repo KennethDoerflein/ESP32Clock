@@ -10,11 +10,17 @@ void DisplayManager::addPage(Page *page)
   pages.push_back(page);
 }
 
-void DisplayManager::setPage(int index)
+void DisplayManager::setPage(int index, bool forceRedraw)
 {
   if (index < 0 || index >= pages.size())
   {
     return; // Index out of bounds
+  }
+
+  // If the page isn't changing and we're not forcing a redraw, do nothing.
+  if (currentPageIndex == index && !forceRedraw)
+  {
+    return;
   }
 
   if (currentPage)

@@ -40,14 +40,21 @@ public:
   /**
    * @brief Sets the currently active page by its index.
    * @param index The index of the page to activate.
+   * @param forceRedraw If true, forces the page to exit and re-enter.
    */
-  void setPage(int index);
+  void setPage(int index, bool forceRedraw = false);
 
   /**
    * @brief Gets the number of pages managed.
    * @return The total number of pages.
    */
   int getPagesSize();
+
+  /**
+   * @brief Gets the index of the currently active page.
+   * @return The index of the current page.
+   */
+  int getCurrentPageIndex() const { return currentPageIndex; }
 
   /**
    * @brief Updates the currently active page.

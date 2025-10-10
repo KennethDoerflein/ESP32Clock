@@ -106,6 +106,17 @@ void loop()
     // Update the current display page
     displayManager.update();
 
+    // Check if settings have changed and need a reload.
+    auto &config = ConfigManager::getInstance();
+    if (config.isDirty())
+    {
+      // Forcing a redraw of the current page is enough to apply
+      // all visual settings (time format, temp unit, etc.)
+      displayManager.setPage(displayManager.getCurrentPageIndex(), true);
+      config.clearDirtyFlag();
+      Serial.println("Configuration reloaded and page refreshed.");
+    }
+
     // Simple page switching logic for until button is added
     if (millis() - lastPageChange > 10000) // Switch every 10 seconds
     {
