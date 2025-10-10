@@ -45,6 +45,17 @@ private:
   // Private constructor.
   ClockWebServer();
 
+  // --- Request Handlers ---
+  void onRootRequest(AsyncWebServerRequest *request);
+  void onWifiRequest(AsyncWebServerRequest *request);
+  void onWifiSaveRequest(AsyncWebServerRequest *request);
+  void onSettingsRequest(AsyncWebServerRequest *request);
+  void onCaptivePortalRequest(AsyncWebServerRequest *request);
+
+  // --- Template Processor and Helpers ---
+  String processor(const String &var);
+  String getNetworksList();
+
   /// The actual server instance.
   AsyncWebServer server;
   /// Flag indicating if the server is in captive portal mode.

@@ -53,9 +53,16 @@ void setup()
   display.drawStatusMessage("Initializing...");
 
   // Initialize WiFi. This will connect or start an AP.
-  WiFiManager::getInstance().begin();
+  // The begin method returns true if it started the captive portal.
+  bool captivePortalStarted = WiFiManager::getInstance().begin();
 
-  // Start the web server.
+  // If captive portal is active, enable it on the web server.
+  if (captivePortalStarted)
+  {
+    ClockWebServer::getInstance().enableCaptivePortal();
+  }
+
+  // Start the web server. It will now have the correct routes.
   ClockWebServer::getInstance().begin();
 
   // Initialize the Display Manager

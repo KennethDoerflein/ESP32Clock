@@ -5,7 +5,6 @@
 #include <DNSServer.h>
 #include "ConfigManager.h"
 #include "display.h"
-#include "ClockWebServer.h" // For access to the web server
 
 // --- Static Member Initialization ---
 const char *WiFiManager::AP_SSID = "ESP32-Clock-Setup";
@@ -31,8 +30,9 @@ WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr) {}
  * credentials stored in the ConfigManager. If the SSID is not configured or
  * the connection fails, it launches a captive portal for configuration.
  * It also provides visual feedback on the display during this process.
+ * @return True if the captive portal was started, false otherwise.
  */
-void WiFiManager::begin()
+bool WiFiManager::begin()
 {
   // Set a unique hostname based on the last 3 bytes of the MAC address.
   uint8_t mac[6];
@@ -73,7 +73,10 @@ void WiFiManager::begin()
   if (!_isConnected)
   {
     startCaptivePortal();
+    return true; // Captive portal was started
   }
+
+  return false; // WiFi connected successfully
 }
 
 /**
@@ -126,7 +129,4 @@ void WiFiManager::startCaptivePortal()
   // Start DNS Server
   _dnsServer.reset(new DNSServer());
   _dnsServer->start(53, "*", apIP);
-
-  // Let the web server know we are in captive portal mode
-  ClockWebServer::getInstance().enableCaptivePortal();
 }

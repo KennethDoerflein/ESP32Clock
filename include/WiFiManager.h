@@ -31,8 +31,9 @@ public:
    *
    * Tries to connect to the configured WiFi network. If it fails or if no
    * network is configured, it starts a soft Access Point (AP) and a captive portal.
+   * @return True if the captive portal was started, false otherwise.
    */
-  void begin();
+  bool begin();
 
   /**
    * @brief Handles captive portal DNS requests.
@@ -67,7 +68,7 @@ private:
   /**
    * @brief Starts the captive portal.
    *
-   * Sets up the AP, DNS server, and web server routes for configuration.
+   * Sets up the AP and DNS server for configuration.
    */
   void startCaptivePortal();
 
