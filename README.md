@@ -131,8 +131,12 @@ This project is broken down into phases to prioritize a functional base clock be
 ### Phase 2: Web Interface & Advanced Configuration (Untested)
 
 - [x] **UI/UX Enhancements:**
+
   - [x] Create a single-page application (SPA) feel for the web UI.
   - [x] Add a "Reboot Device" button to the web interface.
+  - [ ] Add button to change hostname to the web interface.
+  - [ ] Add option to reset to defaults to the web interface.
+
 - [ ] **Settings Management:**
   - [x] **Display Options:**
     - [x] Toggle between 12/24-hour format.
