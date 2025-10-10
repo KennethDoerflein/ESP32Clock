@@ -31,7 +31,7 @@ class Display;
 
 // Define page instances
 std::unique_ptr<ClockPage> clockPage;
-InfoPage infoPage;
+std::unique_ptr<InfoPage> infoPage;
 
 /**
  * @brief The main setup function, run once on boot.
@@ -48,6 +48,7 @@ void setup()
   // Now that the display is initialized, create the pages that need it.
   // Using std::unique_ptr to safely manage the memory.
   clockPage.reset(new ClockPage(&display.getTft()));
+  infoPage.reset(new InfoPage());
 
   setupSensors();
   display.drawStatusMessage("Initializing...");
@@ -71,7 +72,7 @@ void setup()
 
   // Add pages to the manager. Use .get() to pass the raw pointer.
   displayManager.addPage(clockPage.get());
-  displayManager.addPage(&infoPage);
+  displayManager.addPage(infoPage.get());
 
   // If connected, set up the main display and sync time.
   if (WiFiManager::getInstance().isConnected())
