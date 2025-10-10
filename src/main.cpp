@@ -12,7 +12,6 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
-#include "ClockWebServer.h"
 #include <WiFi.h>
 
 // Include all custom module headers.
@@ -22,14 +21,19 @@
 #include "TimeManager.h"
 #include "ntp.h"
 #include "WiFiManager.h"
+#include "DisplayManager.h"
+#include "pages/ClockPage.h"
+#include "pages/InfoPage.h"
+#include "ClockWebServer.h"
+
+class Display;
+
+// Define page instances
+ClockPage *clockPage = nullptr;
+InfoPage infoPage;
 
 /**
  * @brief The main setup function, run once on boot.
- *
- * Initializes serial communication, managers, sensors, display, and WiFi.
- * It orchestrates the startup sequence, relying on dedicated managers for
- * specific tasks. It ensures that the web server is started and that the
- * time is synchronized if a WiFi connection is established.
  */
 void setup()
 {
@@ -37,9 +41,13 @@ void setup()
 
   // Initialize managers and hardware.
   ConfigManager::getInstance().begin();
-  setupSensors();
   auto &display = Display::getInstance();
   display.begin();
+
+  // Now that the display is initialized, create the pages that need it.
+  clockPage = new ClockPage(&display.getTft());
+
+  setupSensors();
   display.drawStatusMessage("Initializing...");
 
   // Initialize WiFi. This will connect or start an AP.
@@ -48,31 +56,37 @@ void setup()
   // Start the web server.
   ClockWebServer::getInstance().begin();
 
+  // Initialize the Display Manager
+  auto &displayManager = DisplayManager::getInstance();
+  displayManager.begin(display.getTft());
+
+  // Add pages to the manager
+  displayManager.addPage(clockPage);
+  displayManager.addPage(&infoPage);
+
   // If connected, set up the main display and sync time.
   if (WiFiManager::getInstance().isConnected())
   {
     display.drawStatusMessage("Syncing Time...");
     TimeManager::getInstance().begin();
-    display.drawLayout();
+    // Set the initial page
+    displayManager.setPage(0);
   }
   else
   {
-    // A message is already shown by WiFiManager, but we can affirm it.
     display.drawStatusMessage("Connect to AP & set WiFi");
   }
 }
 
 /**
  * @brief The main application loop.
- *
- * This function runs continuously. If WiFi is connected, it updates the
- * time, brightness, and display elements. It also periodically reads and
- * displays sensor data by calling the appropriate handlers. If WiFi is not
- * connected, it does nothing, yielding to system tasks.
  */
 void loop()
 {
-  delay(10); // Small delay to yield to other tasks.
+  static unsigned long lastPageChange = 0;
+  static int currentPageIndex = 0;
+
+  delay(100); // Small delay to yield to other tasks.
 
   // Handle DNS requests for the captive portal if it's active.
   WiFiManager::getInstance().handleDns();
@@ -82,15 +96,22 @@ void loop()
   {
     auto &timeManager = TimeManager::getInstance();
     auto &display = Display::getInstance();
+    auto &displayManager = DisplayManager::getInstance();
 
     // Perform periodic tasks.
     timeManager.update();
     display.updateBrightness();
-    handleSensorUpdates(); // Sensor updates include redrawing.
+    handleSensorUpdates();
 
-    // Redraw the main display components.
-    display.drawClock(timeManager.getFormattedTime().c_str(), timeManager.getTOD().c_str());
-    display.drawDate(timeManager.getFormattedDate().c_str());
-    display.drawDayOfWeek(timeManager.getDayOfWeek().c_str());
+    // Update the current display page
+    displayManager.update();
+
+    // Simple page switching logic for until button is added
+    if (millis() - lastPageChange > 10000) // Switch every 10 seconds
+    {
+      lastPageChange = millis();
+      currentPageIndex = (currentPageIndex + 1) % displayManager.getPagesSize();
+      displayManager.setPage(currentPageIndex);
+    }
   }
 }
