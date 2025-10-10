@@ -87,6 +87,12 @@ void ClockWebServer::begin()
           config.setCelsius(request->hasParam("useCelsius"));
           config.save();
           request->send(200, "text/plain", "Settings saved successfully!"); });
+
+    server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+          request->send(200, "text/plain", "Rebooting...");
+          delay(100); // Give the server time to send the response
+          ESP.restart(); });
   }
 
   server.begin();

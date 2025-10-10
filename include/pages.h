@@ -214,42 +214,85 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
   <title>Clock Settings</title>
   %HEAD%
 </head>
-<body>
-  <div class="container mt-5">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h1 class="card-title text-center mb-4">Clock Settings</h1>
-        <form action="/settings/save" method="POST">
-        
-          <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-            <label class="form-check-label" for="auto-brightness">Auto Brightness</label>
-            <input class="form-check-input" type="checkbox" role="switch" id="auto-brightness" name="autoBrightness" %AUTO_BRIGHTNESS_CHECKED%>
-          </div>
+  <body>
+    <div class="container mt-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h1 class="card-title text-center mb-4">Clock Settings</h1>
+          <form action="/settings/save" method="POST">
+            <div
+              class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
+              <label class="form-check-label" for="auto-brightness">Auto Brightness</label>
+              <input
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                id="auto-brightness"
+                name="autoBrightness"
+                %AUTO_BRIGHTNESS_CHECKED% />
+            </div>
 
-          <div class="mb-3 p-3 border rounded">
-            <label for="brightness" class="form-label">Manual Brightness</label>
-            <input type="range" class="form-range" id="brightness" name="brightness" min="10" max="255" value="%BRIGHTNESS_VALUE%">
-          </div>
-          
-          <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-            <label class="form-check-label" for="24hour">24-Hour Format</label>
-            <input class="form-check-input" type="checkbox" role="switch" id="24hour" name="use24HourFormat" %IS_24_HOUR_CHECKED%>
-          </div>
-          
-          <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-            <label class="form-check-label" for="celsius">Use Celsius (&deg;C)</label>
-            <input class="form-check-input" type="checkbox" role="switch" id="celsius" name="useCelsius" %USE_CELSIUS_CHECKED%>
-          </div>
+            <div class="mb-3 p-3 border rounded">
+              <label for="brightness" class="form-label">Manual Brightness</label>
+              <input
+                type="range"
+                class="form-range"
+                id="brightness"
+                name="brightness"
+                min="10"
+                max="255"
+                value="%BRIGHTNESS_VALUE%" />
+            </div>
 
-          <div class="d-grid gap-2 mt-4">
-            <button type="submit" class="btn btn-success">Save Settings</button>
-            <a href="/" class="btn btn-secondary">Back to Menu</a>
-          </div>
-        </form>
+            <div
+              class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
+              <label class="form-check-label" for="24hour">24-Hour Format</label>
+              <input
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                id="24hour"
+                name="use24HourFormat"
+                %IS_24_HOUR_CHECKED% />
+            </div>
+
+            <div
+              class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
+              <label class="form-check-label" for="celsius">Use Celsius (&deg;C)</label>
+              <input
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                id="celsius"
+                name="useCelsius"
+                %USE_CELSIUS_CHECKED% />
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+              <button type="submit" class="btn btn-success">Save Settings</button>
+              <a href="/" class="btn btn-secondary">Back to Menu</a>
+              <button type="button" class="btn btn-danger w-100 mt-3" onclick="rebootDevice()">
+                Reboot Device
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
-  </div>
-</body>
+    <script>
+      function rebootDevice() {
+        if (confirm("Are you sure you want to reboot the device?")) {
+          fetch("/reboot").then((response) => {
+            if (response.ok) {
+              alert("Device is rebooting...");
+            } else {
+              alert("Failed to send reboot command.");
+            }
+          });
+        }
+      }
+    </script>
+  </body>
 </html>
 )rawliteral";
 #endif // PAGES_H
