@@ -1,15 +1,15 @@
-// utils.cpp
+// utils.cpp (NOT USED ANYMORE)
 
 #include "utils.h" // Include the header file
 
-// Define the array of day name abbreviations.
-const char *dayNames[] = {
-    "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+// // Define the array of day name abbreviations.
+// const char *dayNames[] = {
+//     "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
 
-// Define the array of month name abbreviations.
-const char *monthNames[] = {
-    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+// // Define the array of month name abbreviations.
+// const char *monthNames[] = {
+//     "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+//     "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
 
 void printChipInfo()
 {
