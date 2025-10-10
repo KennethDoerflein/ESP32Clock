@@ -5,9 +5,11 @@ void DisplayManager::begin(TFT_eSPI &tft_instance)
   this->tft = &tft_instance;
 }
 
-void DisplayManager::addPage(Page *page)
+#include <utility> // For std::move
+
+void DisplayManager::addPage(std::unique_ptr<Page> page)
 {
-  pages.push_back(page);
+  pages.push_back(std::move(page));
 }
 
 void DisplayManager::setPage(int index, bool forceRedraw)
@@ -29,7 +31,7 @@ void DisplayManager::setPage(int index, bool forceRedraw)
   }
 
   currentPageIndex = index;
-  currentPage = pages[currentPageIndex];
+  currentPage = pages[currentPageIndex].get();
   currentPage->onEnter(*tft);
 }
 

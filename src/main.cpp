@@ -27,12 +27,6 @@
 #include "pages/InfoPage.h"
 #include "ClockWebServer.h"
 
-class Display;
-
-// Define page instances
-std::unique_ptr<ClockPage> clockPage;
-std::unique_ptr<InfoPage> infoPage;
-
 /**
  * @brief The main setup function, run once on boot.
  */
@@ -44,11 +38,6 @@ void setup()
   ConfigManager::getInstance().begin();
   auto &display = Display::getInstance();
   display.begin();
-
-  // Now that the display is initialized, create the pages that need it.
-  // Using std::unique_ptr to safely manage the memory.
-  clockPage.reset(new ClockPage(&display.getTft()));
-  infoPage.reset(new InfoPage());
 
   setupSensors();
   display.drawStatusMessage("Initializing...");
@@ -70,9 +59,9 @@ void setup()
   auto &displayManager = DisplayManager::getInstance();
   displayManager.begin(display.getTft());
 
-  // Add pages to the manager. Use .get() to pass the raw pointer.
-  displayManager.addPage(clockPage.get());
-  displayManager.addPage(infoPage.get());
+  // Add pages to the manager. Ownership is moved to the manager.
+  displayManager.addPage(std::make_unique<ClockPage>(&display.getTft()));
+  displayManager.addPage(std::make_unique<InfoPage>());
 
   // If connected, set up the main display and sync time.
   if (WiFiManager::getInstance().isConnected())
