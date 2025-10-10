@@ -13,6 +13,7 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <WiFi.h>
+#include <memory> // For std::unique_ptr
 
 // Include all custom module headers.
 #include "ConfigManager.h"
@@ -29,7 +30,7 @@
 class Display;
 
 // Define page instances
-ClockPage *clockPage = nullptr;
+std::unique_ptr<ClockPage> clockPage;
 InfoPage infoPage;
 
 /**
@@ -45,7 +46,8 @@ void setup()
   display.begin();
 
   // Now that the display is initialized, create the pages that need it.
-  clockPage = new ClockPage(&display.getTft());
+  // Using std::unique_ptr to safely manage the memory.
+  clockPage.reset(new ClockPage(&display.getTft()));
 
   setupSensors();
   display.drawStatusMessage("Initializing...");
@@ -60,8 +62,8 @@ void setup()
   auto &displayManager = DisplayManager::getInstance();
   displayManager.begin(display.getTft());
 
-  // Add pages to the manager
-  displayManager.addPage(clockPage);
+  // Add pages to the manager. Use .get() to pass the raw pointer.
+  displayManager.addPage(clockPage.get());
   displayManager.addPage(&infoPage);
 
   // If connected, set up the main display and sync time.
@@ -117,7 +119,7 @@ void loop()
       Serial.println("Configuration reloaded and page refreshed.");
     }
 
-    // Simple page switching logic for until button is added
+    // Simple page switching logic for until a button is added
     if (millis() - lastPageChange > 10000) // Switch every 10 seconds
     {
       lastPageChange = millis();
