@@ -150,52 +150,39 @@ void TimeManager::checkAlarms()
 
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    const Alarm &alarm = config.getAlarm(i);
+    // Get a mutable copy of the alarm to work with.
+    Alarm alarm = config.getAlarm(i);
 
-    if (!alarm.enabled)
+    if (!alarm.isEnabled())
     {
       continue;
     }
 
-    // Check if snooze time has passed.
-    if (alarm.snoozed && millis() > alarm.snoozeUntil)
+    // Update snooze state. If snooze ends, the alarm state is modified.
+    bool needsSave = alarm.updateSnooze();
+
+    // Check if the alarm should ring now.
+    if (alarm.shouldRing(now))
     {
-      // Snooze is over, so we need to make a mutable copy to update it.
-      Alarm mutableAlarm = alarm;
-      mutableAlarm.snoozed = false;
-      mutableAlarm.snoozeUntil = 0;
-      config.setAlarm(i, mutableAlarm);
-      // Continue to check if it should ring again now.
+      AlarmManager::getInstance().trigger(alarm.getId());
+      // A one-time alarm disables itself after ringing.
+      if (alarm.getDays() == 0)
+      {
+        alarm.dismiss(); // This sets enabled to false.
+        needsSave = true;
+      }
+      // Only trigger one alarm per minute.
+      if (needsSave)
+      {
+        config.setAlarm(i, alarm);
+      }
+      return;
     }
 
-    if (alarm.snoozed)
+    // If we didn't ring, but snooze state changed, we still need to save.
+    if (needsSave)
     {
-      continue;
-    }
-
-    if (alarm.hour == now.hour() && alarm.minute == now.minute())
-    {
-      // Time matches. Now check day of the week.
-      // RTClib dayOfTheWeek() is 0 for Sunday, 1 for Monday, etc.
-      // Our bitmask is DAY_SUN = 1 << 0, DAY_MON = 1 << 1, etc.
-      uint8_t todayBitmask = 1 << now.dayOfTheWeek();
-
-      // Check if it's a repeating alarm for today, or a one-time alarm.
-      if ((alarm.days & todayBitmask) > 0)
-      {
-        AlarmManager::getInstance().trigger(alarm);
-        return; // Only trigger one alarm at a time.
-      }
-      else if (alarm.days == 0)
-      {
-        // This is a one-time alarm.
-        AlarmManager::getInstance().trigger(alarm);
-        // Disable it so it doesn't ring again tomorrow.
-        Alarm mutableAlarm = alarm;
-        mutableAlarm.enabled = false;
-        config.setAlarm(i, mutableAlarm);
-        return;
-      }
+      config.setAlarm(i, alarm);
     }
   }
 }

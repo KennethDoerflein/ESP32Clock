@@ -7,16 +7,15 @@
 
 // Define the GPIO pin for the active buzzer
 #define BUZZER_PIN 4
-// Define the snooze duration in milliseconds (e.g., 5 minutes)
-#define SNOOZE_DURATION_MS (5 * 60 * 1000)
 
 /**
  * @class AlarmManager
- * @brief Manages the state of a ringing alarm, including audio and display feedback.
+ * @brief Manages the physical ringing of an alarm (buzzer and display).
  *
- * This singleton class is responsible for what happens when an alarm is triggered.
- * It controls the buzzer, manages the snooze and dismiss logic, and coordinates
- * with the DisplayManager to show the appropriate screen.
+ * This singleton class is a simple "ringer" service. It controls the buzzer,
+ * coordinates with the DisplayManager to show the ringing screen, and keeps
+ * track of the currently active alarm. The logic for snoozing and dismissing
+ * is handled by the Alarm class itself.
  */
 class AlarmManager
 {
@@ -37,31 +36,32 @@ public:
   void begin();
 
   /**
-   * @brief Updates the alarm manager's state. Should be called in the main loop.
+   * @brief Updates the alarm manager's state (e.g., beeping). Should be in the main loop.
    */
   void update();
 
   /**
    * @brief Triggers the alarm to start ringing.
-   * @param alarm The alarm that is being triggered.
+   * @param alarmId The ID of the alarm that is being triggered.
    */
-  void trigger(const Alarm &alarm);
+  void trigger(uint8_t alarmId);
 
   /**
-   * @brief Snoozes the currently ringing alarm.
+   * @brief Stops the alarm from ringing.
    */
-  void snooze();
-
-  /**
-   * @brief Dismisses the currently ringing alarm for the day.
-   */
-  void dismiss();
+  void stop();
 
   /**
    * @brief Checks if an alarm is currently ringing.
    * @return True if an alarm is active, false otherwise.
    */
   bool isRinging() const;
+
+  /**
+   * @brief Gets the ID of the currently ringing alarm.
+   * @return The ID of the active alarm, or -1 if no alarm is ringing.
+   */
+  int getActiveAlarmId() const;
 
 private:
   /**

@@ -132,6 +132,7 @@ void loop()
     // Perform periodic tasks.
     alarmManager.update();
     timeManager.update();
+    timeManager.checkAlarms();
     display.updateBrightness();
     handleSensorUpdates();
 
@@ -156,13 +157,24 @@ void loop()
 
       if (alarmManager.isRinging())
       {
-        if (pressDuration > 10000)
-        { // Long press (> 10 seconds)
-          alarmManager.dismiss();
-        }
-        else
-        { // Short press
-          alarmManager.snooze();
+        int alarmId = alarmManager.getActiveAlarmId();
+        if (alarmId != -1)
+        {
+          auto &config = ConfigManager::getInstance();
+          Alarm alarm = config.getAlarm(alarmId); // Get a copy
+
+          if (pressDuration > 10000) // Long press (> 10 seconds) to dismiss
+          {
+            Serial.println("Long press detected. Dismissing alarm.");
+            alarm.dismiss();
+          }
+          else // Short press to snooze
+          {
+            Serial.println("Short press detected. Snoozing alarm.");
+            alarm.snooze();
+          }
+          config.setAlarm(alarmId, alarm); // Save the updated state
+          alarmManager.stop();             // Stop the physical ringing
         }
       }
       else
@@ -181,7 +193,7 @@ void loop()
     bool anyAlarmEnabled = false;
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
-      if (config.getAlarm(i).enabled)
+      if (config.getAlarm(i).isEnabled())
       {
         anyAlarmEnabled = true;
         break;

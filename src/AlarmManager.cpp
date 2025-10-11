@@ -1,7 +1,6 @@
 // AlarmManager.cpp
 
 #include "AlarmManager.h"
-#include "ConfigManager.h"
 #include "DisplayManager.h"
 
 void AlarmManager::begin()
@@ -21,38 +20,14 @@ void AlarmManager::update()
   digitalWrite(BUZZER_PIN, buzzerOn ? HIGH : LOW);
 }
 
-void AlarmManager::snooze()
+void AlarmManager::stop()
 {
   if (!_isRinging)
     return;
 
-  Serial.printf("Snoozing alarm ID %d\n", _activeAlarmId);
+  Serial.printf("Stopping alarm ID %d\n", _activeAlarmId);
   digitalWrite(BUZZER_PIN, LOW); // Turn off buzzer
   _isRinging = false;
-
-  auto &config = ConfigManager::getInstance();
-  Alarm snoozedAlarm = config.getAlarm(_activeAlarmId);
-  snoozedAlarm.snoozed = true;
-  snoozedAlarm.snoozeUntil = millis() + SNOOZE_DURATION_MS;
-  config.setAlarm(_activeAlarmId, snoozedAlarm);
-
-  _activeAlarmId = -1;
-
-  // Force a redraw to clear the "RINGING!" message
-  DisplayManager::getInstance().setPage(DisplayManager::getInstance().getCurrentPageIndex(), true);
-}
-
-void AlarmManager::dismiss()
-{
-  if (!_isRinging)
-    return;
-
-  Serial.printf("Dismissing alarm ID %d\n", _activeAlarmId);
-  digitalWrite(BUZZER_PIN, LOW); // Turn off buzzer
-  _isRinging = false;
-
-  // For a repeating alarm, this just stops it for today.
-  // For a one-time alarm, it's already been disabled by TimeManager.
   _activeAlarmId = -1;
 
   // Force a redraw to clear the "RINGING!" message
@@ -64,14 +39,19 @@ bool AlarmManager::isRinging() const
   return _isRinging;
 }
 
-void AlarmManager::trigger(const Alarm &alarm)
+int AlarmManager::getActiveAlarmId() const
+{
+  return _activeAlarmId;
+}
+
+void AlarmManager::trigger(uint8_t alarmId)
 {
   if (_isRinging)
     return; // Don't trigger if another is already active
 
-  Serial.printf("Triggering alarm ID %d\n", alarm.id);
+  Serial.printf("Triggering alarm ID %d\n", alarmId);
   _isRinging = true;
-  _activeAlarmId = alarm.id;
+  _activeAlarmId = alarmId;
 
   // Show the ringing screen
   DisplayManager::getInstance().showAlarmScreen();

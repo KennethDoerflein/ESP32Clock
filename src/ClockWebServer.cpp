@@ -60,11 +60,11 @@ void ClockWebServer::begin()
       for (int i = 0; i < config.getNumAlarms(); ++i) {
         const Alarm& alarm = config.getAlarm(i);
         JsonObject alarmObj = alarmsArray.add<JsonObject>();
-        alarmObj["id"] = alarm.id;
-        alarmObj["enabled"] = alarm.enabled;
-        alarmObj["hour"] = alarm.hour;
-        alarmObj["minute"] = alarm.minute;
-        alarmObj["days"] = alarm.days;
+        alarmObj["id"] = alarm.getId();
+        alarmObj["enabled"] = alarm.isEnabled();
+        alarmObj["hour"] = alarm.getHour();
+        alarmObj["minute"] = alarm.getMinute();
+        alarmObj["days"] = alarm.getDays();
       }
       
       String response;
@@ -106,11 +106,11 @@ void ClockWebServer::begin()
             int id = alarmObj["id"] | -1;
             if (id >= 0 && id < config.getNumAlarms()) {
               Alarm alarm;
-              alarm.id = id;
-              alarm.enabled = alarmObj["enabled"] | false;
-              alarm.hour = alarmObj["hour"] | 8;
-              alarm.minute = alarmObj["minute"] | 0;
-              alarm.days = alarmObj["days"] | 0;
+              alarm.setId(id);
+              alarm.setEnabled(alarmObj["enabled"] | false);
+              alarm.setHour(alarmObj["hour"] | 6);
+              alarm.setMinute(alarmObj["minute"] | 0);
+              alarm.setDays(alarmObj["days"] | 0);
               config.setAlarm(id, alarm);
             }
           }

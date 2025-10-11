@@ -35,7 +35,7 @@ void ConfigManager::setDefaults()
   for (int i = 0; i < MAX_ALARMS; ++i)
   {
     _alarms[i] = Alarm(); // Reset to default constructor
-    _alarms[i].id = i;
+    _alarms[i].setId(i);
   }
 
   Serial.println("Loaded default configuration.");
@@ -99,11 +99,11 @@ void ConfigManager::load()
     {
       if (i >= MAX_ALARMS)
         break;
-      _alarms[i].id = alarmObj["id"] | i;
-      _alarms[i].enabled = alarmObj["enabled"] | false;
-      _alarms[i].hour = alarmObj["hour"] | 8;
-      _alarms[i].minute = alarmObj["minute"] | 0;
-      _alarms[i].days = alarmObj["days"] | 0;
+      _alarms[i].setId(alarmObj["id"] | i);
+      _alarms[i].setEnabled(alarmObj["enabled"] | false);
+      _alarms[i].setHour(alarmObj["hour"] | 6);
+      _alarms[i].setMinute(alarmObj["minute"] | 0);
+      _alarms[i].setDays(alarmObj["days"] | 0);
       i++;
     }
   }
@@ -135,11 +135,11 @@ bool ConfigManager::save()
   for (int i = 0; i < MAX_ALARMS; ++i)
   {
     JsonObject alarmObj = alarmsArray.add<JsonObject>();
-    alarmObj["id"] = _alarms[i].id;
-    alarmObj["enabled"] = _alarms[i].enabled;
-    alarmObj["hour"] = _alarms[i].hour;
-    alarmObj["minute"] = _alarms[i].minute;
-    alarmObj["days"] = _alarms[i].days;
+    alarmObj["id"] = _alarms[i].getId();
+    alarmObj["enabled"] = _alarms[i].isEnabled();
+    alarmObj["hour"] = _alarms[i].getHour();
+    alarmObj["minute"] = _alarms[i].getMinute();
+    alarmObj["days"] = _alarms[i].getDays();
   }
 
   // Serialize the JSON document into the file.
