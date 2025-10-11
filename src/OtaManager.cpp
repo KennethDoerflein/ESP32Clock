@@ -5,7 +5,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
-#include "pages.h" // For UPDATE_PAGE_HTML
+#include "web_content.h" // For UPDATE_PAGE_HTML
 
 // --- GitHub OTA Configuration ---
 #define GITHUB_REPO "KennethDoerflein/ESP32Clock"

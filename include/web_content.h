@@ -1,10 +1,10 @@
-// pages.h
+// web_content.h
 
-#ifndef PAGES_H
-#define PAGES_H
+#ifndef WEB_CONTENT_H
+#define WEB_CONTENT_H
 
 /**
- * @file pages.h
+ * @file web_content.h
  * @brief Contains the HTML, CSS, and JavaScript for the web interface.
  *
  * All content is stored as C-style string literals in PROGMEM to conserve RAM.

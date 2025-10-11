@@ -4,7 +4,7 @@
 #include "ConfigManager.h"
 #include "OtaManager.h"
 #include "WiFiManager.h"
-#include "pages.h"
+#include "web_content.h"
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <WiFi.h>
