@@ -169,6 +169,7 @@ This project is broken down into phases to prioritize a functional base clock be
 - [ ] **Audio Feedback:**
   - [ ] Implement progressive alarm volume (ramping).
   - [ ] Add different sound options for the alarm.
-- [x] **Display Feedback:**
+- [ ] **Display Feedback:**
   - [x] Show a visual indicator on the display when an alarm is set.
   - [x] Show a "ringing" screen when an alarm is active.
+  - [ ] Add a snooze countdown
