@@ -30,6 +30,9 @@ private:
   void drawTemperature(TFT_eSPI &tft);
   void drawHumidity(TFT_eSPI &tft);
 
+  // Flag to track sprite creation
+  bool _spritesCreated = false;
+
   // Sprites for this page, initialized in the constructor
   TFT_eSprite sprClock;
   TFT_eSprite sprDayOfWeek;

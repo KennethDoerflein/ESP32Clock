@@ -14,18 +14,19 @@ void TimeManager::begin()
   syncWithNTP();
 }
 
-void TimeManager::update()
+bool TimeManager::update()
 {
   // Use a non-blocking delay to run the update logic approximately once per second.
   unsigned long currentMillis = millis();
   if (currentMillis - lastUpdate < UPDATE_INTERVAL)
   {
-    return; // Not time to update yet
+    return false; // No update occurred.
   }
   lastUpdate = currentMillis;
 
   // Perform routine checks, like the daily time sync.
   checkDailySync();
+  return true; // An update occurred.
 }
 
 void TimeManager::syncWithNTP()

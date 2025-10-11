@@ -24,18 +24,16 @@ void ClockPage::onEnter(TFT_eSPI &tft)
 {
   tft.fillScreen(TFT_BLACK);
   setupLayout(tft);
-  setupSprites(tft);
+  if (!_spritesCreated)
+  {
+    setupSprites(tft);
+    _spritesCreated = true;
+  }
 }
 
 void ClockPage::onExit()
 {
-  // Delete sprites to free up memory
-  sprClock.deleteSprite();
-  sprDayOfWeek.deleteSprite();
-  sprDate.deleteSprite();
-  sprTemp.deleteSprite();
-  sprHumidity.deleteSprite();
-  sprTOD.deleteSprite();
+  // Sprites are no longer deleted on exit to preserve them.
 }
 
 void ClockPage::update()

@@ -39,8 +39,9 @@ public:
    *
    * This method should be called repeatedly in the main loop. It handles
    * periodic tasks, such as the daily NTP sync check.
+   * @return true if a time update occurred (typically once per second).
    */
-  void update();
+  bool update();
 
   /**
    * @brief Checks all active alarms to see if any should be triggered.

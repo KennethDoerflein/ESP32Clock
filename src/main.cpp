@@ -30,8 +30,10 @@
 
 // --- Pin Definitions ---
 #define SNOOZE_BUTTON_PIN 5
+#define LOOP_INTERVAL 100 // Interval for the main loop in milliseconds
 
-// --- Global Variables for Button Handling ---
+// --- Global Variables for Timers & Button Handling ---
+unsigned long lastLoopTime = 0;
 volatile unsigned long buttonPressTime = 0;
 volatile unsigned long buttonReleaseTime = 0;
 volatile bool buttonState = HIGH; // Start with the button not pressed
@@ -113,13 +115,19 @@ void setup()
  */
 void loop()
 {
-  static unsigned long lastPageChange = 0;
-  static int currentPageIndex = 0;
-
-  delay(100); // Small delay to yield to other tasks.
-
   // Handle DNS requests for the captive portal if it's active.
   WiFiManager::getInstance().handleDns();
+
+  // Implement a non-blocking delay.
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastLoopTime < LOOP_INTERVAL)
+  {
+    // Yield to other tasks, especially the web server, when not busy.
+    // A small delay helps prevent watchdog timeouts on ESP32.
+    delay(1);
+    return;
+  }
+  lastLoopTime = currentMillis;
 
   // Only run the main clock logic if WiFi is connected.
   if (WiFiManager::getInstance().isConnected())
@@ -131,13 +139,16 @@ void loop()
 
     // Perform periodic tasks.
     alarmManager.update();
-    timeManager.update();
+    bool timeUpdated = timeManager.update();
     timeManager.checkAlarms();
     display.updateBrightness();
     handleSensorUpdates();
 
-    // Update the current display page
-    displayManager.update();
+    // Update the current display page only if the time has changed.
+    if (timeUpdated)
+    {
+      displayManager.update();
+    }
 
     // Check if settings have changed and need a reload.
     auto &config = ConfigManager::getInstance();
