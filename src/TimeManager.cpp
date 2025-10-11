@@ -139,19 +139,38 @@ void TimeManager::checkAlarms()
   }
 
   DateTime now = RTC.now();
+  uint32_t nowSeconds = now.unixtime();
 
-  // Only check once per minute to avoid re-triggering.
-  if (now.minute() == _lastMinuteChecked)
+  // On first run, initialize the last checked time and do nothing.
+  if (_lastTimeChecked == 0)
   {
+    _lastTimeChecked = nowSeconds;
     return;
   }
-  _lastMinuteChecked = now.minute();
+
+  uint32_t lastCheckSeconds = _lastTimeChecked;
+
+  // If time has not advanced or went backwards, do nothing.
+  if (nowSeconds <= lastCheckSeconds)
+  {
+    _lastTimeChecked = nowSeconds; // Keep track of potential time jumps
+    return;
+  }
+
+  // To prevent a huge loop if the device was off, cap the catch-up time.
+  // 1 hour should be more than enough to cover any reasonable NTP sync delay.
+  const uint32_t maxCatchUpSeconds = 1 * 60 * 60;
+  if (nowSeconds > lastCheckSeconds + maxCatchUpSeconds)
+  {
+    lastCheckSeconds = nowSeconds - maxCatchUpSeconds;
+  }
 
   auto &config = ConfigManager::getInstance();
+  bool alarmJustTriggered = false;
 
+  // We iterate through each of the alarms first.
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    // Get a mutable copy of the alarm to work with.
     Alarm alarm = config.getAlarm(i);
 
     if (!alarm.isEnabled())
@@ -159,31 +178,43 @@ void TimeManager::checkAlarms()
       continue;
     }
 
-    // Update snooze state. If snooze ends, the alarm state is modified.
+    // Snooze logic is always based on the real current time ("now").
+    // If the snooze period ends, updateSnooze will re-enable the alarm.
     bool needsSave = alarm.updateSnooze();
 
-    // Check if the alarm should ring now.
-    if (alarm.shouldRing(now))
+    // Now, check every minute between the last check and the current time
+    // to see if this alarm should have rung.
+    // We start from the beginning of the *next* minute after the last check.
+    DateTime t = DateTime(lastCheckSeconds);
+    DateTime startTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute()) + TimeSpan(0, 0, 1, 0);
+
+    for (DateTime checkMinute = startTime; checkMinute <= now; checkMinute = checkMinute + TimeSpan(0, 0, 1, 0))
     {
-      AlarmManager::getInstance().trigger(alarm.getId());
-      // A one-time alarm disables itself after ringing.
-      if (alarm.getDays() == 0)
+      if (alarm.shouldRing(checkMinute))
       {
-        alarm.dismiss(); // This sets enabled to false.
-        needsSave = true;
+        AlarmManager::getInstance().trigger(alarm.getId());
+        alarmJustTriggered = true;
+
+        if (alarm.getDays() == 0)
+        {
+          alarm.dismiss();
+          needsSave = true;
+        }
+        break; // Stop checking minutes for this alarm
       }
-      // Only trigger one alarm per minute.
-      if (needsSave)
-      {
-        config.setAlarm(i, alarm);
-      }
-      return;
     }
 
-    // If we didn't ring, but snooze state changed, we still need to save.
     if (needsSave)
     {
       config.setAlarm(i, alarm);
     }
+
+    if (alarmJustTriggered)
+    {
+      break; // Exit the main alarm loop
+    }
   }
+
+  // Always update the last checked time to the current time.
+  _lastTimeChecked = nowSeconds;
 }

@@ -109,7 +109,7 @@ private:
   /// @brief The interval at which the `update` method runs its checks, in milliseconds.
   static constexpr unsigned long UPDATE_INTERVAL = 1000; // 1 second
 
-  uint8_t _lastMinuteChecked = 60; ///< Stores the last minute an alarm check was performed.
+  uint32_t _lastTimeChecked = 0; ///< Stores the Unix timestamp of the last alarm check.
 
   /**
    * @brief Checks if a daily NTP sync is needed and performs it.
