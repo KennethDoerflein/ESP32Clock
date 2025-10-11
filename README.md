@@ -169,3 +169,4 @@ This project is broken down into phases to prioritize a functional base clock be
 - [ ] **Display Feedback:**
   - [ ] Show a visual indicator on the display when an alarm is set.
   - [ ] Show a "ringing" screen when an alarm is active.
+- [ ] Significantly increase 5 alarm limit

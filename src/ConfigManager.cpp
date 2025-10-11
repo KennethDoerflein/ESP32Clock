@@ -31,6 +31,13 @@ void ConfigManager::setDefaults()
   brightness = 128;        // Default brightness at 50%
   use24HourFormat = false; // Default to 12-hour format
   useCelsius = false;      // Default to Fahrenheit
+
+  for (int i = 0; i < MAX_ALARMS; ++i)
+  {
+    _alarms[i] = Alarm(); // Reset to default constructor
+    _alarms[i].id = i;
+  }
+
   Serial.println("Loaded default configuration.");
 }
 
@@ -83,6 +90,24 @@ void ConfigManager::load()
   use24HourFormat = doc["use24HourFormat"] | false;
   useCelsius = doc["useCelsius"] | false;
 
+  // Deserialize the alarms array
+  JsonArray alarmsArray = doc["alarms"];
+  if (!alarmsArray.isNull())
+  {
+    int i = 0;
+    for (JsonObject alarmObj : alarmsArray)
+    {
+      if (i >= MAX_ALARMS)
+        break;
+      _alarms[i].id = alarmObj["id"] | i;
+      _alarms[i].enabled = alarmObj["enabled"] | false;
+      _alarms[i].hour = alarmObj["hour"] | 8;
+      _alarms[i].minute = alarmObj["minute"] | 0;
+      _alarms[i].days = alarmObj["days"] | 0;
+      i++;
+    }
+  }
+
   Serial.println("Configuration loaded successfully.");
 }
 
@@ -105,6 +130,18 @@ bool ConfigManager::save()
   doc["use24HourFormat"] = use24HourFormat;
   doc["useCelsius"] = useCelsius;
 
+  // Serialize the alarms array
+  JsonArray alarmsArray = doc["alarms"].to<JsonArray>();
+  for (int i = 0; i < MAX_ALARMS; ++i)
+  {
+    JsonObject alarmObj = alarmsArray.add<JsonObject>();
+    alarmObj["id"] = _alarms[i].id;
+    alarmObj["enabled"] = _alarms[i].enabled;
+    alarmObj["hour"] = _alarms[i].hour;
+    alarmObj["minute"] = _alarms[i].minute;
+    alarmObj["days"] = _alarms[i].days;
+  }
+
   // Serialize the JSON document into the file.
   if (serializeJson(doc, configFile) == 0)
   {
@@ -118,4 +155,31 @@ bool ConfigManager::save()
   configFile.close();
   Serial.println("Configuration saved.");
   return true;
+}
+
+const Alarm &ConfigManager::getAlarm(int index) const
+{
+  if (index < 0 || index >= MAX_ALARMS)
+  {
+    // This is an error, restart the system.
+    Serial.println("FATAL: Alarm index out of bounds!");
+    ESP.restart(); // Restart the ESP32 to recover
+  }
+  return _alarms[index];
+}
+
+int ConfigManager::getNumAlarms() const
+{
+  return MAX_ALARMS;
+}
+
+void ConfigManager::setAlarm(int index, const Alarm &alarm)
+{
+  if (index < 0 || index >= MAX_ALARMS)
+  {
+    Serial.println("ERROR: Alarm index out of bounds!");
+    return;
+  }
+  _alarms[index] = alarm;
+  _isDirty = true;
 }

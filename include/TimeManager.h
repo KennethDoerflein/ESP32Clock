@@ -43,6 +43,13 @@ public:
   void update();
 
   /**
+   * @brief Checks all active alarms to see if any should be triggered.
+   *
+   * This should be called frequently from the main loop.
+   */
+  void checkAlarms();
+
+  /**
    * @brief Forces a time synchronization with the NTP server.
    *
    * This function attempts to connect to an NTP server to update the RTC.
@@ -100,6 +107,8 @@ private:
 
   /// @brief The interval at which the `update` method runs its checks, in milliseconds.
   static constexpr unsigned long UPDATE_INTERVAL = 1000; // 1 second
+
+  uint8_t _lastMinuteChecked = 60; ///< Stores the last minute an alarm check was performed.
 
   /**
    * @brief Checks if a daily NTP sync is needed and performs it.

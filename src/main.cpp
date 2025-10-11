@@ -17,6 +17,7 @@
 
 // Include all custom module headers.
 #include "ConfigManager.h"
+#include "AlarmManager.h"
 #include "sensors.h"
 #include "display.h"
 #include "TimeManager.h"
@@ -27,6 +28,28 @@
 #include "pages/InfoPage.h"
 #include "ClockWebServer.h"
 
+// --- Pin Definitions ---
+#define SNOOZE_BUTTON_PIN 5
+
+// --- Global Variables for Button Handling ---
+volatile unsigned long buttonPressTime = 0;
+volatile unsigned long buttonReleaseTime = 0;
+volatile bool buttonState = HIGH; // Start with the button not pressed
+
+// --- Interrupt Service Routine (ISR) ---
+void IRAM_ATTR handleButtonInterrupt()
+{
+  buttonState = digitalRead(SNOOZE_BUTTON_PIN);
+  if (buttonState == LOW)
+  { // Button was just pressed
+    buttonPressTime = millis();
+  }
+  else
+  { // Button was just released
+    buttonReleaseTime = millis();
+  }
+}
+
 /**
  * @brief The main setup function, run once on boot.
  */
@@ -36,6 +59,14 @@ void setup()
 
   // Initialize managers and hardware.
   ConfigManager::getInstance().begin();
+
+  // Initialize the snooze button
+  pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
+
+  // Initialize the Alarm Manager
+  AlarmManager::getInstance().begin();
+
   auto &display = Display::getInstance();
   display.begin();
 
@@ -96,8 +127,10 @@ void loop()
     auto &timeManager = TimeManager::getInstance();
     auto &display = Display::getInstance();
     auto &displayManager = DisplayManager::getInstance();
+    auto &alarmManager = AlarmManager::getInstance();
 
     // Perform periodic tasks.
+    alarmManager.update();
     timeManager.update();
     display.updateBrightness();
     handleSensorUpdates();
@@ -116,12 +149,44 @@ void loop()
       Serial.println("Configuration reloaded and page refreshed.");
     }
 
-    // Simple page switching logic for until a button is added
-    if (millis() - lastPageChange > 10000) // Switch every 10 seconds
+    // --- Button Handling Logic ---
+    if (buttonReleaseTime > 0)
     {
-      lastPageChange = millis();
-      currentPageIndex = (currentPageIndex + 1) % displayManager.getPagesSize();
-      displayManager.setPage(currentPageIndex);
+      unsigned long pressDuration = buttonReleaseTime - buttonPressTime;
+
+      if (alarmManager.isRinging())
+      {
+        if (pressDuration > 10000)
+        { // Long press (> 10 seconds)
+          alarmManager.dismiss();
+        }
+        else
+        { // Short press
+          alarmManager.snooze();
+        }
+      }
+      else
+      {
+        // If not ringing, a short press cycles pages.
+        int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
+        displayManager.setPage(newIndex);
+      }
+
+      // Reset timers
+      buttonPressTime = 0;
+      buttonReleaseTime = 0;
     }
+
+    // --- Update Alarm Icon ---
+    bool anyAlarmEnabled = false;
+    for (int i = 0; i < config.getNumAlarms(); ++i)
+    {
+      if (config.getAlarm(i).enabled)
+      {
+        anyAlarmEnabled = true;
+        break;
+      }
+    }
+    displayManager.drawAlarmIcon(anyAlarmEnabled);
   }
 }

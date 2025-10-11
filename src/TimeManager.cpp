@@ -4,6 +4,7 @@
 #include "ntp.h"
 #include "sensors.h"
 #include "ConfigManager.h"
+#include "AlarmManager.h"
 
 void TimeManager::begin()
 {
@@ -124,6 +125,77 @@ void TimeManager::checkDailySync()
     {
       Serial.println("Performing daily 3 AM time sync...");
       syncWithNTP();
+    }
+  }
+}
+
+void TimeManager::checkAlarms()
+{
+  // If an alarm is already ringing, there's no need to check for others.
+  if (AlarmManager::getInstance().isRinging())
+  {
+    return;
+  }
+
+  DateTime now = RTC.now();
+
+  // Only check once per minute to avoid re-triggering.
+  if (now.minute() == _lastMinuteChecked)
+  {
+    return;
+  }
+  _lastMinuteChecked = now.minute();
+
+  auto &config = ConfigManager::getInstance();
+
+  for (int i = 0; i < config.getNumAlarms(); ++i)
+  {
+    const Alarm &alarm = config.getAlarm(i);
+
+    if (!alarm.enabled)
+    {
+      continue;
+    }
+
+    // Check if snooze time has passed.
+    if (alarm.snoozed && millis() > alarm.snoozeUntil)
+    {
+      // Snooze is over, so we need to make a mutable copy to update it.
+      Alarm mutableAlarm = alarm;
+      mutableAlarm.snoozed = false;
+      mutableAlarm.snoozeUntil = 0;
+      config.setAlarm(i, mutableAlarm);
+      // Continue to check if it should ring again now.
+    }
+
+    if (alarm.snoozed)
+    {
+      continue;
+    }
+
+    if (alarm.hour == now.hour() && alarm.minute == now.minute())
+    {
+      // Time matches. Now check day of the week.
+      // RTClib dayOfTheWeek() is 0 for Sunday, 1 for Monday, etc.
+      // Our bitmask is DAY_SUN = 1 << 0, DAY_MON = 1 << 1, etc.
+      uint8_t todayBitmask = 1 << now.dayOfTheWeek();
+
+      // Check if it's a repeating alarm for today, or a one-time alarm.
+      if ((alarm.days & todayBitmask) > 0)
+      {
+        AlarmManager::getInstance().trigger(alarm);
+        return; // Only trigger one alarm at a time.
+      }
+      else if (alarm.days == 0)
+      {
+        // This is a one-time alarm.
+        AlarmManager::getInstance().trigger(alarm);
+        // Disable it so it doesn't ring again tomorrow.
+        Alarm mutableAlarm = alarm;
+        mutableAlarm.enabled = false;
+        config.setAlarm(i, mutableAlarm);
+        return;
+      }
     }
   }
 }

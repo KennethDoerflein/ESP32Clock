@@ -63,6 +63,17 @@ public:
    */
   void update();
 
+  /**
+   * @brief Draws or erases the alarm indicator icon on the display.
+   * @param enabled True to draw the icon, false to erase it.
+   */
+  void drawAlarmIcon(bool enabled);
+
+  /**
+   * @brief Switches the display to the "ringing" screen.
+   */
+  void showAlarmScreen();
+
 private:
   DisplayManager() : tft(nullptr), currentPage(nullptr) {}
 
@@ -70,4 +81,5 @@ private:
   std::vector<std::unique_ptr<Page>> pages; ///< A list of all available pages.
   Page *currentPage;                        ///< Pointer to the currently active page.
   int currentPageIndex = -1;                ///< Index of the current page.
+  bool _alarmIconVisible = false;           ///< Tracks the current state of the alarm icon.
 };

@@ -47,6 +47,77 @@ void ClockWebServer::begin()
     server.on("/settings", HTTP_GET, [this](AsyncWebServerRequest *request)
               { onSettingsRequest(request); });
 
+    server.on("/alarms", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onAlarmsRequest(request); });
+
+    // --- API Handlers for Alarms ---
+    server.on("/api/alarms", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      auto& config = ConfigManager::getInstance();
+      JsonDocument doc;
+      JsonArray alarmsArray = doc.to<JsonArray>();
+
+      for (int i = 0; i < config.getNumAlarms(); ++i) {
+        const Alarm& alarm = config.getAlarm(i);
+        JsonObject alarmObj = alarmsArray.add<JsonObject>();
+        alarmObj["id"] = alarm.id;
+        alarmObj["enabled"] = alarm.enabled;
+        alarmObj["hour"] = alarm.hour;
+        alarmObj["minute"] = alarm.minute;
+        alarmObj["days"] = alarm.days;
+      }
+      
+      String response;
+      serializeJson(doc, response);
+      request->send(200, "application/json", response); });
+
+    server.on("/api/alarms/save", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+        
+        if (index == 0) {
+          // A new request has started. Create a buffer to hold the JSON data.
+          // We allocate it on the heap because it can be large.
+          request->_tempObject = new std::vector<uint8_t>();
+        }
+
+        std::vector<uint8_t>* buffer = (std::vector<uint8_t>*)request->_tempObject;
+        buffer->insert(buffer->end(), data, data + len);
+
+        if (index + len == total) {
+          // All data has been received.
+          JsonDocument doc;
+          DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
+          delete buffer; // Clean up the buffer
+          request->_tempObject = nullptr;
+
+          if (error) {
+            request->send(400, "text/plain", "Invalid JSON");
+            return;
+          }
+
+          JsonArray alarmsArray = doc.as<JsonArray>();
+          if (alarmsArray.isNull()) {
+            request->send(400, "text/plain", "Expected a JSON array");
+            return;
+          }
+
+          auto& config = ConfigManager::getInstance();
+          for (JsonObject alarmObj : alarmsArray) {
+            int id = alarmObj["id"] | -1;
+            if (id >= 0 && id < config.getNumAlarms()) {
+              Alarm alarm;
+              alarm.id = id;
+              alarm.enabled = alarmObj["enabled"] | false;
+              alarm.hour = alarmObj["hour"] | 8;
+              alarm.minute = alarmObj["minute"] | 0;
+              alarm.days = alarmObj["days"] | 0;
+              config.setAlarm(id, alarm);
+            }
+          }
+          config.save();
+          request->send(200, "text/plain", "Alarms saved successfully!");
+        } });
+
     // Lambda for settings save; it's simple enough not to need a full method.
     server.on("/settings/save", HTTP_POST, [](AsyncWebServerRequest *request)
               {
@@ -111,6 +182,17 @@ void ClockWebServer::onSettingsRequest(AsyncWebServerRequest *request)
     return;
   }
   request->send_P(200, "text/html", SETTINGS_PAGE_HTML, [this](const String &var)
+                  { return processor(var); });
+}
+
+void ClockWebServer::onAlarmsRequest(AsyncWebServerRequest *request)
+{
+  if (OtaManager::getInstance().isUpdating())
+  {
+    request->send(503, "text/plain", "Update in progress");
+    return;
+  }
+  request->send_P(200, "text/html", ALARMS_PAGE_HTML, [this](const String &var)
                   { return processor(var); });
 }
 

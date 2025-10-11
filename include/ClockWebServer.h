@@ -50,6 +50,7 @@ private:
   void onWifiRequest(AsyncWebServerRequest *request);
   void onWifiSaveRequest(AsyncWebServerRequest *request);
   void onSettingsRequest(AsyncWebServerRequest *request);
+  void onAlarmsRequest(AsyncWebServerRequest *request);
   void onCaptivePortalRequest(AsyncWebServerRequest *request);
 
   // --- Template Processor and Helpers ---

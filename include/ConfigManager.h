@@ -3,6 +3,9 @@
 #pragma once
 
 #include <Arduino.h>
+#include "Alarm.h"
+
+const int MAX_ALARMS = 5; // Maximum number of alarms that can be set
 
 /**
  * @class ConfigManager
@@ -46,6 +49,19 @@ public:
    * @return The WiFi SSID as a String.
    */
   String getWifiSSID() const { return wifiSSID; }
+
+  /**
+   * @brief Gets a specific alarm by its index.
+   * @param index The index of the alarm.
+   * @return A constant reference to the Alarm object.
+   */
+  const Alarm &getAlarm(int index) const;
+
+  /**
+   * @brief Gets the total number of alarms.
+   * @return The number of alarms.
+   */
+  int getNumAlarms() const;
 
   /**
    * @brief Gets the stored WiFi password.
@@ -139,6 +155,13 @@ public:
   }
 
   /**
+   * @brief Updates an alarm at a specific index.
+   * @param index The index of the alarm to update.
+   * @param alarm The new alarm data.
+   */
+  void setAlarm(int index, const Alarm &alarm);
+
+  /**
    * @brief Checks if the configuration has been modified since the last save.
    * @return True if the configuration is "dirty", false otherwise.
    */
@@ -163,6 +186,7 @@ private:
   bool use24HourFormat = false;
   bool useCelsius = false;
   bool _isDirty;
+  Alarm _alarms[MAX_ALARMS];
 
   /**
    * @brief Loads the configuration from the JSON file.
