@@ -113,7 +113,7 @@ The web interface provides access to all the clock's settings.
 
 This project is broken down into phases to prioritize a functional base clock before implementing more complex features.
 
-### Phase 1: Core Functionality (Untested)
+### Phase 1: Core Functionality (Complete: Untested)
 
 - [x] **Hardware Integration:** Connect ESP32-S3 with ILI9488 display, DS3231 RTC, and BME280 sensor.
 - [x] **Display Logic:**
@@ -128,7 +128,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Store and retrieve settings from LittleFS.
   - [x] Set up initial Wi-Fi credentials via a captive portal.
 
-### Phase 2: Web Interface & Advanced Configuration (Untested)
+### Phase 2: Web Interface & Advanced Configuration (In Progress)
 
 - [x] **UI/UX Enhancements:**
 
@@ -137,7 +137,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] Add button to change hostname to the web interface.
   - [ ] Add option to reset to defaults to the web interface.
 
-- [ ] **Settings Management:**
+- [x] **Settings Management:**
   - [x] **Display Options:**
     - [x] Toggle between 12/24-hour format.
     - [x] Toggle between Celsius/Fahrenheit.
@@ -149,17 +149,19 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Provide OTA updates via file upload.
   - [x] Provide OTA updates directly from GitHub releases.
 
-### Phase 3: Alarms & User Interaction
+### Phase 3: Alarms & User Interaction (In Progress)
 
-- [ ] **Alarm Management:**
-  - [ ] **Backend:**
-    - [ ] Define a data structure to store multiple alarms.
-    - [ ] Save and load alarms from persistent storage.
-    - [ ] Implement logic to trigger an alarm at the set time.
-  - [ ] **Web Interface:**
-    - [ ] Create a UI to add, edit, and delete alarms.
-    - [ ] Allow setting the time for each alarm.
-    - [ ] Allow setting which days of the week an alarm repeats.
+- [x] **Alarm Management:**
+  - [x] **Backend:**
+    - [x] Define a data structure to store multiple alarms.
+    - [x] Save and load alarms from persistent storage.
+    - [x] Implement logic to trigger an alarm at the set time.
+  - [x] **Web Interface:**
+    - [x] Create a UI to edit alarms.
+    - [ ] Create a UI to add, and delete alarms.
+    - [x] Allow setting the time for each alarm.
+    - [x] Allow setting which days of the week an alarm repeats.
+    - [ ] Significantly increase 5 alarm limit
   - [ ] **Hardware Interaction:**
     - [ ] Use a physical button to snooze a ringing alarm.
     - [ ] Use a long-press on the physical button to permanently dismiss a ringing alarm for the day.
@@ -169,4 +171,3 @@ This project is broken down into phases to prioritize a functional base clock be
 - [ ] **Display Feedback:**
   - [ ] Show a visual indicator on the display when an alarm is set.
   - [ ] Show a "ringing" screen when an alarm is active.
-- [ ] Significantly increase 5 alarm limit
