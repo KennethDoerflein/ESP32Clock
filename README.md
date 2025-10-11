@@ -163,11 +163,12 @@ This project is broken down into phases to prioritize a functional base clock be
     - [x] Allow setting which days of the week an alarm repeats.
     - [ ] Significantly increase 5 alarm limit
   - [ ] **Hardware Interaction:**
-    - [ ] Use a physical button to snooze a ringing alarm.
-    - [ ] Use a long-press on the physical button to permanently dismiss a ringing alarm for the day.
+    - [x] Use a physical button to snooze a ringing alarm.
+    - [x] Use a long-press on the physical button to permanently dismiss a ringing alarm for the day.
+    - [ ] Implement a factory reset by long-pressing the boot button.
 - [ ] **Audio Feedback:**
   - [ ] Implement progressive alarm volume (ramping).
   - [ ] Add different sound options for the alarm.
-- [ ] **Display Feedback:**
-  - [ ] Show a visual indicator on the display when an alarm is set.
-  - [ ] Show a "ringing" screen when an alarm is active.
+- [x] **Display Feedback:**
+  - [x] Show a visual indicator on the display when an alarm is set.
+  - [x] Show a "ringing" screen when an alarm is active.
