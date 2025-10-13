@@ -14,7 +14,7 @@ jobs:
 
     permissions:
       contents: write
-      
+
     steps:
       # 1. Checkout the repository code
       - name: Checkout code
@@ -47,7 +47,7 @@ jobs:
           name: Release ${{ github.ref_name }}
 
           # This will create a "draft" release, so you can manually edit release notes before publishing
-          draft: false
+          draft: true
 
           # This will mark the release as "pre-release" if you want
           prerelease: false
