@@ -155,7 +155,7 @@ void ClockPage::drawTemperature(TFT_eSPI &tft)
     return;
 
   char buf[16];
-  snprintf(buf, sizeof(buf), "%.0f%c", temp, ConfigManager::getInstance().isCelsius() ? 'C' : 'F');
+  snprintf(buf, sizeof(buf), "%.0f°%c", temp, ConfigManager::getInstance().isCelsius() ? 'C' : 'F');
   sprTemp.fillSprite(TFT_BLACK);
   sprTemp.drawString(buf, 0, sprTemp.height() / 2);
   sprTemp.pushSprite(MARGIN, sensorY);
