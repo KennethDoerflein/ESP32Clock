@@ -55,7 +55,6 @@ private:
 
   // --- Template Processor and Helpers ---
   String processor(const String &var);
-  String getNetworksList();
 
   /// The actual server instance.
   AsyncWebServer server;

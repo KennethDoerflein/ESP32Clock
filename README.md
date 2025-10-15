@@ -90,9 +90,7 @@ The web interface provides access to all the clock's settings.
 
 #### 1. WiFi Configuration
 
-- A list of available WiFi networks is automatically scanned and displayed.
-- Click on a network name to populate the SSID field.
-- Enter the password for the selected network and click **"Save & Connect"**.
+- Enter the SSID and password for the selected network and click **"Save & Connect"**.
 - The device will save the credentials and restart to connect to your WiFi network. On success, the display will show the new IP address assigned by your router. You can now access the web interface from this new IP address on your local network.
 
 #### 2. Clock Settings
@@ -136,6 +134,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Add a "Reboot Device" button to the web interface.
   - [ ] Add button to change hostname to the web interface.
   - [ ] Add option to reset to defaults to the web interface.
+  - [ ] Implement WiFi network scanning for easier setup.
 
 - [x] **Settings Management:**
   - [x] **Display Options:**
@@ -145,9 +144,9 @@ This project is broken down into phases to prioritize a functional base clock be
     - [x] Enable/disable automatic brightness scheduling.
   - [ ] **Timezone Configuration:**
     - [ ] Add a dropdown to select the timezone.
-- [x] **Firmware Updates:**
-  - [x] Provide OTA updates via file upload.
-  - [x] Provide OTA updates directly from GitHub releases.
+- [ ] **Firmware Updates:**
+  - [ ] Provide OTA updates via file upload.
+  - [ ] Provide OTA updates directly from GitHub releases.
 
 ### Phase 3: Alarms & User Interaction (In Progress)
 

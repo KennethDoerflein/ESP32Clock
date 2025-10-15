@@ -2,7 +2,6 @@
 
 #include "ClockWebServer.h"
 #include "ConfigManager.h"
-#include "OtaManager.h"
 #include "WiFiManager.h"
 #include "web_content.h"
 #include <ArduinoJson.h>
@@ -121,7 +120,6 @@ void ClockWebServer::begin()
     // Lambda for settings save; it's simple enough not to need a full method.
     server.on("/settings/save", HTTP_POST, [](AsyncWebServerRequest *request)
               {
-      if (OtaManager::getInstance().isUpdating()) return;
       auto &config = ConfigManager::getInstance();
       config.setAutoBrightness(request->hasParam("autoBrightness"));
       config.setBrightness(request->arg("brightness").toInt());
@@ -141,10 +139,6 @@ void ClockWebServer::begin()
   server.on("/wifi/save", HTTP_POST, [this](AsyncWebServerRequest *request)
             { onWifiSaveRequest(request); });
 
-  // Initialize and register OTA manager routes, passing the processor function.
-  OtaManager::getInstance().begin(server, [this](const String &var)
-                                  { return processor(var); });
-
   server.begin();
 }
 
@@ -154,55 +148,30 @@ void ClockWebServer::begin()
 
 void ClockWebServer::onRootRequest(AsyncWebServerRequest *request)
 {
-  if (OtaManager::getInstance().isUpdating())
-  {
-    request->send(503, "text/plain", "Update in progress");
-    return;
-  }
   request->send_P(200, "text/html", INDEX_HTML, [this](const String &var)
                   { return processor(var); });
 }
 
 void ClockWebServer::onWifiRequest(AsyncWebServerRequest *request)
 {
-  if (OtaManager::getInstance().isUpdating())
-  {
-    request->send(503, "text/plain", "Update in progress");
-    return;
-  }
   request->send_P(200, "text/html", WIFI_CONFIG_HTML, [this](const String &var)
                   { return processor(var); });
 }
 
 void ClockWebServer::onSettingsRequest(AsyncWebServerRequest *request)
 {
-  if (OtaManager::getInstance().isUpdating())
-  {
-    request->send(503, "text/plain", "Update in progress");
-    return;
-  }
   request->send_P(200, "text/html", SETTINGS_PAGE_HTML, [this](const String &var)
                   { return processor(var); });
 }
 
 void ClockWebServer::onAlarmsRequest(AsyncWebServerRequest *request)
 {
-  if (OtaManager::getInstance().isUpdating())
-  {
-    request->send(503, "text/plain", "Update in progress");
-    return;
-  }
   request->send_P(200, "text/html", ALARMS_PAGE_HTML, [this](const String &var)
                   { return processor(var); });
 }
 
 void ClockWebServer::onWifiSaveRequest(AsyncWebServerRequest *request)
 {
-  if (OtaManager::getInstance().isUpdating())
-  {
-    request->send(503, "text/plain", "Update in progress");
-    return;
-  }
   String ssid = request->arg("ssid");
   String password = request->arg("password");
   auto &config = ConfigManager::getInstance();
@@ -216,12 +185,6 @@ void ClockWebServer::onWifiSaveRequest(AsyncWebServerRequest *request)
 
 void ClockWebServer::onCaptivePortalRequest(AsyncWebServerRequest *request)
 {
-  if (OtaManager::getInstance().isUpdating())
-  {
-    request->send(503, "text/plain", "Update in progress");
-    return;
-  }
-
   // Captive portal detection logic for modern OSes.
   // This handles the OS's connectivity check and keeps the portal open.
   if (!request->host().equals(WiFi.softAPIP().toString()) && !request->url().equals("/"))
@@ -242,7 +205,7 @@ String ClockWebServer::processor(const String &var)
   if (var == "HEAD")
     return BOOTSTRAP_HEAD;
   if (var == "NETWORKS")
-    return getNetworksList();
+    return "";
   if (var == "WIFI_PAGE_TITLE")
     return WiFiManager::getInstance().isCaptivePortal() ? "WiFi Setup" : "Configure WiFi";
   if (var == "BACK_BUTTON_CLASS")
@@ -260,18 +223,4 @@ String ClockWebServer::processor(const String &var)
     return config.isCelsius() ? "checked" : "";
 
   return String();
-}
-
-String ClockWebServer::getNetworksList()
-{
-  String networks_html;
-  int n = WiFi.scanNetworks();
-  for (int i = 0; i < n; ++i)
-  {
-    networks_html += "<a href='#' class='list-group-item list-group-item-action d-flex justify-content-between align-items-center' onclick='event.preventDefault(); selectNetwork(\"" + WiFi.SSID(i) + "\")'>";
-    networks_html += WiFi.SSID(i);
-    networks_html += "<span class='badge bg-primary rounded-pill'>" + String(WiFi.RSSI(i)) + " dBm</span>";
-    networks_html += "</a>";
-  }
-  return networks_html;
 }

@@ -43,7 +43,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <h1 class="card-title mb-4">Control Panel</h1>
         <div class="d-grid gap-3">
           <a href="/wifi" class="btn btn-primary btn-lg">Configure WiFi</a>
-          <a href="/update" class="btn btn-info btn-lg">Update Firmware</a>
           <a href="/settings" class="btn btn-secondary btn-lg">Clock Settings</a>
           <a href="/alarms" class="btn btn-warning btn-lg">Alarm Settings</a>
         </div>
@@ -88,117 +87,12 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
           </div>
         </form>
         <hr class="my-4">
-        <h2 class="h4 text-center">Available Networks</h2>
-        <div id="networks" class="list-group">%NETWORKS%</div>
         <div class="d-grid mt-4 %BACK_BUTTON_CLASS%">
           <a href="/" class="btn btn-secondary">Back to Menu</a>
         </div>
       </div>
     </div>
   </div>
-</body>
-</html>
-)rawliteral";
-
-/**
- * @brief The Firmware Update page.
- * Provides two update methods: manual upload and a one-click GitHub update.
- * Includes JavaScript to handle the file upload progress bar and the AJAX request for the GitHub update.
- */
-const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Firmware Update</title>
-  %HEAD%
-</head>
-<body>
-  <div class="container mt-5">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h1 class="card-title text-center mb-4">Firmware Update</h1>
-        
-        <h2 class="h5">Manual Upload</h2>
-        <form id="upload-form" action="/update/upload" method="POST" enctype="multipart/form-data" class="mb-3">
-          <div class="input-group">
-            <input type="file" class="form-control" name="update" required>
-            <button type="submit" class="btn btn-primary">Upload</button>
-          </div>
-        </form>
-        
-        <hr class="my-4">
-
-        <h2 class="h5">GitHub Update</h2>
-        <div class="d-grid">
-          <button id="github-update-btn" class="btn btn-dark">Check for Updates from GitHub</button>
-        </div>
-
-        <div class="progress mt-4" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="height: 2rem;">
-          <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
-        </div>
-        <div id="status-message" class="text-center mt-2"></div>
-        
-        <div class="d-grid mt-4">
-          <a href="/" class="btn btn-secondary">Back to Menu</a>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
-    const form = document.getElementById('upload-form');
-    const progressBar = document.getElementById('progress-bar');
-    const statusMessage = document.getElementById('status-message');
-    const githubBtn = document.getElementById('github-update-btn');
-
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/update/upload', true);
-
-        xhr.upload.addEventListener('progress', function(e) {
-            if (e.lengthComputable) {
-                const percentComplete = (e.loaded / e.total) * 100;
-                progressBar.style.width = percentComplete.toFixed(2) + '%';
-                progressBar.textContent = percentComplete.toFixed(2) + '%';
-            }
-        });
-
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                statusMessage.textContent = 'Update successful! Rebooting...';
-                setTimeout(() => location.reload(), 3000);
-            } else {
-                statusMessage.textContent = 'Update failed: ' + xhr.responseText;
-            }
-        };
-        
-        xhr.onerror = function() {
-            statusMessage.textContent = 'An error occurred during the upload.';
-        };
-
-        xhr.send(formData);
-        statusMessage.textContent = 'Uploading...';
-    });
-
-    githubBtn.addEventListener('click', function() {
-        statusMessage.textContent = 'Checking GitHub for updates...';
-        progressBar.style.width = '0%';
-        progressBar.textContent = '0%';
-
-        fetch('/update/github')
-            .then(response => response.text())
-            .then(text => {
-                statusMessage.textContent = text;
-                if (text.includes('successful')) {
-                   // The backend handles the reboot.
-                }
-            })
-            .catch(err => {
-                statusMessage.textContent = 'Error: ' + err;
-            });
-    });
-  </script>
 </body>
 </html>
 )rawliteral";
