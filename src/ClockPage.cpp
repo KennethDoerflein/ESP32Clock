@@ -1,5 +1,5 @@
 // Comment out the next line to disable sprite borders for debugging
-#define DEBUG_BORDERS
+//#define DEBUG_BORDERS
 
 #include "pages/ClockPage.h"
 #include "ConfigManager.h"
