@@ -35,7 +35,7 @@ void AlarmManager::update()
   {
     _rampStage = STAGE_FAST_BEEP;
   }
-  else if (_rampStage == STAGE_FAST_BEEP && alarmElapsedTime >= STAGE2_DURATION_MS)
+  else if (_rampStage == STAGE_FAST_BEEP && alarmElapsedTime >= (STAGE1_DURATION_MS + STAGE2_DURATION_MS))
   {
     _rampStage = STAGE_CONTINUOUS;
     digitalWrite(BUZZER_PIN, HIGH); // Turn buzzer on permanently for this stage
