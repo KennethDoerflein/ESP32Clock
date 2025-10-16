@@ -65,6 +65,12 @@ public:
    */
   String scanNetworksAsync();
 
+  /**
+   * @brief Gets the configured hostname of the device.
+   * @return The hostname as a String.
+   */
+  String getHostname() const;
+
   // Delete copy constructor and assignment operator for singleton pattern.
   WiFiManager(const WiFiManager &) = delete;
   void operator=(const WiFiManager &) = delete;
@@ -84,6 +90,8 @@ private:
 
   /// @brief The SSID for the Access Point mode, used for initial configuration.
   static const char *AP_SSID;
+  /// @brief The hostname for the device, generated from the MAC address.
+  String _hostname;
   /// @brief Flag indicating the current WiFi connection status.
   bool _isConnected;
   /// @brief Pointer to the DNS server instance for the captive portal.

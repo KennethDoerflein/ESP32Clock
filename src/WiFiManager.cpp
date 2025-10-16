@@ -5,7 +5,6 @@
 #include <DNSServer.h>
 #include "ConfigManager.h"
 #include "display.h"
-#include <ESPmDNS.h>
 #include <ArduinoJson.h>
 
 // --- Static Member Initialization ---
@@ -39,10 +38,11 @@ bool WiFiManager::begin()
   // Set a unique hostname based on the last 3 bytes of the MAC address.
   uint8_t mac[6];
   WiFi.macAddress(mac);
-  char hostname[18]; // "ESP32Clock_" + 6 hex chars + null terminator
-  sprintf(hostname, "ESP32Clock_%02X%02X%02X", mac[3], mac[4], mac[5]);
-  WiFi.setHostname(hostname);
-  Serial.printf("Hostname set to: %s\n", hostname);
+  char hostname_cstr[18]; // "ESP32Clock_" + 6 hex chars + null terminator
+  sprintf(hostname_cstr, "ESP32Clock_%02X%02X%02X", mac[3], mac[4], mac[5]);
+  _hostname = hostname_cstr;
+  WiFi.setHostname(_hostname.c_str());
+  Serial.printf("Hostname set to: %s\n", _hostname.c_str());
 
   // --- WiFi Connection Logic ---
   String ssid = ConfigManager::getInstance().getWifiSSID();
@@ -67,17 +67,6 @@ bool WiFiManager::begin()
       Serial.println("\nWiFi connected!");
       Serial.print("IP Address: ");
       Serial.println(WiFi.localIP());
-
-      // Start the mDNS responder for ESP32Clock_XXXXXX.local
-      if (MDNS.begin(hostname))
-      {
-        Serial.println("mDNS responder started");
-        MDNS.addService("http", "tcp", 80); // Advertise a web server
-      }
-      else
-      {
-        Serial.println("Error starting mDNS!");
-      }
 
       display.drawStatusMessage(("IP: " + WiFi.localIP().toString()).c_str());
       delay(2000);
@@ -214,4 +203,13 @@ void WiFiManager::startCaptivePortal()
   // Start DNS Server
   _dnsServer.reset(new DNSServer());
   _dnsServer->start(53, "*", apIP);
+}
+
+/**
+ * @brief Gets the configured hostname of the device.
+ * @return The hostname as a String.
+ */
+String WiFiManager::getHostname() const
+{
+  return _hostname;
 }
