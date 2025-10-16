@@ -108,13 +108,35 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 <head>
   <title>Clock Settings</title>
   %HEAD%
+  <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <style>
+      .status-indicator {
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-width: 95px;
+      }
+  </style>
 </head>
   <body>
     <div class="container mt-5">
       <div class="card shadow-sm">
         <div class="card-body">
-          <h1 class="card-title text-center mb-4">Clock Settings</h1>
-          <form action="/settings/save" method="POST">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="card-title m-0">Clock Settings</h1>
+            <div class="status-indicator"></div>
+          </div>
+          
+          <div class="alert alert-info d-flex align-items-center" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <div>Heads up! All your changes are saved automatically.</div>
+          </div>
+
+          <form id="settings-form">
             <div
               class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
               <label class="form-check-label" for="auto-brightness">Auto Brightness</label>
@@ -123,8 +145,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 type="checkbox"
                 role="switch"
                 id="auto-brightness"
-                name="autoBrightness"
-                %AUTO_BRIGHTNESS_CHECKED% />
+                name="autoBrightness" />
             </div>
 
             <div class="mb-3 p-3 border rounded">
@@ -135,8 +156,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 id="brightness"
                 name="brightness"
                 min="10"
-                max="255"
-                value="%BRIGHTNESS_VALUE%" />
+                max="255" />
             </div>
 
             <div
@@ -147,8 +167,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 type="checkbox"
                 role="switch"
                 id="24hour"
-                name="use24HourFormat"
-                %IS_24_HOUR_CHECKED% />
+                name="use24HourFormat" />
             </div>
 
             <div
@@ -159,12 +178,10 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 type="checkbox"
                 role="switch"
                 id="celsius"
-                name="useCelsius"
-                %USE_CELSIUS_CHECKED% />
+                name="useCelsius" />
             </div>
 
             <div class="d-grid gap-2 mt-4">
-              <button type="submit" class="btn btn-success">Save Settings</button>
               <a href="/" class="btn btn-secondary">Back to Menu</a>
               <button type="button" class="btn btn-danger w-100 mt-3" onclick="rebootDevice()">
                 Reboot Device
@@ -175,6 +192,74 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
     <script>
+      const DEBOUNCE_DELAY_MS = 1500;
+      const ERROR_DISPLAY_MS = 3000;
+      let saveTimeout;
+
+      const statusEl = document.querySelector(".status-indicator");
+      const form = document.getElementById("settings-form");
+      const autoBrightnessEl = document.getElementById("auto-brightness");
+      const brightnessEl = document.getElementById("brightness");
+      const twentyFourHourEl = document.getElementById("24hour");
+      const celsiusEl = document.getElementById("celsius");
+
+      const STATUS_INDICATORS = {
+        SAVED:
+          '<i class="bi bi-check-circle-fill text-success"></i> <span class="text-muted">Saved</span>',
+        UNSAVED:
+          '<i class="bi bi-pencil-fill text-warning"></i> <span class="text-warning">Unsaved</span>',
+        SAVING:
+          '<div class="spinner-border spinner-border-sm text-primary" role="status"></div> <span class="text-primary">Saving...</span>',
+        ERROR:
+          '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
+      };
+
+      function handleInputChange() {
+        clearTimeout(saveTimeout);
+        statusEl.innerHTML = STATUS_INDICATORS.UNSAVED;
+        saveTimeout = setTimeout(saveSettings, DEBOUNCE_DELAY_MS);
+      }
+
+      async function loadSettings() {
+        statusEl.innerHTML = "";
+        try {
+          const response = await fetch('/api/settings');
+          const settings = await response.json();
+          autoBrightnessEl.checked = settings.autoBrightness;
+          brightnessEl.value = settings.brightness;
+          twentyFourHourEl.checked = settings.use24HourFormat;
+          celsiusEl.checked = settings.useCelsius;
+          statusEl.innerHTML = STATUS_INDICATORS.SAVED;
+        } catch (e) {
+          statusEl.innerHTML = STATUS_INDICATORS.ERROR;
+        }
+      }
+
+      async function saveSettings() {
+        statusEl.innerHTML = STATUS_INDICATORS.SAVING;
+        
+        const settings = {
+            autoBrightness: autoBrightnessEl.checked,
+            brightness: parseInt(brightnessEl.value),
+            use24HourFormat: twentyFourHourEl.checked,
+            useCelsius: celsiusEl.checked
+        };
+
+        try {
+          await fetch('/api/settings/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(settings)
+          });
+          statusEl.innerHTML = STATUS_INDICATORS.SAVED;
+        } catch (e) {
+          statusEl.innerHTML = STATUS_INDICATORS.ERROR;
+          setTimeout(() => {
+            statusEl.innerHTML = STATUS_INDICATORS.UNSAVED;
+          }, ERROR_DISPLAY_MS);
+        }
+      }
+
       function rebootDevice() {
         if (confirm("Are you sure you want to reboot the device?")) {
           fetch("/reboot").then((response) => {
@@ -186,6 +271,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           });
         }
       }
+      
+      form.addEventListener('input', handleInputChange);
+      document.addEventListener("DOMContentLoaded", loadSettings);
     </script>
   </body>
 </html>

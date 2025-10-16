@@ -120,8 +120,11 @@ public:
    */
   void setAutoBrightness(bool enabled)
   {
-    autoBrightness = enabled;
-    _isDirty = true;
+    if (autoBrightness != enabled)
+    {
+      autoBrightness = enabled;
+      _isDirty = true;
+    }
   }
 
   /**
@@ -130,8 +133,11 @@ public:
    */
   void setBrightness(uint8_t value)
   {
-    brightness = value;
-    _isDirty = true;
+    if (brightness != value)
+    {
+      brightness = value;
+      _isDirty = true;
+    }
   }
 
   /**
@@ -140,8 +146,11 @@ public:
    */
   void set24HourFormat(bool enabled)
   {
-    use24HourFormat = enabled;
-    _isDirty = true;
+    if (use24HourFormat != enabled)
+    {
+      use24HourFormat = enabled;
+      _isDirty = true;
+    }
   }
 
   /**
@@ -150,8 +159,11 @@ public:
    */
   void setCelsius(bool enabled)
   {
-    useCelsius = enabled;
-    _isDirty = true;
+    if (useCelsius != enabled)
+    {
+      useCelsius = enabled;
+      _isDirty = true;
+    }
   }
 
   /**

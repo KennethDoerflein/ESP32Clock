@@ -1,5 +1,5 @@
 // Comment out the next line to disable sprite borders for debugging
-//#define DEBUG_BORDERS
+// #define DEBUG_BORDERS
 
 #include "pages/ClockPage.h"
 #include "ConfigManager.h"
@@ -32,6 +32,14 @@ void ClockPage::onEnter(TFT_eSPI &tft)
     setupSprites(tft);
     _spritesCreated = true;
   }
+
+  // Force a redraw of all elements
+  lastTime = "";
+  lastDate = "";
+  lastDayOfWeek = "";
+  lastTemp = -999;
+  lastHumidity = -999;
+  lastTOD = "";
 }
 
 void ClockPage::onExit()
@@ -100,16 +108,16 @@ void ClockPage::setupSprites(TFT_eSPI &tft)
 
 void ClockPage::drawClock(TFT_eSPI &tft)
 {
-    auto &timeManager = TimeManager::getInstance();
-  #ifdef DEBUG_BORDERS
-    String timeStr = "88:88";
-  #else
-    String timeStr = timeManager.getFormattedTime();
-  #endif
-    String todStr = timeManager.getTOD();
-  
-    if (timeStr == lastTime && todStr == lastTOD)
-      return;
+  auto &timeManager = TimeManager::getInstance();
+#ifdef DEBUG_BORDERS
+  String timeStr = "88:88";
+#else
+  String timeStr = timeManager.getFormattedTime();
+#endif
+  String todStr = timeManager.getTOD();
+
+  if (timeStr == lastTime && todStr == lastTOD)
+    return;
 
   sprClock.fillSprite(TFT_BLACK);
   sprClock.drawString(timeStr.c_str(), sprClock.width() / 2, sprClock.height() / 2);

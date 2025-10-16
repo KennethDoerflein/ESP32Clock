@@ -117,16 +117,57 @@ void ClockWebServer::begin()
           request->send(200, "text/plain", "Alarms saved successfully!");
         } });
 
-    // Lambda for settings save; it's simple enough not to need a full method.
-    server.on("/settings/save", HTTP_POST, [](AsyncWebServerRequest *request)
+    // --- API Handlers for Settings ---
+    server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request)
               {
-      auto &config = ConfigManager::getInstance();
-      config.setAutoBrightness(request->hasParam("autoBrightness"));
-      config.setBrightness(request->arg("brightness").toInt());
-      config.set24HourFormat(request->hasParam("use24HourFormat"));
-      config.setCelsius(request->hasParam("useCelsius"));
-      config.save();
-      request->send(200, "text/plain", "Settings saved successfully!"); });
+      auto& config = ConfigManager::getInstance();
+      JsonDocument doc;
+      doc["autoBrightness"] = config.isAutoBrightness();
+      doc["brightness"] = config.getBrightness();
+      doc["use24HourFormat"] = config.is24HourFormat();
+      doc["useCelsius"] = config.isCelsius();
+      
+      String response;
+      serializeJson(doc, response);
+      request->send(200, "application/json", response); });
+
+    // API handler for settings save
+    server.on(
+        "/api/settings/save", HTTP_POST, [](AsyncWebServerRequest *request) {},
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total)
+        {
+          if (index == 0)
+          {
+            request->_tempObject = new std::vector<uint8_t>();
+          }
+
+          std::vector<uint8_t> *buffer =
+              (std::vector<uint8_t> *)request->_tempObject;
+          buffer->insert(buffer->end(), data, data + len);
+
+          if (index + len == total)
+          {
+            JsonDocument doc;
+            if (deserializeJson(doc, buffer->data(), buffer->size()))
+            {
+              request->send(400, "text/plain", "Invalid JSON");
+            }
+            else
+            {
+              auto &config = ConfigManager::getInstance();
+              config.setAutoBrightness(doc["autoBrightness"]);
+              config.setBrightness(doc["brightness"]);
+              config.set24HourFormat(doc["use24HourFormat"]);
+              config.setCelsius(doc["useCelsius"]);
+              config.save();
+              request->send(200, "text/plain", "Settings saved!");
+            }
+            delete buffer;
+            request->_tempObject = nullptr;
+          }
+        });
 
     server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
               {
@@ -210,17 +251,6 @@ String ClockWebServer::processor(const String &var)
     return WiFiManager::getInstance().isCaptivePortal() ? "WiFi Setup" : "Configure WiFi";
   if (var == "BACK_BUTTON_CLASS")
     return WiFiManager::getInstance().isCaptivePortal() ? "d-none" : "";
-
-  // Settings placeholders
-  auto &config = ConfigManager::getInstance();
-  if (var == "AUTO_BRIGHTNESS_CHECKED")
-    return config.isAutoBrightness() ? "checked" : "";
-  if (var == "BRIGHTNESS_VALUE")
-    return String(config.getBrightness());
-  if (var == "IS_24_HOUR_CHECKED")
-    return config.is24HourFormat() ? "checked" : "";
-  if (var == "USE_CELSIUS_CHECKED")
-    return config.isCelsius() ? "checked" : "";
 
   return String();
 }
