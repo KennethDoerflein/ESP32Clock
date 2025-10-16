@@ -154,9 +154,9 @@ void loop()
     auto &config = ConfigManager::getInstance();
     if (config.isDirty())
     {
-      // Forcing a redraw of the current page is enough to apply
-      // all visual settings (time format, temp unit, etc.)
-      displayManager.setPage(displayManager.getCurrentPageIndex(), true);
+      // A "soft" refresh is enough to apply settings changes
+      // without blanking the screen.
+      displayManager.refresh();
       config.clearDirtyFlag();
       Serial.println("Configuration reloaded and page refreshed.");
     }

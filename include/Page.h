@@ -40,4 +40,10 @@ public:
    * @param tft A reference to the main TFT_eSPI object.
    */
   virtual void render(TFT_eSPI &tft) = 0;
+
+  /**
+   * @brief Called to force a refresh of the page's content without a full redraw.
+   * This is useful for applying settings changes that affect the display.
+   */
+  virtual void refresh() {}
 };

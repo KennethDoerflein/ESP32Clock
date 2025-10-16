@@ -64,6 +64,11 @@ public:
   void update();
 
   /**
+   * @brief Forces the current page to refresh its content.
+   */
+  void refresh();
+
+  /**
    * @brief Draws or erases the alarm indicator icon on the display.
    * @param enabled True to draw the icon, false to erase it.
    */

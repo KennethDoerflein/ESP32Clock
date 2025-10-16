@@ -126,7 +126,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   sprClock.drawRect(0, 0, sprClock.width(), sprClock.height(), TFT_RED);
 #endif
 
-  bool is24Hour = (todStr.length() == 0);
+  bool is24Hour = timeManager.is24HourFormat();
   int clockX = (tft.width() - (sprClock.width() + sprTOD.width())) / 2 - 40;
   if (clockX < 0)
     clockX = 0;
@@ -134,7 +134,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   sprClock.pushSprite(clockX, clockY);
   lastTime = timeStr;
 
-  if (todStr != lastTOD)
+  if (!is24Hour && todStr != lastTOD)
   {
     sprTOD.fillSprite(TFT_BLACK);
     sprTOD.drawString(todStr.c_str(), sprTOD.width(), 0);
@@ -143,9 +143,15 @@ void ClockPage::drawClock(TFT_eSPI &tft)
     sprTOD.drawRect(0, 0, sprTOD.width(), sprTOD.height(), TFT_GREEN);
 #endif
 
-    sprTOD.pushSprite(clockX + sprClock.width() + 50, clockY + 10);
     lastTOD = todStr;
   }
+  else
+  {
+    sprTOD.fillSprite(TFT_BLACK);
+    lastTOD = "";
+  }
+
+  sprTOD.pushSprite(clockX + sprClock.width() + 50, clockY + 10);
 }
 
 void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
@@ -218,4 +224,15 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
 
   sprHumidity.pushSprite(tft.width() / 2, sensorY);
   lastHumidity = humidity;
+}
+
+void ClockPage::refresh()
+{
+  // Force a redraw of all elements by resetting their last known values
+  lastTime = "";
+  lastDate = "";
+  lastDayOfWeek = "";
+  lastTemp = -999;
+  lastHumidity = -999;
+  lastTOD = "";
 }

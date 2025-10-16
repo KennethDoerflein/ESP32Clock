@@ -44,6 +44,14 @@ void DisplayManager::update()
   }
 }
 
+void DisplayManager::refresh()
+{
+  if (currentPage)
+  {
+    currentPage->refresh();
+  }
+}
+
 int DisplayManager::getPagesSize()
 {
   return pages.size();

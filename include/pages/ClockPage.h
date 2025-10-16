@@ -20,6 +20,7 @@ public:
   void onExit() override;
   void update() override;
   void render(TFT_eSPI &tft) override;
+  void refresh() override;
 
 private:
   void setupSprites(TFT_eSPI &tft);
