@@ -5,6 +5,7 @@
 #include <Arduino.h>
 
 // LEDC (LED Control) constants for managing the backlight PWM.
+#define TFT_BL 6               // Manually define the backlight pin here
 #define BACKLIGHT_CHANNEL 0    // LEDC channel 0
 #define BACKLIGHT_FREQ 5000    // 5 kHz frequency
 #define BACKLIGHT_RESOLUTION 8 // 8-bit resolution (0-255)
