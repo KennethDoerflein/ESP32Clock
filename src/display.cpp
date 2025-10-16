@@ -56,9 +56,23 @@ void Display::updateBrightness()
   }
   else
   {
-    // Use the manually set brightness value.
-    dutyCycle = config.getBrightness();
+    if (config.getBrightness() > 255)
+    {
+      dutyCycle = 255; // Clamp to max value
+    }
+    else if (config.getBrightness() < 10)
+    {
+      dutyCycle = 10; // Clamp to min value
+    }
+    else
+    {
+      // Use the manually set brightness value.
+      dutyCycle = config.getBrightness();
+    }
   }
+
+  actualBrightness = dutyCycle; // Store the calculated brightness
+
   // Apply the calculated brightness value to the backlight LED.
   ledcWrite(BACKLIGHT_CHANNEL, dutyCycle);
 }

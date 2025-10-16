@@ -7,6 +7,7 @@
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <WiFi.h>
+#include "display.h"
 
 // --- Singleton Implementation ---
 ClockWebServer &ClockWebServer::getInstance()
@@ -124,6 +125,7 @@ void ClockWebServer::begin()
       JsonDocument doc;
       doc["autoBrightness"] = config.isAutoBrightness();
       doc["brightness"] = config.getBrightness();
+      doc["actualBrightness"] = Display::getInstance().getActualBrightness();
       doc["use24HourFormat"] = config.is24HourFormat();
       doc["useCelsius"] = config.isCelsius();
       

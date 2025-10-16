@@ -100,7 +100,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 /**
  * @brief The Clock Settings page.
  * Contains a form to adjust settings like brightness, time format, and temperature unit.
- * Placeholders like `%AUTO_BRIGHTNESS_CHECKED%` are replaced with current setting values.
+ * Fetches data from /api/settings and auto-saves on change.
  */
 const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -149,7 +149,10 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
             </div>
 
             <div class="mb-3 p-3 border rounded">
-              <label for="brightness" class="form-label">Manual Brightness</label>
+              <label for="brightness" class="form-label d-flex justify-content-between">
+                <span>Manual Brightness</span>
+                <span id="brightness-value">255</span>
+              </label>
               <input
                 type="range"
                 class="form-range"
@@ -200,6 +203,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const form = document.getElementById("settings-form");
       const autoBrightnessEl = document.getElementById("auto-brightness");
       const brightnessEl = document.getElementById("brightness");
+      const brightnessValueEl = document.getElementById("brightness-value");
       const twentyFourHourEl = document.getElementById("24hour");
       const celsiusEl = document.getElementById("celsius");
 
@@ -219,6 +223,10 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         statusEl.innerHTML = STATUS_INDICATORS.UNSAVED;
         saveTimeout = setTimeout(saveSettings, DEBOUNCE_DELAY_MS);
       }
+      
+      function toggleBrightnessSlider() {
+          brightnessEl.disabled = autoBrightnessEl.checked;
+      }
 
       async function loadSettings() {
         statusEl.innerHTML = "";
@@ -226,9 +234,17 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           const response = await fetch('/api/settings');
           const settings = await response.json();
           autoBrightnessEl.checked = settings.autoBrightness;
-          brightnessEl.value = settings.brightness;
+          
+          // Use 'actualBrightness' for the slider's value and text
+          brightnessEl.value = settings.actualBrightness;
+          brightnessValueEl.textContent = settings.actualBrightness;
+          
           twentyFourHourEl.checked = settings.use24HourFormat;
           celsiusEl.checked = settings.useCelsius;
+          
+          // Update the slider's enabled/disabled state
+          toggleBrightnessSlider(); 
+          
           statusEl.innerHTML = STATUS_INDICATORS.SAVED;
         } catch (e) {
           statusEl.innerHTML = STATUS_INDICATORS.ERROR;
@@ -240,7 +256,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         
         const settings = {
             autoBrightness: autoBrightnessEl.checked,
-            brightness: parseInt(brightnessEl.value),
+            // When saving, send the slider's current value as the user's preference
+            brightness: parseInt(brightnessEl.value), 
             use24HourFormat: twentyFourHourEl.checked,
             useCelsius: celsiusEl.checked
         };
@@ -252,6 +269,11 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
               body: JSON.stringify(settings)
           });
           statusEl.innerHTML = STATUS_INDICATORS.SAVED;
+          
+          // After a successful save, reload the settings to get the
+          // updated 'actualBrightness' from the device.
+          setTimeout(loadSettings, 500);
+
         } catch (e) {
           statusEl.innerHTML = STATUS_INDICATORS.ERROR;
           setTimeout(() => {
@@ -271,6 +293,14 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           });
         }
       }
+      
+      // Update the text value as the slider moves
+      brightnessEl.addEventListener('input', () => {
+          brightnessValueEl.textContent = brightnessEl.value;
+      });
+
+      // Toggle the slider when the checkbox is clicked
+      autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
       
       form.addEventListener('input', handleInputChange);
       document.addEventListener("DOMContentLoaded", loadSettings);
@@ -548,4 +578,4 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-#endif // PAGES_H
+#endif // web_content.h

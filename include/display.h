@@ -40,13 +40,20 @@ public:
   void drawStatusMessage(const char *message);
 
   /**
+   * @brief Gets the last calculated brightness value.
+   * @return The current brightness duty cycle (0-255).
+   */
+  int getActualBrightness() const { return actualBrightness; }
+
+  /**
    * @brief Provides access to the underlying TFT_eSPI object.
    * @return A reference to the TFT_eSPI instance.
    */
   TFT_eSPI &getTft() { return tft; }
 
 private:
-  Display() {}
+  Display() : actualBrightness(255) {} // Initialize to a default value
 
-  TFT_eSPI tft; ///< The main TFT_eSPI driver instance.
+  TFT_eSPI tft;         ///< The main TFT_eSPI driver instance.
+  int actualBrightness; ///< Stores the current brightness duty cycle.
 };
