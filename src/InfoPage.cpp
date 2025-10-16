@@ -1,5 +1,5 @@
 #include "pages/InfoPage.h"
-#include "fonts/DSEG14ModernBold16.h"
+#include "fonts/DSEG14ModernBold24.h"
 #include <WiFi.h>
 
 InfoPage::InfoPage() {}
@@ -10,7 +10,7 @@ void InfoPage::onEnter(TFT_eSPI &tft)
 {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.loadFont(DSEG14ModernBold16);
+  tft.loadFont(DSEG14ModernBold24);
 
   // --- Title ---
   tft.setTextDatum(MC_DATUM);
