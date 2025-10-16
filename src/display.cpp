@@ -16,6 +16,9 @@ void Display::begin()
   ledcSetup(BACKLIGHT_CHANNEL, BACKLIGHT_FREQ, BACKLIGHT_RESOLUTION);
   ledcAttachPin(TFT_BL, BACKLIGHT_CHANNEL);
 
+  // Set a default brightness so the screen is on during boot.
+  ledcWrite(BACKLIGHT_CHANNEL, 255);
+
   // Initialize the TFT display driver.
   tft.init();
   tft.setRotation(3); // Set screen rotation.
