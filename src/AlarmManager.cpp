@@ -3,6 +3,17 @@
 #include "AlarmManager.h"
 #include "DisplayManager.h"
 
+// --- Constants for the ramping alarm state machine ---
+const unsigned long STAGE1_DURATION_MS = 10000; // 10 seconds of slow beeping
+const unsigned long STAGE2_DURATION_MS = 20000; // 20 seconds of fast beeping
+// After STAGE2, the alarm will be continuous.
+
+// Beep timings for each stage
+const unsigned long SLOW_BEEP_ON_MS = 200;
+const unsigned long SLOW_BEEP_OFF_MS = 800;
+const unsigned long FAST_BEEP_ON_MS = 150;
+const unsigned long FAST_BEEP_OFF_MS = 150;
+
 void AlarmManager::begin()
 {
   pinMode(BUZZER_PIN, OUTPUT);
@@ -15,9 +26,50 @@ void AlarmManager::update()
   {
     return;
   }
-  // Simple beeping pattern: on for 200ms, off for 200ms.
-  bool buzzerOn = (millis() % 400) < 200;
-  digitalWrite(BUZZER_PIN, buzzerOn ? HIGH : LOW);
+
+  unsigned long currentTime = millis();
+  unsigned long alarmElapsedTime = currentTime - _alarmStartTime;
+
+  // --- Stage Progression Logic ---
+  if (_rampStage == STAGE_SLOW_BEEP && alarmElapsedTime >= STAGE1_DURATION_MS)
+  {
+    _rampStage = STAGE_FAST_BEEP;
+  }
+  else if (_rampStage == STAGE_FAST_BEEP && alarmElapsedTime >= STAGE2_DURATION_MS)
+  {
+    _rampStage = STAGE_CONTINUOUS;
+    digitalWrite(BUZZER_PIN, HIGH); // Turn buzzer on permanently for this stage
+    return;                         // Skip beeping logic
+  }
+
+  if (_rampStage == STAGE_CONTINUOUS)
+  {
+    return; // Buzzer is already on
+  }
+
+  // --- Beeping Logic ---
+  unsigned long beepOnDuration = (_rampStage == STAGE_SLOW_BEEP) ? SLOW_BEEP_ON_MS : FAST_BEEP_ON_MS;
+  unsigned long beepOffDuration = (_rampStage == STAGE_SLOW_BEEP) ? SLOW_BEEP_OFF_MS : FAST_BEEP_OFF_MS;
+  unsigned long beepElapsedTime = currentTime - _lastBeepTime;
+
+  if (_buzzerState == BEEP_ON)
+  {
+    if (beepElapsedTime >= beepOnDuration)
+    {
+      _buzzerState = BEEP_OFF;
+      _lastBeepTime = currentTime;
+      digitalWrite(BUZZER_PIN, LOW);
+    }
+  }
+  else // BEEP_OFF
+  {
+    if (beepElapsedTime >= beepOffDuration)
+    {
+      _buzzerState = BEEP_ON;
+      _lastBeepTime = currentTime;
+      digitalWrite(BUZZER_PIN, HIGH);
+    }
+  }
 }
 
 void AlarmManager::stop()
@@ -26,9 +78,13 @@ void AlarmManager::stop()
     return;
 
   Serial.printf("Stopping alarm ID %d\n", _activeAlarmId);
-  digitalWrite(BUZZER_PIN, LOW); // Turn off buzzer
+  digitalWrite(BUZZER_PIN, LOW); // Ensure buzzer is off
   _isRinging = false;
   _activeAlarmId = -1;
+
+  // --- Reset state machine ---
+  _rampStage = STAGE_SLOW_BEEP;
+  _buzzerState = BEEP_OFF;
 
   // Force a redraw to clear the "RINGING!" message
   DisplayManager::getInstance().setPage(DisplayManager::getInstance().getCurrentPageIndex(), true);
@@ -52,6 +108,13 @@ void AlarmManager::trigger(uint8_t alarmId)
   Serial.printf("Triggering alarm ID %d\n", alarmId);
   _isRinging = true;
   _activeAlarmId = alarmId;
+
+  // --- Initialize the ramping alarm state ---
+  _alarmStartTime = millis();
+  _lastBeepTime = _alarmStartTime;
+  _rampStage = STAGE_SLOW_BEEP;
+  _buzzerState = BEEP_ON;
+  digitalWrite(BUZZER_PIN, HIGH); // Start with the buzzer on
 
   // Show the ringing screen
   DisplayManager::getInstance().showAlarmScreen();

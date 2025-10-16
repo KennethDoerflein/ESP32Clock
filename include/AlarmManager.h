@@ -69,6 +69,24 @@ private:
    */
   AlarmManager() : _isRinging(false), _activeAlarmId(-1) {}
 
+  // --- Enums for the alarm state machine ---
+  enum RampStage
+  {
+    STAGE_SLOW_BEEP,
+    STAGE_FAST_BEEP,
+    STAGE_CONTINUOUS
+  };
+
+  enum BuzzerState
+  {
+    BEEP_OFF,
+    BEEP_ON
+  };
+
   bool _isRinging;
   int _activeAlarmId;
+  RampStage _rampStage;
+  BuzzerState _buzzerState;
+  unsigned long _alarmStartTime;
+  unsigned long _lastBeepTime;
 };

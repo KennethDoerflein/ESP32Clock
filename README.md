@@ -166,7 +166,7 @@ This project is broken down into phases to prioritize a functional base clock be
     - [x] Use a long-press on the physical button to permanently dismiss a ringing alarm for the day.
     - [ ] Implement a factory reset by long-pressing the boot button.
 - [ ] **Audio Feedback:**
-  - [ ] Implement progressive alarm volume (ramping).
+  - [x] Implement progressive alarm volume (ramping).
   - [ ] Add different sound options for the alarm.
 - [ ] **Display Feedback:**
   - [x] Show a visual indicator on the display when an alarm is set.
