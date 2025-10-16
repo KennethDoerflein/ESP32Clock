@@ -182,6 +182,11 @@ void ClockWebServer::begin()
   server.on("/wifi/save", HTTP_POST, [this](AsyncWebServerRequest *request)
             { onWifiSaveRequest(request); });
 
+  server.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+    String json = WiFiManager::getInstance().scanNetworksAsync();
+    request->send(200, "application/json", json); });
+
   server.begin();
 }
 
@@ -247,8 +252,6 @@ String ClockWebServer::processor(const String &var)
 {
   if (var == "HEAD")
     return BOOTSTRAP_HEAD;
-  if (var == "NETWORKS")
-    return "";
   if (var == "WIFI_PAGE_TITLE")
     return WiFiManager::getInstance().isCaptivePortal() ? "WiFi Setup" : "Configure WiFi";
   if (var == "BACK_BUTTON_CLASS")

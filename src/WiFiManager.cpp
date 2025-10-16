@@ -6,6 +6,7 @@
 #include "ConfigManager.h"
 #include "display.h"
 #include <ESPmDNS.h>
+#include <ArduinoJson.h>
 
 // --- Static Member Initialization ---
 const char *WiFiManager::AP_SSID = "ESP32-Clock-Setup";
@@ -120,6 +121,77 @@ bool WiFiManager::isConnected() const
 bool WiFiManager::isCaptivePortal() const
 {
   return _dnsServer != nullptr;
+}
+
+String WiFiManager::scanNetworksAsync()
+{
+  int16_t scanResult = WiFi.scanComplete();
+
+  if (scanResult == WIFI_SCAN_FAILED)
+  {
+    // Scan failed, so start a new one
+    WiFi.scanNetworks(true); // true = async
+    return "{\"status\":\"scanning\"}";
+  }
+  else if (scanResult == WIFI_SCAN_RUNNING)
+  {
+    // Scan is in progress
+    return "{\"status\":\"scanning\"}";
+  }
+  else
+  {
+    // Scan is complete, and we have results
+    JsonDocument doc;
+    JsonArray networks = doc.to<JsonArray>();
+
+    for (int i = 0; i < scanResult; ++i)
+    {
+      JsonObject network = networks.add<JsonObject>();
+      network["ssid"] = WiFi.SSID(i);
+      network["rssi"] = WiFi.RSSI(i);
+      network["channel"] = WiFi.channel(i);
+      // Use a string for encryption type for easier parsing on the frontend
+      switch (WiFi.encryptionType(i))
+      {
+      case WIFI_AUTH_OPEN:
+        network["encryption"] = "OPEN";
+        break;
+      case WIFI_AUTH_WEP:
+        network["encryption"] = "WEP";
+        break;
+      case WIFI_AUTH_WPA_PSK:
+        network["encryption"] = "WPA_PSK";
+        break;
+      case WIFI_AUTH_WPA2_PSK:
+        network["encryption"] = "WPA2_PSK";
+        break;
+      case WIFI_AUTH_WPA_WPA2_PSK:
+        network["encryption"] = "WPA_WPA2_PSK";
+        break;
+      case WIFI_AUTH_WPA2_ENTERPRISE:
+        network["encryption"] = "WPA2_ENTERPRISE";
+        break;
+      case WIFI_AUTH_WPA3_PSK:
+        network["encryption"] = "WPA3_PSK";
+        break;
+      case WIFI_AUTH_WPA2_WPA3_PSK:
+        network["encryption"] = "WPA2_WPA3_PSK";
+        break;
+      default:
+        network["encryption"] = "UNKNOWN";
+        break;
+      }
+    }
+
+    // After retrieving the results, clear them and start a new scan
+    // This makes the "Scan" button on the frontend responsive.
+    WiFi.scanDelete();
+    WiFi.scanNetworks(true);
+
+    String jsonOutput;
+    serializeJson(doc, jsonOutput);
+    return jsonOutput;
+  }
 }
 
 // --- Private Methods ---

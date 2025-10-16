@@ -64,11 +64,19 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 <head>
   <title>%WIFI_PAGE_TITLE%</title>
   %HEAD%
-  <script>
-    function selectNetwork(ssid) {
-      document.getElementById('ssid').value = ssid;
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <style>
+    .network-item {
+      cursor: pointer;
     }
-  </script>
+    .network-item:hover {
+      background-color: #e9ecef;
+    }
+    #networks-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
 </head>
 <body>
   <div class="container mt-5">
@@ -87,12 +95,127 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
           </div>
         </form>
         <hr class="my-4">
+        <div class="text-center mb-3">
+          <button id="scan-button" class="btn btn-primary">
+            <i class="bi bi-wifi"></i> Scan for Networks
+          </button>
+        </div>
+        <div id="networks-status" class="text-center text-muted mb-2 d-none"></div>
+        <div id="networks-list" class="list-group"></div>
         <div class="d-grid mt-4 %BACK_BUTTON_CLASS%">
           <a href="/" class="btn btn-secondary">Back to Menu</a>
         </div>
       </div>
     </div>
   </div>
+  <script>
+    const scanButton = document.getElementById('scan-button');
+    const networksStatus = document.getElementById('networks-status');
+    const networksList = document.getElementById('networks-list');
+    let scanInterval;
+
+    function selectNetwork(ssid) {
+      document.getElementById('ssid').value = ssid;
+    }
+
+    function getSignalIcon(rssi) {
+        if (rssi >= -67) return '<i class="bi bi-reception-4 text-success"></i>';
+        if (rssi >= -70) return '<i class="bi bi-reception-3 text-success"></i>';
+        if (rssi >= -80) return '<i class="bi bi-reception-2 text-warning"></i>';
+        if (rssi >= -90) return '<i class="bi bi-reception-1 text-danger"></i>';
+        return '<i class="bi bi-reception-0 text-danger"></i>';
+    }
+    
+    function getEncryptionIcon(encryption) {
+        return encryption !== 'OPEN' ? '<i class="bi bi-lock-fill"></i>' : '<i class="bi bi-unlock-fill"></i>';
+    }
+
+
+    async function startScan() {
+      scanButton.disabled = true;
+      networksStatus.classList.remove('d-none');
+      networksStatus.innerHTML = `
+        <div class="spinner-border spinner-border-sm" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <span class="ms-2">Scanning for networks...</span>`;
+      networksList.innerHTML = '';
+
+      // Immediately try to fetch results
+      await fetchAndRenderNetworks();
+
+      // Start polling
+      scanInterval = setInterval(fetchAndRenderNetworks, 2000);
+    }
+
+    async function fetchAndRenderNetworks() {
+      try {
+        const response = await fetch('/api/wifi/scan');
+        const data = await response.json();
+
+        if (Array.isArray(data)) {
+          // Scan is complete and we have data
+          clearInterval(scanInterval);
+          renderNetworks(data);
+        } else if (data.status === 'scanning') {
+          // Scan is still in progress, the UI already shows "Scanning..."
+        }
+      } catch (error) {
+        clearInterval(scanInterval);
+        networksStatus.innerHTML = 'Error scanning for networks.';
+        scanButton.disabled = false;
+      }
+    }
+
+    function renderNetworks(networks) {
+      scanButton.disabled = false;
+      networksList.innerHTML = ''; // Clear previous results
+      
+      if (networks.length === 0) {
+        networksStatus.innerHTML = 'No networks found.';
+        return;
+      }
+
+      networksStatus.classList.add('d-none');
+      
+      // Filter out duplicate SSIDs, keeping the one with the strongest signal
+      const uniqueNetworks = Object.values(networks.reduce((acc, net) => {
+        if (!acc[net.ssid] || acc[net.ssid].rssi < net.rssi) {
+          acc[net.ssid] = net;
+        }
+        return acc;
+      }, {}));
+
+      uniqueNetworks.sort((a, b) => b.rssi - a.rssi); // Sort by signal strength
+
+      uniqueNetworks.forEach(net => {
+        const listItem = document.createElement('a');
+        listItem.href = '#';
+        listItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center network-item';
+        listItem.onclick = (e) => {
+            e.preventDefault();
+            selectNetwork(net.ssid);
+        };
+        
+        listItem.innerHTML = `
+          <span>
+            ${getEncryptionIcon(net.encryption)}
+            <strong class="ms-2">${net.ssid}</strong>
+          </span>
+          <span class="badge bg-light text-dark rounded-pill">
+             ${getSignalIcon(net.rssi)}
+             <span class="ms-1">${net.rssi} dBm</span>
+          </span>
+        `;
+        networksList.appendChild(listItem);
+      });
+    }
+
+    scanButton.addEventListener('click', startScan);
+    
+    // Automatically start a scan when the page loads
+    document.addEventListener('DOMContentLoaded', startScan);
+  </script>
 </body>
 </html>
 )rawliteral";
