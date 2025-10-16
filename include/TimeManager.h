@@ -59,6 +59,13 @@ public:
   void syncWithNTP();
 
   /**
+   * @brief Drives the non-blocking NTP state machine.
+   * @details This should be called in the main application loop to handle
+   * ongoing asynchronous NTP synchronization attempts.
+   */
+  void updateNtp();
+
+  /**
    * @brief Gets the current time, formatted for display.
    * @return A String containing the formatted time (e.g., "10:30" or "22:30").
    */

@@ -141,6 +141,7 @@ void loop()
     alarmManager.update();
     bool timeUpdated = timeManager.update();
     timeManager.checkAlarms();
+    timeManager.updateNtp();
     display.updateBrightness();
     handleSensorUpdates();
 

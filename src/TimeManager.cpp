@@ -31,12 +31,24 @@ bool TimeManager::update()
 
 void TimeManager::syncWithNTP()
 {
-  // Call the global syncTime() function, which handles the NTP communication.
+  // This will be the initial, blocking sync
   if (syncTime())
   {
     // If the sync was successful, update the last sync date.
     DateTime now = RTC.now();
     // Store the date as a single integer (e.g., 20231026) for easy comparison.
+    uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
+    lastSyncDate = ymd;
+    Serial.printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
+  }
+}
+
+void TimeManager::updateNtp()
+{
+  NtpSyncState state = updateNtpSync();
+  if (state == NTP_SYNC_SUCCESS)
+  {
+    DateTime now = RTC.now();
     uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;
     Serial.printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
@@ -125,7 +137,7 @@ void TimeManager::checkDailySync()
     if (lastSyncDate != today)
     {
       Serial.println("Performing daily 3 AM time sync...");
-      syncWithNTP();
+      startNtpSync(); // Start the non-blocking sync
     }
   }
 }
