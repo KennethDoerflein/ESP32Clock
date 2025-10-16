@@ -128,17 +128,21 @@ uint8_t TimeManager::getHour() const
 void TimeManager::checkDailySync()
 {
   DateTime now = RTC.now();
-  // Trigger a daily sync at a specific time (e.g., 3 AM) when the network is likely quiet.
-  if (now.hour() == 3)
+  if (now.hour() < 3)
   {
-    // Create a YYYYMMDD integer for the current date.
-    uint32_t today = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
-    // Only sync if the last sync was on a different day.
-    if (lastSyncDate != today)
-    {
-      Serial.println("Performing daily 3 AM time sync...");
-      startNtpSync(); // Start the non-blocking sync
-    }
+    return;
+  }
+
+  // Create a YYYYMMDD integer for the current date.
+  uint32_t today = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
+
+  // If the last sync was on a different day, and it's 3 AM or later, we should sync.
+  // If the device was off at 3 AM
+  // but is on at 4 AM, this will correctly trigger a sync.
+  if (lastSyncDate < today)
+  {
+    Serial.println("Performing daily time sync...");
+    startNtpSync(); // This starts the non-blocking NTP sync.
   }
 }
 
