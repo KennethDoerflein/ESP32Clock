@@ -5,6 +5,7 @@
 #include <DNSServer.h>
 #include "ConfigManager.h"
 #include "display.h"
+#include <ESPmDNS.h>
 
 // --- Static Member Initialization ---
 const char *WiFiManager::AP_SSID = "ESP32-Clock-Setup";
@@ -65,6 +66,18 @@ bool WiFiManager::begin()
       Serial.println("\nWiFi connected!");
       Serial.print("IP Address: ");
       Serial.println(WiFi.localIP());
+
+      // Start the mDNS responder for ESP32Clock_XXXXXX.local
+      if (MDNS.begin(hostname))
+      {
+        Serial.println("mDNS responder started");
+        MDNS.addService("http", "tcp", 80); // Advertise a web server
+      }
+      else
+      {
+        Serial.println("Error starting mDNS!");
+      }
+
       display.drawStatusMessage(("IP: " + WiFi.localIP().toString()).c_str());
       delay(2000);
     }
