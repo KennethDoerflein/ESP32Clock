@@ -77,7 +77,7 @@ void ClockPage::setupSprites(TFT_eSPI &tft)
   // Create the sprites and configure them
   sprClock.createSprite(350, 106);
   sprClock.loadFont(DSEG7ModernBold104);
-  sprClock.setTextDatum(MC_DATUM);
+  sprClock.setTextDatum(MR_DATUM);
   sprClock.setTextColor(TFT_SKYBLUE, TFT_BLACK);
 
   sprTOD.createSprite(55, 34);
@@ -120,7 +120,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
     return;
 
   sprClock.fillSprite(TFT_BLACK);
-  sprClock.drawString(timeStr.c_str(), sprClock.width() / 2, sprClock.height() / 2);
+  sprClock.drawString(timeStr.c_str(), sprClock.width(), sprClock.height() / 2);
 
 #ifdef DEBUG_BORDERS
   sprClock.drawRect(0, 0, sprClock.width(), sprClock.height(), TFT_RED);
