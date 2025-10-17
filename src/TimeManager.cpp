@@ -11,6 +11,7 @@ void TimeManager::begin()
   // Note: RTC hardware initialization is handled externally in setupSensors()
   // to group all I2C device setups together.
   // Perform an initial NTP sync attempt at startup.
+  Serial.println("TimeManager: Performing initial NTP sync...");
   syncWithNTP();
 }
 
@@ -24,6 +25,7 @@ bool TimeManager::update()
   }
   lastUpdate = currentMillis;
 
+  Serial.println("TimeManager: Tick");
   // Perform routine checks, like the daily time sync.
   checkDailySync();
   return true; // An update occurred.
@@ -48,6 +50,7 @@ void TimeManager::updateNtp()
   NtpSyncState state = updateNtpSync();
   if (state == NTP_SYNC_SUCCESS)
   {
+    Serial.println("TimeManager: NTP sync successful.");
     DateTime now = RTC.now();
     uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;

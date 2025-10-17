@@ -79,6 +79,7 @@ bool WiFiManager::begin()
 
   if (ssid.length() > 0)
   {
+    Serial.printf("WiFiManager: Attempting to connect to SSID: %s\n", ssid.c_str());
     display.drawStatusMessage("Connecting to WiFi...");
     _connectionResult = false; // Reset the flag
     WiFi.begin(ssid.c_str(), password.c_str());
@@ -92,10 +93,19 @@ bool WiFiManager::begin()
 
     if (_connectionResult)
     {
+      Serial.println("\nWiFiManager: Connection successful.");
       _isConnected = true;
       display.drawStatusMessage(("IP: " + WiFi.localIP().toString()).c_str());
       delay(2000);
     }
+    else
+    {
+      Serial.println("\nWiFiManager: Connection failed after 15 seconds.");
+    }
+  }
+  else
+  {
+    Serial.println("WiFiManager: No SSID configured.");
   }
 
   if (!_isConnected)

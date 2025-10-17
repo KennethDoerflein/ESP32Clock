@@ -60,50 +60,62 @@ void IRAM_ATTR handleButtonInterrupt()
 void setup()
 {
   Serial.begin(115200);
+  Serial.println("\n\n--- ESP32 Clock Booting Up ---");
 
   // Initialize managers and hardware.
+  Serial.println("Initializing ConfigManager...");
   ConfigManager::getInstance().begin();
 
   // Initialize the snooze button
+  Serial.println("Initializing Snooze Button...");
   pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
 
   // Initialize the Alarm Manager
+  Serial.println("Initializing AlarmManager...");
   AlarmManager::getInstance().begin();
 
   auto &display = Display::getInstance();
+  Serial.println("Initializing Display...");
   display.begin();
 
+  Serial.println("Initializing Sensors...");
   setupSensors();
   display.drawStatusMessage("Initializing...");
 
   // Initialize WiFi. This will connect or start an AP.
   // The begin method returns true if it started the captive portal.
+  Serial.println("Initializing WiFiManager...");
   bool captivePortalStarted = WiFiManager::getInstance().begin();
 
   // If captive portal is active, enable it on the web server.
   if (captivePortalStarted)
   {
+    Serial.println("Captive Portal is active. Enabling on web server.");
     ClockWebServer::getInstance().enableCaptivePortal();
   }
 
   // Start the web server. It will now have the correct routes.
+  Serial.println("Starting Web Server...");
   ClockWebServer::getInstance().begin();
 
   // Add a small delay for web server to stabilize before mDNS announcement.
   delay(100);
 
   // Initialize the Display Manager
+  Serial.println("Initializing DisplayManager...");
   auto &displayManager = DisplayManager::getInstance();
   displayManager.begin(display.getTft());
 
   // Add pages to the manager. Ownership is moved to the manager.
+  Serial.println("Adding pages to DisplayManager...");
   displayManager.addPage(std::make_unique<ClockPage>(&display.getTft()));
   displayManager.addPage(std::make_unique<InfoPage>());
 
   // If connected, set up the main display and sync time.
   if (WiFiManager::getInstance().isConnected())
   {
+    Serial.println("WiFi connected. Syncing time...");
     display.drawStatusMessage("Syncing Time...");
     TimeManager::getInstance().begin();
     // Set the initial page
@@ -111,8 +123,11 @@ void setup()
   }
   else
   {
+    Serial.println("WiFi not connected. Displaying connection message.");
     display.drawStatusMessage("Connect to AP & set WiFi");
   }
+
+  Serial.println("--- Setup Complete ---");
 }
 
 /**
@@ -171,6 +186,7 @@ void loop()
     if (buttonReleaseTime > 0)
     {
       unsigned long pressDuration = buttonReleaseTime - buttonPressTime;
+      Serial.printf("Button press detected. Duration: %lu ms\n", pressDuration);
 
       if (alarmManager.isRinging())
       {
@@ -198,6 +214,7 @@ void loop()
       {
         // If not ringing, a short press cycles pages.
         int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
+        Serial.printf("Cycling to page index: %d\n", newIndex);
         displayManager.setPage(newIndex);
       }
 

@@ -33,10 +33,12 @@ void AlarmManager::update()
   // --- Stage Progression Logic ---
   if (_rampStage == STAGE_SLOW_BEEP && alarmElapsedTime >= STAGE1_DURATION_MS)
   {
+    Serial.println("AlarmManager: Ramping to STAGE_FAST_BEEP");
     _rampStage = STAGE_FAST_BEEP;
   }
   else if (_rampStage == STAGE_FAST_BEEP && alarmElapsedTime >= (STAGE1_DURATION_MS + STAGE2_DURATION_MS))
   {
+    Serial.println("AlarmManager: Ramping to STAGE_CONTINUOUS");
     _rampStage = STAGE_CONTINUOUS;
     digitalWrite(BUZZER_PIN, HIGH); // Turn buzzer on permanently for this stage
     return;                         // Skip beeping logic
