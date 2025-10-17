@@ -136,9 +136,9 @@ This project is broken down into phases to prioritize a functional base clock be
 
   - [x] Create a single-page application (SPA) feel for the web UI.
   - [x] Add a "Reboot Device" button to the web interface.
-  - [ ] Add button to change hostname to the web interface.
   - [ ] Add option to reset to defaults to the web interface.
   - [x] Implement WiFi network scanning for easier setup.
+  - [ ] Improve TOD and seconds centering
 
 - [ ] **Settings Management:**
   - [ ] **Display Options:**
