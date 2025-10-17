@@ -5,6 +5,7 @@
 
 #include <Arduino.h>
 #include <memory>
+#include <WiFi.h>
 
 // Forward declaration
 class DNSServer;
@@ -88,8 +89,17 @@ private:
    */
   void startCaptivePortal();
 
+  /**
+   * @brief WiFi event handler.
+   * @param event The WiFi event that occurred.
+   * @param info The event data.
+   */
+  static void wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info);
+
   /// @brief The SSID for the Access Point mode, used for initial configuration.
   static const char *AP_SSID;
+  /// @brief Flag to signal a successful connection from the event handler.
+  static volatile bool _connectionResult;
   /// @brief The hostname for the device, generated from the MAC address.
   String _hostname;
   /// @brief Flag indicating the current WiFi connection status.

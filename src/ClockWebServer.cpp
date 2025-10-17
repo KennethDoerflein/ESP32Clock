@@ -284,6 +284,21 @@ void ClockWebServer::onCaptivePortalRequest(AsyncWebServerRequest *request)
 
 // --- Template Processor ---
 
+void ClockWebServer::setupMDNS()
+{
+  // Start the mDNS responder for ESP32Clock_XXXXXX.local
+  String hostname = WiFiManager::getInstance().getHostname();
+  if (MDNS.begin(hostname.c_str()))
+  {
+    Serial.println("mDNS responder started");
+    MDNS.addService("http", "tcp", 80); // Advertise the web server
+  }
+  else
+  {
+    Serial.println("Error starting mDNS!");
+  }
+}
+
 String ClockWebServer::processor(const String &var)
 {
   if (var == "HEAD")

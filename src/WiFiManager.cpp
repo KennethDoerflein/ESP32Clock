@@ -5,10 +5,35 @@
 #include <DNSServer.h>
 #include "ConfigManager.h"
 #include "display.h"
+#include "ClockWebServer.h"
 #include <ArduinoJson.h>
 
 // --- Static Member Initialization ---
 const char *WiFiManager::AP_SSID = "ESP32-Clock-Setup";
+volatile bool WiFiManager::_connectionResult = false;
+
+void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+  if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP)
+  {
+    Serial.println("\nWiFi connected! Got IP.");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+    // Set the flag to indicate a successful connection.
+    _connectionResult = true;
+    // Since we have an IP, it's time to start mDNS.
+    // We need to ensure the web server has been initialized first,
+    if (WiFi.isConnected())
+    {
+      ClockWebServer::getInstance().setupMDNS();
+    }
+  }
+  else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
+  {
+    Serial.println("WiFi lost connection.");
+    _connectionResult = false;
+  }
+}
 
 // --- Singleton Implementation ---
 WiFiManager &WiFiManager::getInstance()
@@ -44,6 +69,9 @@ bool WiFiManager::begin()
   WiFi.setHostname(_hostname.c_str());
   Serial.printf("Hostname set to: %s\n", _hostname.c_str());
 
+  // Register the event handler
+  WiFi.onEvent(wifiEventHandler);
+
   // --- WiFi Connection Logic ---
   String ssid = ConfigManager::getInstance().getWifiSSID();
   String password = ConfigManager::getInstance().getWifiPassword();
@@ -52,22 +80,19 @@ bool WiFiManager::begin()
   if (ssid.length() > 0)
   {
     display.drawStatusMessage("Connecting to WiFi...");
+    _connectionResult = false; // Reset the flag
     WiFi.begin(ssid.c_str(), password.c_str());
 
     unsigned long startTime = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 15000)
+    while (!_connectionResult && millis() - startTime < 15000)
     { // 15-second timeout
-      delay(500);
+      delay(100);
       Serial.print(".");
     }
 
-    if (WiFi.status() == WL_CONNECTED)
+    if (_connectionResult)
     {
       _isConnected = true;
-      Serial.println("\nWiFi connected!");
-      Serial.print("IP Address: ");
-      Serial.println(WiFi.localIP());
-
       display.drawStatusMessage(("IP: " + WiFi.localIP().toString()).c_str());
       delay(2000);
     }

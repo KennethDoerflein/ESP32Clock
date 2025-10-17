@@ -104,19 +104,6 @@ void setup()
   // If connected, set up the main display and sync time.
   if (WiFiManager::getInstance().isConnected())
   {
-    // --- mDNS Initialization ---
-    // Start the mDNS responder for ESP32Clock_XXXXXX.local
-    String hostname = WiFiManager::getInstance().getHostname();
-    if (MDNS.begin(hostname.c_str()))
-    {
-      Serial.println("mDNS responder started");
-      MDNS.addService("http", "tcp", 80); // Advertise the web server
-    }
-    else
-    {
-      Serial.println("Error starting mDNS!");
-    }
-
     display.drawStatusMessage("Syncing Time...");
     TimeManager::getInstance().begin();
     // Set the initial page

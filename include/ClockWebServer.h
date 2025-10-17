@@ -5,6 +5,7 @@
 
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
+#include <ESPmDNS.h>
 
 /**
  * @class ClockWebServer
@@ -36,6 +37,14 @@ public:
    * to respond to all requests with the WiFi setup page.
    */
   void enableCaptivePortal();
+
+  /**
+   * @brief Sets up the mDNS responder.
+   *
+   * Initializes and starts the mDNS service to advertise the web server.
+   * This should be called after a successful WiFi connection.
+   */
+  void setupMDNS();
 
   // Delete copy constructor and assignment operator.
   ClockWebServer(const ClockWebServer &) = delete;
