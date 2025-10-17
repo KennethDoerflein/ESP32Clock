@@ -114,12 +114,12 @@ This project is broken down into phases to prioritize a functional base clock be
 ### Phase 1: Core Functionality
 
 - [x] **Hardware Integration:** Connect ESP32-S3 with ILI9488 display, DS3231 RTC, and BME280 sensor.
-- [ ] **Display Logic:**
+- [x] **Display Logic:**
   - [x] Render time, date, day of the week.
   - [x] Render temperature and humidity.
   - [x] Implement basic status messages.
-  - [ ] Fix TOD flashing
-  - [ ] add seconds under TOD
+  - [x] Fix TOD flashing
+  - [x] add seconds under TOD
 - [ ] **Timekeeping:**
   - [x] Initialize RTC and keep time accurately.
   - [x] Connect to Wi-Fi and sync time with an NTP server on startup.
@@ -138,7 +138,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Add a "Reboot Device" button to the web interface.
   - [ ] Add button to change hostname to the web interface.
   - [ ] Add option to reset to defaults to the web interface.
-  - [ ] Implement WiFi network scanning for easier setup.
+  - [x] Implement WiFi network scanning for easier setup.
 
 - [ ] **Settings Management:**
   - [ ] **Display Options:**
