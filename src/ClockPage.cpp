@@ -126,7 +126,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
     clockX = 0;
 
   int secondsX = clockX + sprClock.width() + 15;
-  int todX = secondsX + sprSeconds.width() * 0.2;
+  int todX = secondsX + sprSeconds.width() * 0.15;
 
   // Draw the main time (HH:MM) if it has changed
   if (timeStr != lastTime)
