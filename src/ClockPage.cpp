@@ -161,7 +161,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
     if (lastTOD != "")
     {
       sprTOD.fillSprite(TFT_BLACK);
-      sprTOD.pushSprite(todX, clockY + 10);
+      sprTOD.pushSprite(todX, clockY);
       lastTOD = ""; // Mark as cleared
     }
   }
