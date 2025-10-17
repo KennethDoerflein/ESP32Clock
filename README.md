@@ -210,3 +210,4 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] store in fs
 - [ ] Use long and lat to get weather from noaa
 - [ ] Update every ~10 min
+- [ ] add good morning page after alarm goes off that displays weather
