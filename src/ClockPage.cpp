@@ -220,10 +220,25 @@ void ClockPage::drawTemperature(TFT_eSPI &tft)
   if (abs(temp - lastTemp) < 0.1)
     return;
 
-  char buf[16];
-  snprintf(buf, sizeof(buf), "%.0f%c", temp, ConfigManager::getInstance().isCelsius() ? 'C' : 'F');
-  sprTemp.fillSprite(TFT_BLACK);
-  sprTemp.drawString(buf, 0, sprTemp.height() / 2);
+  sprTemp.fillSprite(TFT_BLACK); // Clear sprite
+
+  // Draw temperature value
+  char tempBuf[8];
+  snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
+  sprTemp.drawString(tempBuf, 0, sprTemp.height() / 2);
+
+  // Calculate position and draw degree circle
+  int tempWidth = sprTemp.textWidth(tempBuf);
+  int circleX = tempWidth + 4;
+  int circleY = sprTemp.height() / 2 - 20;
+  int circleRadius = 3;
+  sprTemp.fillCircle(circleX, circleY, circleRadius, TFT_WHITE);
+
+  // Draw the unit (C/F)
+  char unit = ConfigManager::getInstance().isCelsius() ? 'C' : 'F';
+  char unitBuf[2] = {unit, '\0'};
+  int unitX = circleX + circleRadius * 2; // Position it after the circle
+  sprTemp.drawString(unitBuf, unitX, sprTemp.height() / 2);
 
 #ifdef DEBUG_BORDERS
   sprTemp.drawRect(0, 0, sprTemp.width(), sprTemp.height(), TFT_ORANGE);
