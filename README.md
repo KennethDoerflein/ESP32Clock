@@ -149,9 +149,10 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] **Timezone Configuration:**
     - [ ] Add a dropdown to select the timezone.
 - [ ] **Firmware Updates:**
-  - [ ] Provide OTA updates via file upload.
-  - [ ] Provide OTA updates directly from GitHub releases.
-  - [ ] Better version handling
+  - [x] Provide OTA updates via file upload.
+  - [x] Provide OTA updates directly from GitHub releases.
+  - [x] Better version handling
+    - [ ] Try to improve further (dont change files in codebase)
 
 ### Phase 3: Alarms & User Interaction (In Progress)
 

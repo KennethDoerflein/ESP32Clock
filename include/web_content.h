@@ -19,6 +19,7 @@
 const char BOOTSTRAP_HEAD[] PROGMEM = R"rawliteral(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
 <style>
   body { background-color: #f0f2f5; }
   .container { max-width: 500px; }
@@ -45,6 +46,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           <a href="/wifi" class="btn btn-primary btn-lg">Configure WiFi</a>
           <a href="/settings" class="btn btn-secondary btn-lg">Clock Settings</a>
           <a href="/alarms" class="btn btn-warning btn-lg">Alarm Settings</a>
+          <a href="/update" class="btn btn-info btn-lg">Update Firmware</a>
+        </div>
+        <div class="mt-4 text-center text-muted">
+          <small>Firmware Version: %FIRMWARE_VERSION%</small>
         </div>
       </div>
     </div>
@@ -64,7 +69,6 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 <head>
   <title>%WIFI_PAGE_TITLE%</title>
   %HEAD%
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <style>
     .network-item {
       cursor: pointer;
@@ -231,9 +235,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 <head>
   <title>Clock Settings</title>
   %HEAD%
-  <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <style>
       .status-indicator {
         font-size: 0.9rem;
@@ -443,10 +444,6 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
   <head>
     <title>Alarm Settings</title>
     %HEAD%
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-
     <style>
       :root {
         --btn-base-size: 2.5rem; /* 40px */
@@ -698,6 +695,117 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
       document.addEventListener("DOMContentLoaded", loadAlarms);
     </script>
   </body>
+</html>
+)rawliteral";
+
+/**
+ * @brief The OTA Update page
+ * Provides forms for manual and GitHub updates with on-page status feedback.
+ */
+const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Firmware Update</title>
+  %HEAD%
+</head>
+<body>
+  <div class="container mt-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="card-title text-center mb-4">Firmware Update</h1>
+
+        <!-- Manual Update Section -->
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="card-title d-flex align-items-center"><i class="bi bi-upload me-2"></i>Manual Update</h5>
+            <p class="card-text text-muted small">Select a .bin file from your computer to upload and flash.</p>
+            <form id="upload-form">
+              <div class="input-group">
+                <input type="file" class="form-control" id="firmware" name="firmware" accept=".bin" required>
+                <button class="btn btn-primary" type="submit">Upload</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Online Update Section -->
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title d-flex align-items-center"><i class="bi bi-cloud-download me-2"></i>Online Update (Untested)</h5>
+            <p class="card-text text-muted small">Check for the latest release and update automatically.</p>
+            <div class="d-grid">
+              <button id="online-button" class="btn btn-success">Check for Updates</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Status and Back Button -->
+        <div id="status" class="mt-4"></div>
+        <div class="d-grid mt-4">
+          <a href="/" class="btn btn-secondary">Back to Menu</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const uploadForm = document.getElementById('upload-form');
+    const onlineButton = document.getElementById('online-button');
+    const statusDiv = document.getElementById('status');
+    const fileInput = document.getElementById('firmware');
+
+    function showStatus(message, type = 'info') {
+      statusDiv.innerHTML = `<div class="alert alert-${type} d-flex align-items-center" role="alert">
+          ${type === 'info' ? '<div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading...</span></div>' : ''}
+          <div>${message}</div>
+        </div>`;
+    }
+
+    uploadForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (!fileInput.files.length) {
+        showStatus('Please select a firmware file first.', 'warning');
+        return;
+      }
+      showStatus('Uploading firmware... Do not close this page.');
+      const formData = new FormData(this);
+      fetch('/update', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then(text => {
+        showStatus(text, 'success');
+      })
+      .catch(error => {
+        showStatus(`Upload failed: ${error.message}`, 'danger');
+      });
+    });
+
+    onlineButton.addEventListener('click', function() {
+      showStatus('Checking for online updates...');
+      fetch('/api/update/github', { method: 'POST' })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then(text => {
+        showStatus(text, 'success');
+      })
+      .catch(error => {
+        showStatus(`Online update check failed: ${error.message}`, 'danger');
+      });
+    });
+  </script>
+</body>
 </html>
 )rawliteral";
 

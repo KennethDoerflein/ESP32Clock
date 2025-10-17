@@ -1,6 +1,7 @@
 #include "pages/InfoPage.h"
 #include "fonts/DSEG14ModernBold24.h"
 #include <WiFi.h>
+#include "version.h"
 
 InfoPage::InfoPage() {}
 
@@ -34,7 +35,9 @@ void InfoPage::onEnter(TFT_eSPI &tft)
 
   // Display Version
   y_pos += 30;
-  tft.drawString("Version: 0.0.0", x_pos, y_pos);
+  String version = "Version: ";
+  version += FIRMWARE_VERSION;
+  tft.drawString(version, x_pos, y_pos);
 
   tft.unloadFont();
 }

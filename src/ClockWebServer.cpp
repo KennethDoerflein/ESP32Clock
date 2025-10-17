@@ -8,6 +8,8 @@
 #include <AsyncTCP.h>
 #include <WiFi.h>
 #include "display.h"
+#include "UpdateManager.h"
+#include "version.h"
 
 // --- Singleton Implementation ---
 ClockWebServer &ClockWebServer::getInstance()
@@ -176,6 +178,40 @@ void ClockWebServer::begin()
       request->send(200, "text/plain", "Rebooting...");
       delay(100);
       ESP.restart(); });
+
+    server.on("/update", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { request->send_P(200, "text/html", UPDATE_PAGE_HTML, [this](const String &var)
+                                { return processor(var); }); });
+
+    server.on(
+        "/update", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+          // This handler is intentionally empty. The response is sent in the upload handler.
+        },
+        [](AsyncWebServerRequest *request, String filename, size_t index,
+           uint8_t *data, size_t len, bool final)
+        {
+          UpdateManager::getInstance().handleFileUpload(data, len, index, request->contentLength());
+          if (final)
+          {
+            if (UpdateManager::getInstance().endUpdate())
+            {
+              request->send(200, "text/plain", "Update successful! Rebooting...");
+              delay(1000); // Give client time to receive response
+              ESP.restart();
+            }
+            else
+            {
+              request->send(500, "text/plain", "Update failed. Check serial monitor for details.");
+            }
+          }
+        });
+
+    server.on("/api/update/github", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+      String status = UpdateManager::getInstance().handleGithubUpdate();
+      request->send(200, "text/plain", status); });
   }
 
   // This route is shared between normal and captive portal modes.
@@ -256,6 +292,8 @@ String ClockWebServer::processor(const String &var)
     return WiFiManager::getInstance().isCaptivePortal() ? "WiFi Setup" : "Configure WiFi";
   if (var == "BACK_BUTTON_CLASS")
     return WiFiManager::getInstance().isCaptivePortal() ? "d-none" : "";
+  if (var == "FIRMWARE_VERSION")
+    return FIRMWARE_VERSION;
 
   return String();
 }

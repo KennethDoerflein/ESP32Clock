@@ -28,6 +28,7 @@
 #include "pages/ClockPage.h"
 #include "pages/InfoPage.h"
 #include "ClockWebServer.h"
+#include "UpdateManager.h"
 
 // --- Pin Definitions ---
 #define SNOOZE_BUTTON_PIN 5
