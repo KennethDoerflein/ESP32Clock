@@ -76,6 +76,14 @@ String TimeManager::getFormattedTime() const
   return String(timeStr);
 }
 
+String TimeManager::getFormattedSeconds() const
+{
+  DateTime now = RTC.now();
+  char secondsStr[3];
+  sprintf(secondsStr, "%02d", now.second());
+  return String(secondsStr);
+}
+
 String TimeManager::getFormattedDate() const
 {
   DateTime now = RTC.now();

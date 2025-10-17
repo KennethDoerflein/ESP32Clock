@@ -90,6 +90,12 @@ public:
   String getTOD() const;
 
   /**
+   * @brief Gets the seconds of the current time, formatted for display.
+   * @return A String containing the formatted seconds (e.g., "59").
+   */
+  String getFormattedSeconds() const;
+
+  /**
    * @brief Gets the current hour in 24-hour format.
    * @return The current hour (0-23).
    */

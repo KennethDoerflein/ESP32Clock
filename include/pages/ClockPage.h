@@ -41,12 +41,14 @@ private:
   TFT_eSprite sprTemp;
   TFT_eSprite sprHumidity;
   TFT_eSprite sprTOD;
+  TFT_eSprite sprSeconds;
 
   // Cached values to prevent unnecessary redraws
   String lastTime;
   String lastDate;
   String lastDayOfWeek;
   String lastTOD;
+  String lastSeconds;
   float lastTemp = -999;
   float lastHumidity = -999;
 
