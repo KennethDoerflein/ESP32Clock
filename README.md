@@ -119,6 +119,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Render temperature and humidity.
   - [x] Implement basic status messages.
   - [ ] Fix TOD flashing
+  - [ ] add seconds under TOD
 - [ ] **Timekeeping:**
   - [x] Initialize RTC and keep time accurately.
   - [x] Connect to Wi-Fi and sync time with an NTP server on startup.
