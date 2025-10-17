@@ -123,8 +123,7 @@ This project is broken down into phases to prioritize a functional base clock be
 - [ ] **Timekeeping:**
   - [x] Initialize RTC and keep time accurately.
   - [x] Connect to Wi-Fi and sync time with an NTP server on startup.
-  - [ ] Implement a daily automatic time sync.
-    - [ ] Add test mode to sync every 5 min
+  - [X] Implement a daily automatic time sync.
   - [ ] fail soft if sync has been completed once already
 - [x] **Basic Configuration:**
   - [x] Store and retrieve settings from LittleFS.
