@@ -19,6 +19,10 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
     Serial.println("\nWiFi connected! Got IP.");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
+
+    // Disable WiFi power-saving mode to improve stability
+    WiFi.setSleep(false);
+
     // Set the flag to indicate a successful connection.
     _connectionResult = true;
     // Since we have an IP, it's time to start mDNS.
