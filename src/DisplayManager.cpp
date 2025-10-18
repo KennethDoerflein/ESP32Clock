@@ -33,6 +33,10 @@ void DisplayManager::setPage(int index, bool forceRedraw)
   currentPageIndex = index;
   currentPage = pages[currentPageIndex].get();
   currentPage->onEnter(*tft);
+
+  // After a page change, the screen is cleared, so the icon is no longer visible.
+  // We need to reset its state to force a redraw on the next loop.
+  _alarmIconVisible = false;
 }
 
 void DisplayManager::update()
@@ -65,16 +69,25 @@ void DisplayManager::drawAlarmIcon(bool enabled)
   }
   _alarmIconVisible = enabled;
 
+  // Define the bounding box for the icon for easy clearing
+  const int icon_x = 462;
+  const int icon_y = 5;
+  const int icon_w = 18;
+  const int icon_h = 18;
+
   if (enabled)
   {
-    // Draw a simple bell icon (a circle with a dot)
-    tft->fillCircle(470, 10, 5, TFT_YELLOW);
-    tft->fillRect(465, 15, 10, 2, TFT_YELLOW);
+    // Bell body using a rounded rectangle
+    tft->fillRoundRect(icon_x + 2, icon_y, 12, 11, 4, TFT_YELLOW);
+    // Bell lip/flare
+    tft->fillRect(icon_x, icon_y + 10, 16, 3, TFT_YELLOW);
+    // Clapper (small circle inside)
+    tft->fillCircle(icon_x + 8, icon_y + 12, 2, TFT_ORANGE);
   }
   else
   {
-    // Erase the icon by drawing a black rectangle over it
-    tft->fillRect(460, 5, 15, 15, TFT_BLACK);
+    // Erase the icon by drawing a black rectangle over its bounding box
+    tft->fillRect(icon_x, icon_y, icon_w, icon_h, TFT_BLACK);
   }
 }
 
