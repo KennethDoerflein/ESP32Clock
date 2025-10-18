@@ -107,6 +107,12 @@ public:
    */
   bool is24HourFormat() const;
 
+  /**
+   * @brief Gets the current time from the RTC.
+   * @return A DateTime object representing the current time.
+   */
+  DateTime getRTCTime() const;
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.

@@ -171,6 +171,17 @@ const Alarm &ConfigManager::getAlarm(int index) const
   return _alarms[index];
 }
 
+Alarm &ConfigManager::getAlarm(int index)
+{
+  if (index < 0 || index >= MAX_ALARMS)
+  {
+    // This is an error, restart the system.
+    Serial.println("FATAL: Alarm index out of bounds!");
+    ESP.restart(); // Restart the ESP32 to recover
+  }
+  return _alarms[index];
+}
+
 int ConfigManager::getNumAlarms() const
 {
   return MAX_ALARMS;

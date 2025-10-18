@@ -56,6 +56,7 @@ public:
    * @return A constant reference to the Alarm object.
    */
   const Alarm &getAlarm(int index) const;
+  Alarm &getAlarm(int index);
 
   /**
    * @brief Gets the total number of alarms.

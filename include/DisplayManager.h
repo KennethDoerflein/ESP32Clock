@@ -71,8 +71,9 @@ public:
   /**
    * @brief Draws or erases the alarm indicator icon on the display.
    * @param enabled True to draw the icon, false to erase it.
+   * @param snoozing If true, draw the icon in a snoozing state (e.g., different color).
    */
-  void drawAlarmIcon(bool enabled);
+  void drawAlarmIcon(bool enabled, bool snoozing);
 
   /**
    * @brief Switches the display to the "ringing" screen.
@@ -87,4 +88,5 @@ private:
   Page *currentPage;                        ///< Pointer to the currently active page.
   int currentPageIndex = -1;                ///< Index of the current page.
   bool _alarmIconVisible = false;           ///< Tracks the current state of the alarm icon.
+  bool _isSnoozing = false;                 ///< Tracks the snooze state of the icon.
 };

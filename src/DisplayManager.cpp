@@ -61,13 +61,14 @@ int DisplayManager::getPagesSize()
   return pages.size();
 }
 
-void DisplayManager::drawAlarmIcon(bool enabled)
+void DisplayManager::drawAlarmIcon(bool enabled, bool snoozing)
 {
-  if (_alarmIconVisible == enabled)
+  if (_alarmIconVisible == enabled && _isSnoozing == snoozing)
   {
     return; // No change needed
   }
   _alarmIconVisible = enabled;
+  _isSnoozing = snoozing;
 
   // Define the bounding box for the icon for easy clearing
   const int icon_x = 462;
@@ -77,12 +78,13 @@ void DisplayManager::drawAlarmIcon(bool enabled)
 
   if (enabled)
   {
+    uint16_t color = snoozing ? TFT_BLUE : TFT_YELLOW;
     // Bell body using a rounded rectangle
-    tft->fillRoundRect(icon_x + 2, icon_y, 12, 11, 4, TFT_YELLOW);
+    tft->fillRoundRect(icon_x + 2, icon_y, 12, 11, 4, color);
     // Bell lip/flare
-    tft->fillRect(icon_x, icon_y + 10, 16, 3, TFT_YELLOW);
+    tft->fillRect(icon_x, icon_y + 10, 16, 3, color);
     // Clapper (small circle inside)
-    tft->fillCircle(icon_x + 8, icon_y + 12, 2, TFT_ORANGE);
+    tft->fillCircle(icon_x + 8, icon_y + 12, 2, TFT_BLACK);
   }
   else
   {

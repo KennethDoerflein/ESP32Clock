@@ -108,13 +108,20 @@ void ClockWebServer::begin()
           for (JsonObject alarmObj : alarmsArray) {
             int id = alarmObj["id"] | -1;
             if (id >= 0 && id < config.getNumAlarms()) {
-              Alarm alarm;
-              alarm.setId(id);
-              alarm.setEnabled(alarmObj["enabled"] | false);
-              alarm.setHour(alarmObj["hour"] | 6);
-              alarm.setMinute(alarmObj["minute"] | 0);
-              alarm.setDays(alarmObj["days"] | 0);
-              config.setAlarm(id, alarm);
+              Alarm newAlarm;
+              newAlarm.setId(id);
+              newAlarm.setEnabled(alarmObj["enabled"] | false);
+              newAlarm.setHour(alarmObj["hour"] | 6);
+              newAlarm.setMinute(alarmObj["minute"] | 0);
+              newAlarm.setDays(alarmObj["days"] | 0);
+
+              // Preserve snooze state
+              const Alarm& oldAlarm = config.getAlarm(id);
+              if (oldAlarm.isSnoozed()) {
+                newAlarm.setSnoozeState(true, oldAlarm.getSnoozeUntil());
+              }
+
+              config.setAlarm(id, newAlarm);
             }
           }
           config.save();

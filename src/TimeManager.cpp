@@ -27,7 +27,7 @@ bool TimeManager::update()
     return false; // No update occurred.
   }
   lastUpdate = currentMillis;
-  
+
 #ifdef LOG_TICKS
   SerialLog::getInstance().print("TimeManager: Tick\n");
 #endif
@@ -179,13 +179,10 @@ void TimeManager::checkAlarms()
   DateTime now = RTC.now();
   uint32_t nowSeconds = now.unixtime();
 
-  // On first run, initialize the last checked time and do nothing.
-  if (_lastTimeChecked == 0)
-  {
-    _lastTimeChecked = nowSeconds;
-    return;
-  }
-
+  // If this is the first run, we want to check for past alarms, but not
+  // so far in the past that we trigger alarms from days ago. We'll start
+  // our check from the current time, and the logic below will cap the
+  // look-behind period at half an hour.
   uint32_t lastCheckSeconds = _lastTimeChecked;
 
   // If time has not advanced or went backwards, do nothing.
@@ -196,8 +193,16 @@ void TimeManager::checkAlarms()
   }
 
   // To prevent a huge loop if the device was off, cap the catch-up time.
-  // 1 hour should be more than enough to cover any reasonable NTP sync delay.
-  const uint32_t maxCatchUpSeconds = 1 * 60 * 60;
+  // 0.5 hour should be more than enough to cover any reasonable NTP sync delay.
+  const uint32_t maxCatchUpSeconds = 30 * 60;
+
+  // On the first run after boot, _lastTimeChecked is 0.
+  // We set our check start point to half an hour ago to find any alarms we missed.
+  if (_lastTimeChecked == 0)
+  {
+    _lastTimeChecked = nowSeconds - maxCatchUpSeconds;
+  }
+
   if (nowSeconds > lastCheckSeconds + maxCatchUpSeconds)
   {
     lastCheckSeconds = nowSeconds - maxCatchUpSeconds;
@@ -209,7 +214,7 @@ void TimeManager::checkAlarms()
   // We iterate through each of the alarms first.
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    Alarm alarm = config.getAlarm(i);
+    Alarm &alarm = config.getAlarm(i);
 
     if (!alarm.isEnabled())
     {
@@ -218,27 +223,34 @@ void TimeManager::checkAlarms()
 
     // Snooze logic is always based on the real current time ("now").
     // If the snooze period ends, updateSnooze will re-enable the alarm.
-    bool needsSave = alarm.updateSnooze();
+    bool snoozeEnded = alarm.updateSnooze();
+    bool needsSave = false;
 
-    // Now, check every minute between the last check and the current time
-    // to see if this alarm should have rung.
-    // We start from the beginning of the *next* minute after the last check.
-    DateTime t = DateTime(lastCheckSeconds);
-    DateTime startTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute()) + TimeSpan(0, 0, 1, 0);
-
-    for (DateTime checkMinute = startTime; checkMinute <= now; checkMinute = checkMinute + TimeSpan(0, 0, 1, 0))
+    if (snoozeEnded)
     {
-      if (alarm.shouldRing(checkMinute))
-      {
-        AlarmManager::getInstance().trigger(alarm.getId());
-        alarmJustTriggered = true;
+      // If snooze just ended, re-trigger the alarm immediately.
+      AlarmManager::getInstance().trigger(alarm.getId());
+      alarmJustTriggered = true;
+    }
+    else
+    {
+      // Now, check every minute between the last check and the current time
+      // to see if this alarm should have rung.
+      // We start from the beginning of the *next* minute after the last check.
+      DateTime t = DateTime(lastCheckSeconds);
+      DateTime startTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute()) + TimeSpan(0, 0, 1, 0);
 
-        if (alarm.getDays() == 0)
+      for (DateTime checkMinute = startTime; checkMinute <= now; checkMinute = checkMinute + TimeSpan(0, 0, 1, 0))
+      {
+        if (alarm.shouldRing(checkMinute))
         {
-          alarm.dismiss();
-          needsSave = true;
+          AlarmManager::getInstance().trigger(alarm.getId());
+          alarmJustTriggered = true;
+
+          // Note: One-time alarms are dismissed by the user (long press)
+          // in main.cpp, not automatically. This allows them to be snoozed.
+          break; // Stop checking minutes for this alarm
         }
-        break; // Stop checking minutes for this alarm
       }
     }
 
@@ -255,4 +267,9 @@ void TimeManager::checkAlarms()
 
   // Always update the last checked time to the current time.
   _lastTimeChecked = nowSeconds;
+}
+
+DateTime TimeManager::getRTCTime() const
+{
+  return RTC.now();
 }

@@ -27,6 +27,7 @@ public:
   uint8_t getMinute() const { return _minute; }
   uint8_t getDays() const { return _days; }
   bool isSnoozed() const { return _snoozed; }
+  unsigned long getSnoozeUntil() const { return _snoozeUntil; }
 
   // Public setters for properties
   void setId(uint8_t id) { _id = id; }
@@ -34,6 +35,11 @@ public:
   void setHour(uint8_t hour) { _hour = hour; }
   void setMinute(uint8_t minute) { _minute = minute; }
   void setDays(uint8_t days) { _days = days; }
+  void setSnoozeState(bool snoozed, unsigned long snoozeUntil)
+  {
+    _snoozed = snoozed;
+    _snoozeUntil = snoozeUntil;
+  }
 
   /**
    * @brief Snoozes the alarm for a predefined duration.
@@ -100,7 +106,7 @@ public:
 private:
   uint8_t _id = 0;
   bool _enabled = false;
-  uint8_t _hour = 6;   // Default to 6:00 AM
+  uint8_t _hour = 6; // Default to 6:00 AM
   uint8_t _minute = 0;
   uint8_t _days = 0; // Bitmask for days of the week
   bool _snoozed = false;

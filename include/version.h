@@ -1,3 +1,3 @@
 #pragma once
 
-#define FIRMWARE_VERSION "dev-20251018-033540"
+#define FIRMWARE_VERSION "dev-20251018-163116"

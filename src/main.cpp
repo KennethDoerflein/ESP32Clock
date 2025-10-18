@@ -38,21 +38,37 @@
 
 // --- Global Variables for Timers & Button Handling ---
 unsigned long lastLoopTime = 0;
-volatile unsigned long buttonPressTime = 0;
-volatile unsigned long buttonReleaseTime = 0;
-volatile bool buttonState = HIGH; // Start with the button not pressed
+volatile unsigned long pressDuration = 0;
+volatile bool newPress = false;
 
 // --- Interrupt Service Routine (ISR) ---
 void IRAM_ATTR handleButtonInterrupt()
 {
-  buttonState = digitalRead(SNOOZE_BUTTON_PIN);
-  if (buttonState == LOW)
-  { // Button was just pressed
-    buttonPressTime = millis();
+  static unsigned long lastInterruptTime = 0;
+  static unsigned long buttonPressTime = 0;
+  unsigned long interruptTime = millis();
+
+  // Basic debouncing
+  if (interruptTime - lastInterruptTime < 50)
+  {
+    return;
+  }
+  lastInterruptTime = interruptTime;
+
+  if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
+  {
+    // Button was just pressed
+    buttonPressTime = interruptTime;
   }
   else
-  { // Button was just released
-    buttonReleaseTime = millis();
+  {
+    // Button was just released
+    if (buttonPressTime > 0)
+    { // Ensure we have a valid press time
+      pressDuration = interruptTime - buttonPressTime;
+      newPress = true;
+      buttonPressTime = 0; // Reset for next press
+    }
   }
 }
 
@@ -192,14 +208,20 @@ void loop()
       // without blanking the screen.
       displayManager.refresh();
       config.clearDirtyFlag();
-      SerialLog::getInstance().print("Configuration reloaded and page refreshed.\n");
+      SerialLog::getInstance().print("Settings changed, refreshing display.\n");
     }
 
     // --- Button Handling Logic ---
-    if (buttonReleaseTime > 0)
+    if (newPress)
     {
-      unsigned long pressDuration = buttonReleaseTime - buttonPressTime;
-      SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", pressDuration);
+      unsigned long duration;
+      // Atomically read and reset the flag
+      noInterrupts();
+      duration = pressDuration;
+      newPress = false;
+      interrupts();
+
+      SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", duration);
 
       if (alarmManager.isRinging())
       {
@@ -209,17 +231,22 @@ void loop()
           auto &config = ConfigManager::getInstance();
           Alarm alarm = config.getAlarm(alarmId); // Get a copy
 
-          if (pressDuration > 10000) // Long press (> 10 seconds) to dismiss
+          bool isSnooze = duration <= 10000;
+
+          if (isSnooze)
+          {
+            alarm.snooze();
+            DateTime now = TimeManager::getInstance().getRTCTime();
+            DateTime snoozeUntil = now + TimeSpan(SNOOZE_DURATION_MS / 1000);
+            SerialLog::getInstance().printf("Snoozing until: %02d:%02d:%02d\n", snoozeUntil.hour(), snoozeUntil.minute(), snoozeUntil.second());
+          }
+          else // Long press (> 10 seconds) to dismiss
           {
             SerialLog::getInstance().print("Long press detected. Dismissing alarm.\n");
             alarm.dismiss();
           }
-          else // Short press to snooze
-          {
-            SerialLog::getInstance().print("Short press detected. Snoozing alarm.\n");
-            alarm.snooze();
-          }
           config.setAlarm(alarmId, alarm); // Save the updated state
+          config.save();                   // Persist the change to storage
           alarmManager.stop();             // Stop the physical ringing
         }
       }
@@ -230,22 +257,23 @@ void loop()
         SerialLog::getInstance().printf("Cycling to page index: %d\n", newIndex);
         displayManager.setPage(newIndex);
       }
-
-      // Reset timers
-      buttonPressTime = 0;
-      buttonReleaseTime = 0;
     }
 
     // --- Update Alarm Icon ---
     bool anyAlarmEnabled = false;
+    bool anyAlarmSnoozed = false;
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
-      if (config.getAlarm(i).isEnabled())
+      const auto &alarm = config.getAlarm(i);
+      if (alarm.isEnabled())
       {
         anyAlarmEnabled = true;
-        break;
+        if (alarm.isSnoozed())
+        {
+          anyAlarmSnoozed = true;
+        }
       }
     }
-    displayManager.drawAlarmIcon(anyAlarmEnabled);
+    displayManager.drawAlarmIcon(anyAlarmEnabled, anyAlarmSnoozed);
   }
 }
