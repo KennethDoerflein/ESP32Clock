@@ -159,6 +159,8 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] Alarms stopping instead of being snoozed.
 - [ ] **UI/UX Enhancements**
   - [ ] Lag when leaving the Wi-Fi page due to scanning.
+-[ ] **Web UI**
+  -[ ] Can't scroll up while log message are being added
 
 ### Future Plans
 
