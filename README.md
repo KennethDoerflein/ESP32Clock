@@ -159,6 +159,7 @@ This project is broken down into phases to prioritize a functional base clock be
 
 - [ ] **Alarms & User Interaction**
   - [ ] Alarms stopping instead of being snoozed.
+  - [ ] Web UI alarm settings opens and closes when enabling or disabling alarm
 - [ ] **UI/UX Enhancements**
   - [ ] Lag when leaving the Wi-Fi page due to scanning.
 -[ ] **Web UI**
