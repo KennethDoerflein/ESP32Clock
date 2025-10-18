@@ -139,6 +139,8 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Implement WiFi network scanning for easier setup.
   - [ ] Improve TOD and seconds centering
   - [ ] Improve lag when trying to leave wifi page due to scanning
+  - [ ] make temp unit smaller and higher up like a superscript
+  - [ ] make degree sign bigger and more degree like
 
 - [ ] **Settings Management:**
   - [ ] **Display Options:**
