@@ -45,6 +45,15 @@ public:
   void handleDns();
 
   /**
+   * @brief Handles WiFi connection and reconnection logic.
+   *
+   * This method should be called periodically in the main loop to manage
+   * the WiFi connection. It will attempt to reconnect if the connection
+   * is lost.
+   */
+  void handleConnection();
+
+  /**
    * @brief Checks if the device is currently connected to a WiFi network.
    * @return True if connected, false otherwise.
    */
@@ -112,6 +121,10 @@ private:
   bool _isConnected;
   /// @brief Pointer to the DNS server instance for the captive portal.
   std::unique_ptr<DNSServer> _dnsServer;
+  /// @brief Timestamp of the last reconnection attempt.
+  unsigned long _lastReconnectAttempt = 0;
+  /// @brief Flag to indicate if a reconnection is in progress.
+  bool _isReconnecting = false;
 };
 
 #endif // WIFIMANAGER_H

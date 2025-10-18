@@ -146,7 +146,10 @@ void setup()
 void loop()
 {
   // Handle DNS requests for the captive portal if it's active.
-  WiFiManager::getInstance().handleDns();
+  auto &wifiManager = WiFiManager::getInstance();
+  wifiManager.handleDns();
+  // Manage WiFi connection and reconnection.
+  wifiManager.handleConnection();
 
   // Implement a non-blocking delay.
   unsigned long currentMillis = millis();

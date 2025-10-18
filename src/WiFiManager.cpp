@@ -33,6 +33,46 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
   {
     logger.print("WiFi lost connection.\n");
     _connectionResult = false;
+    // Set _isConnected to false directly, but don't trigger reconnection here.
+    // The handle() method will manage the reconnection process.
+    getInstance()._isConnected = false;
+  }
+}
+
+void WiFiManager::handleConnection()
+{
+  if (isCaptivePortal())
+  {
+    return;
+  }
+
+  if (_isConnected)
+  {
+    if (_isReconnecting)
+    {
+      _isReconnecting = false;
+    }
+    return;
+  }
+
+  unsigned long now = millis();
+
+  if (_isReconnecting)
+  {
+    if (now - _lastReconnectAttempt > 15000) // 15s timeout
+    {
+      SerialLog::getInstance().print("WiFi reconnection timed out.\n");
+      _isReconnecting = false;
+    }
+    return;
+  }
+
+  if (now - _lastReconnectAttempt > 30000) // 30s interval
+  {
+    _lastReconnectAttempt = now;
+    _isReconnecting = true;
+    SerialLog::getInstance().print("Attempting to reconnect WiFi...\n");
+    WiFi.reconnect();
   }
 }
 
