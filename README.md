@@ -142,6 +142,7 @@ This project is broken down into phases to prioritize a functional base clock be
     - [ ] Show a "ringing" screen when an alarm is going off.
     - [ ] Show a snooze countdown.
     - [ ] Add a visual indicator for how long to hold the snooze button.
+    - [ ] Display when RTC battery needs to be replaced
 - [ ] **UI/UX Enhancements**
   - [ ] Add an option to reset to defaults in the web interface.
   - [ ] Improve TOD and seconds centering.
