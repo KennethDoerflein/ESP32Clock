@@ -8,6 +8,7 @@
  */
 #include "ntp.h"
 #include "sensors.h"
+#include "SerialLog.h"
 #include <Arduino.h>
 
 // --- Common NTP Constants ---
@@ -62,7 +63,7 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
   // Update the hardware RTC with the adjusted time.
   RTC.adjust(adjustedTime);
 
-  Serial.print("RTC synchronized with NTP time (compensated): ");
+  SerialLog::getInstance().print("RTC synchronized with NTP time (compensated): ");
   char timeStr[20];
   sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
           adjustedTime.year(),
@@ -71,7 +72,7 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
           adjustedTime.hour(),
           adjustedTime.minute(),
           adjustedTime.second());
-  Serial.println(timeStr);
+  SerialLog::getInstance().printf("%s\n", timeStr);
 }
 
 /**
@@ -95,7 +96,7 @@ void startNtpSync()
   {
     return;
   }
-  Serial.println("Starting non-blocking NTP sync...");
+  SerialLog::getInstance().printf("Starting non-blocking NTP sync...\n");
   ntpState = NTP_SYNC_IN_PROGRESS;
   retryCount = 0;
   // Set lastSyncAttemptMs to 0 to trigger an immediate first attempt in updateNtpSync
@@ -123,7 +124,7 @@ NtpSyncState updateNtpSync()
   lastSyncAttemptMs = currentMillis; // Mark the time of this attempt
   retryCount++;
 
-  Serial.printf("Fetching NTP time (Attempt %d/%d)...\n", retryCount, maxRetries);
+  SerialLog::getInstance().printf("Fetching NTP time (Attempt %d/%d)...\n", retryCount, maxRetries);
 
   struct tm timeinfo;
   // Pass the struct directly as the function expects a reference
@@ -137,7 +138,7 @@ NtpSyncState updateNtpSync()
   // If sync failed, check for retry limit
   if (retryCount >= maxRetries)
   {
-    Serial.println("Failed to sync time with NTP server after all retries.");
+    SerialLog::getInstance().printf("Failed to sync time with NTP server after all retries.\n");
     ntpState = NTP_SYNC_FAILED; // Update state to failed
     return ntpState;
   }
@@ -146,7 +147,7 @@ NtpSyncState updateNtpSync()
   unsigned long jitter = random(jitterMaxMs + 1);
   unsigned long nextDelay = currentRetryDelay + jitter;
 
-  Serial.printf("Failed to obtain time. Retrying in approx. %.2f seconds...\n", nextDelay / 1000.0);
+  SerialLog::getInstance().printf("Failed to obtain time. Retrying in approx. %.2f seconds...\n", nextDelay / 1000.0);
 
   // Exponentially increase the base delay for the *next* cycle
   currentRetryDelay *= 2;
@@ -168,7 +169,7 @@ bool syncTime()
 
   for (int i = 1; i <= maxRetries; i++)
   {
-    Serial.printf("Fetching NTP time (Attempt %d/%d)...\n", i, maxRetries);
+    SerialLog::getInstance().printf("Fetching NTP time (Attempt %d/%d)...\n", i, maxRetries);
 
     if (getNTPData(timeinfo))
     {
@@ -182,7 +183,7 @@ bool syncTime()
       unsigned long jitter = random(jitterMaxMs + 1);
       unsigned long totalDelay = delayForNextAttempt + jitter;
 
-      Serial.printf("Failed to obtain time. Retrying in %.2f seconds...\n", totalDelay / 1000.0);
+      SerialLog::getInstance().printf("Failed to obtain time. Retrying in %.2f seconds...\n", totalDelay / 1000.0);
       delay(totalDelay);
 
       delayForNextAttempt *= 2;
@@ -193,6 +194,6 @@ bool syncTime()
     }
   }
 
-  Serial.println("Failed to sync time with NTP server after all retries.");
+  SerialLog::getInstance().printf("Failed to sync time with NTP server after all retries.\n");
   return false;
 }
