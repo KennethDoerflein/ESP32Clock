@@ -134,6 +134,8 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] **Alarm Management:**
     - [ ] UI for adding and deleting alarms.
     - [ ] Significantly increase the 5-alarm limit.
+    - [ ] Let user set snooze duration
+    - [ ] Let user set hold to dismiss alarm duration
   - [ ] **Hardware Interaction:**
     - [ ] Implement a factory reset via a long-press of the boot button.
   - [ ] **Audio Feedback:**
