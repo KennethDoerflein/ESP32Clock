@@ -2,6 +2,7 @@
 
 #include "AlarmManager.h"
 #include "DisplayManager.h"
+#include "SerialLog.h"
 
 // --- Constants for the ramping alarm state machine ---
 const unsigned long STAGE1_DURATION_MS = 10000; // 10 seconds of slow beeping
@@ -33,12 +34,12 @@ void AlarmManager::update()
   // --- Stage Progression Logic ---
   if (_rampStage == STAGE_SLOW_BEEP && alarmElapsedTime >= STAGE1_DURATION_MS)
   {
-    Serial.println("AlarmManager: Ramping to STAGE_FAST_BEEP");
+    SerialLog::getInstance().print("AlarmManager: Ramping to STAGE_FAST_BEEP\n");
     _rampStage = STAGE_FAST_BEEP;
   }
   else if (_rampStage == STAGE_FAST_BEEP && alarmElapsedTime >= (STAGE1_DURATION_MS + STAGE2_DURATION_MS))
   {
-    Serial.println("AlarmManager: Ramping to STAGE_CONTINUOUS");
+    SerialLog::getInstance().print("AlarmManager: Ramping to STAGE_CONTINUOUS\n");
     _rampStage = STAGE_CONTINUOUS;
     digitalWrite(BUZZER_PIN, HIGH); // Turn buzzer on permanently for this stage
     return;                         // Skip beeping logic
@@ -79,7 +80,7 @@ void AlarmManager::stop()
   if (!_isRinging)
     return;
 
-  Serial.printf("Stopping alarm ID %d\n", _activeAlarmId);
+  SerialLog::getInstance().printf("Stopping alarm ID %d\n", _activeAlarmId);
   digitalWrite(BUZZER_PIN, LOW); // Ensure buzzer is off
   _isRinging = false;
   _activeAlarmId = -1;
@@ -107,7 +108,7 @@ void AlarmManager::trigger(uint8_t alarmId)
   if (_isRinging)
     return; // Don't trigger if another is already active
 
-  Serial.printf("Triggering alarm ID %d\n", alarmId);
+  SerialLog::getInstance().printf("Triggering alarm ID %d\n", alarmId);
   _isRinging = true;
   _activeAlarmId = alarmId;
 

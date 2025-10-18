@@ -10,6 +10,7 @@
 #include "display.h"
 #include "UpdateManager.h"
 #include "version.h"
+#include "SerialLog.h"
 
 // --- Singleton Implementation ---
 ClockWebServer &ClockWebServer::getInstance()
@@ -212,6 +213,15 @@ void ClockWebServer::begin()
               {
       String status = UpdateManager::getInstance().handleGithubUpdate();
       request->send(200, "text/plain", status); });
+
+    if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
+    {
+      server.on("/seriallog", HTTP_GET, [this](AsyncWebServerRequest *request)
+                { request->send_P(200, "text/html", SERIAL_LOG_PAGE_HTML,
+                                  [this](const String &var)
+                                  { return processor(var); }); });
+      SerialLog::getInstance().begin(&server);
+    }
   }
 
   // This route is shared between normal and captive portal modes.
@@ -283,12 +293,12 @@ void ClockWebServer::setupMDNS()
   String hostname = WiFiManager::getInstance().getHostname();
   if (MDNS.begin(hostname.c_str()))
   {
-    Serial.println("mDNS responder started");
+    SerialLog::getInstance().print("mDNS responder started\n");
     MDNS.addService("http", "tcp", 80); // Advertise the web server
   }
   else
   {
-    Serial.println("Error starting mDNS!");
+    SerialLog::getInstance().print("Error starting mDNS!\n");
   }
 }
 
@@ -302,6 +312,14 @@ String ClockWebServer::processor(const String &var)
     return WiFiManager::getInstance().isCaptivePortal() ? "d-none" : "";
   if (var == "FIRMWARE_VERSION")
     return FIRMWARE_VERSION;
+  if (var == "SERIAL_LOG_BUTTON")
+  {
+    if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
+    {
+      return "<a href=\"/seriallog\" class=\"btn btn-outline-light btn-lg\">Serial Log</a>";
+    }
+    return "";
+  }
 
   return String();
 }

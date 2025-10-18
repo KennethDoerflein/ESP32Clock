@@ -21,7 +21,6 @@ const char BOOTSTRAP_HEAD[] PROGMEM = R"rawliteral(
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
 <style>
-  body { background-color: #f0f2f5; }
   .container { max-width: 500px; }
 </style>
 )rawliteral";
@@ -32,7 +31,7 @@ const char BOOTSTRAP_HEAD[] PROGMEM = R"rawliteral(
  */
 const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html>
+<html data-bs-theme="dark">
 <head>
   <title>ESP32 Clock Control</title>
   %HEAD%
@@ -47,6 +46,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           <a href="/settings" class="btn btn-secondary btn-lg">Clock Settings</a>
           <a href="/alarms" class="btn btn-warning btn-lg">Alarm Settings</a>
           <a href="/update" class="btn btn-info btn-lg">Update Firmware</a>
+          %SERIAL_LOG_BUTTON%
         </div>
         <div class="mt-4 text-center text-muted">
           <small>Firmware Version: %FIRMWARE_VERSION%</small>
@@ -65,7 +65,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
  */
 const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html>
+<html data-bs-theme="dark">
 <head>
   <title>%WIFI_PAGE_TITLE%</title>
   %HEAD%
@@ -231,7 +231,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
  */
 const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html>
+<html data-bs-theme="dark">
 <head>
   <title>Clock Settings</title>
   %HEAD%
@@ -440,7 +440,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
  */
 const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
   <head>
     <title>Alarm Settings</title>
     %HEAD%
@@ -489,7 +489,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
       }
     </style>
   </head>
-  <body class="bg-light">
+  <body>
     <div class="container mt-5">
       <div class="card shadow-sm">
         <div class="card-body">
@@ -704,7 +704,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
  */
 const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
   <title>Firmware Update</title>
   %HEAD%
@@ -805,6 +805,116 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
       });
     });
   </script>
+</body>
+</html>
+)rawliteral";
+
+/**
+ * @brief The Serial Log page for development builds.
+ * Displays real-time serial logs with a retro console theme and download functionality.
+ */
+const char SERIAL_LOG_PAGE_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <title>Serial Log</title>
+    %HEAD%
+    <style>
+        /* Retro Console Theme */
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        body {
+            background-color: #000;
+            color: #00FF00;
+            font-family: 'VT323', monospace; /* Authentic retro font with a fallback */
+        }
+        .container {
+            max-width: 95%;
+        }
+        .retro-header {
+            color: #00FF00;
+            text-shadow: 0 0 5px #00FF00;
+        }
+        .btn-retro {
+            background-color: #1a1a1a;
+            border: 1px solid #00FF00;
+            color: #00FF00;
+            text-shadow: 0 0 2px #00FF00;
+        }
+        .btn-retro:hover {
+            background-color: #00FF00;
+            color: #000;
+            text-shadow: none;
+        }
+        #log {
+            background-color: #0a0a0a;
+            border: 2px solid #00FF00;
+            border-radius: 5px;
+            height: 70vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 1.2rem;
+            text-shadow: 0 0 2px #00FF00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3) inset;
+        }
+        .log-connect { color: #39FF14; }
+        .log-disconnect { color: #FFA500; }
+        .log-error { color: #FF3131; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1 class="h3 retro-header">Serial LOG</h1>
+            <div>
+                <button id="download-btn" class="btn btn-retro me-2">Download Log</button>
+                <a href="/" class="btn btn-retro">Back to Menu</a>
+            </div>
+        </div>
+        <div id="log" class="p-3"></div>
+    </div>
+    <script>
+        const logDiv = document.getElementById('log');
+        const downloadBtn = document.getElementById('download-btn');
+
+        function connect() {
+            const socket = new WebSocket(`ws://${window.location.host}/ws`);
+            socket.onopen = () => {
+                logDiv.innerHTML += '<span class="log-connect">[SYSTEM] WebSocket connection established. Listening...</span>\n';
+            };
+            socket.onmessage = (event) => {
+                const textNode = document.createTextNode(event.data);
+                logDiv.appendChild(textNode);
+                logDiv.scrollTop = logDiv.scrollHeight;
+            };
+            socket.onclose = (event) => {
+                logDiv.innerHTML += `<span class="log-disconnect">[SYSTEM] WebSocket connection closed (Code: ${event.code}). Reconnecting...</span>\n`;
+                setTimeout(connect, 3000);
+            };
+            socket.onerror = (error) => {
+                 logDiv.innerHTML += '<span class="log-error">[SYSTEM] WebSocket error occurred.</span>\n';
+            }
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            // Get the text content, which preserves line breaks
+            const logText = logDiv.textContent;
+            // Create a blob, which is a file-like object
+            const blob = new Blob([logText], { type: 'text/plain;charset=utf-8;' });
+            // Create a temporary invisible link
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "esp32clocklog.txt";
+            // Programmatically click the link to trigger the download
+            document.body.appendChild(link);
+            link.click();
+            // Clean up by removing the temporary link
+            document.body.removeChild(link);
+        });
+
+        document.addEventListener('DOMContentLoaded', connect);
+    </script>
 </body>
 </html>
 )rawliteral";

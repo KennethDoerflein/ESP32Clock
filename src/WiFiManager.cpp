@@ -7,6 +7,7 @@
 #include "display.h"
 #include "ClockWebServer.h"
 #include <ArduinoJson.h>
+#include "SerialLog.h"
 
 // --- Static Member Initialization ---
 const char *WiFiManager::AP_SSID = "ESP32-Clock-Setup";
@@ -14,15 +15,11 @@ volatile bool WiFiManager::_connectionResult = false;
 
 void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
 {
+  auto &logger = SerialLog::getInstance();
   if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP)
   {
-    Serial.println("\nWiFi connected! Got IP.");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-
-    // Disable WiFi power-saving mode to improve stability
-    WiFi.setSleep(false);
-
+    logger.print("\nWiFi connected! Got IP.\n");
+    logger.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
     // Set the flag to indicate a successful connection.
     _connectionResult = true;
     // Since we have an IP, it's time to start mDNS.
@@ -34,7 +31,7 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
   }
   else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
   {
-    Serial.println("WiFi lost connection.");
+    logger.print("WiFi lost connection.\n");
     _connectionResult = false;
   }
 }
@@ -71,7 +68,7 @@ bool WiFiManager::begin()
   sprintf(hostname_cstr, "ESP32Clock_%02X%02X%02X", mac[3], mac[4], mac[5]);
   _hostname = hostname_cstr;
   WiFi.setHostname(_hostname.c_str());
-  Serial.printf("Hostname set to: %s\n", _hostname.c_str());
+  SerialLog::getInstance().printf("Hostname set to: %s\n", _hostname.c_str());
 
   // Register the event handler
   WiFi.onEvent(wifiEventHandler);
@@ -80,10 +77,11 @@ bool WiFiManager::begin()
   String ssid = ConfigManager::getInstance().getWifiSSID();
   String password = ConfigManager::getInstance().getWifiPassword();
   auto &display = Display::getInstance();
+  auto &logger = SerialLog::getInstance();
 
   if (ssid.length() > 0)
   {
-    Serial.printf("WiFiManager: Attempting to connect to SSID: %s\n", ssid.c_str());
+    logger.printf("WiFiManager: Attempting to connect to SSID: %s\n", ssid.c_str());
     display.drawStatusMessage("Connecting to WiFi...");
     _connectionResult = false; // Reset the flag
     WiFi.begin(ssid.c_str(), password.c_str());
@@ -92,24 +90,24 @@ bool WiFiManager::begin()
     while (!_connectionResult && millis() - startTime < 15000)
     { // 15-second timeout
       delay(100);
-      Serial.print(".");
+      logger.print(".");
     }
 
     if (_connectionResult)
     {
-      Serial.println("\nWiFiManager: Connection successful.");
+      logger.print("\nWiFiManager: Connection successful.\n");
       _isConnected = true;
       display.drawStatusMessage(("IP: " + WiFi.localIP().toString()).c_str());
       delay(2000);
     }
     else
     {
-      Serial.println("\nWiFiManager: Connection failed after 15 seconds.");
+      logger.print("\nWiFiManager: Connection failed after 15 seconds.\n");
     }
   }
   else
   {
-    Serial.println("WiFiManager: No SSID configured.");
+    logger.print("WiFiManager: No SSID configured.\n");
   }
 
   if (!_isConnected)
@@ -230,14 +228,14 @@ String WiFiManager::scanNetworksAsync()
 void WiFiManager::startCaptivePortal()
 {
   auto &display = Display::getInstance();
-  Serial.println("\nStarting Captive Portal.");
+  auto &logger = SerialLog::getInstance();
+  logger.print("\nStarting Captive Portal.\n");
   display.drawStatusMessage(("Setup AP: " + String(AP_SSID)).c_str());
 
   // Start AP
   WiFi.softAP(AP_SSID);
   IPAddress apIP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(apIP);
+  logger.printf("AP IP address: %s\n", apIP.toString().c_str());
 
   // Start DNS Server
   _dnsServer.reset(new DNSServer());

@@ -5,13 +5,14 @@
 #include "sensors.h"
 #include "ConfigManager.h"
 #include "AlarmManager.h"
+#include "SerialLog.h"
 
 void TimeManager::begin()
 {
   // Note: RTC hardware initialization is handled externally in setupSensors()
   // to group all I2C device setups together.
   // Perform an initial NTP sync attempt at startup.
-  Serial.println("TimeManager: Performing initial NTP sync...");
+  SerialLog::getInstance().print("TimeManager: Performing initial NTP sync...\n");
   syncWithNTP();
 }
 
@@ -25,7 +26,7 @@ bool TimeManager::update()
   }
   lastUpdate = currentMillis;
 
-  Serial.println("TimeManager: Tick");
+  SerialLog::getInstance().print("TimeManager: Tick\n");
   // Perform routine checks, like the daily time sync.
   checkDailySync();
   return true; // An update occurred.
@@ -41,7 +42,7 @@ void TimeManager::syncWithNTP()
     // Store the date as a single integer (e.g., 20231026) for easy comparison.
     uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;
-    Serial.printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
+    SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
   }
 }
 
@@ -50,11 +51,11 @@ void TimeManager::updateNtp()
   NtpSyncState state = updateNtpSync();
   if (state == NTP_SYNC_SUCCESS)
   {
-    Serial.println("TimeManager: NTP sync successful.");
+    SerialLog::getInstance().print("TimeManager: NTP sync successful.\n");
     DateTime now = RTC.now();
     uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;
-    Serial.printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
+    SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
   }
 }
 
@@ -152,7 +153,7 @@ void TimeManager::checkDailySync()
   // but is on at 4 AM, this will correctly trigger a sync.
   if (lastSyncDate < today)
   {
-    Serial.println("Performing daily time sync...");
+    SerialLog::getInstance().print("Performing daily time sync...\n");
     startNtpSync(); // This starts the non-blocking NTP sync.
   }
 }
