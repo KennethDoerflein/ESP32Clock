@@ -144,10 +144,13 @@ This project is broken down into phases to prioritize a functional base clock be
     - [ ] Show a "ringing" screen when an alarm is going off.
     - [ ] Show a snooze countdown.
     - [ ] Add a visual indicator for how long to hold the snooze button.
+    - [ ] Display when RTC battery needs to be replaced
 - [ ] **UI/UX Enhancements**
   - [ ] Add an option to reset to defaults in the web interface.
   - [ ] Improve TOD and seconds centering.
   - [ ] Improve the appearance of the temperature unit and degree sign.
+  - [ ] Change display colors from webui
+  - [ ] flip display orientation from webui
 - [ ] **Firmware Updates**
   - [ ] Warn the user if they try to leave the page during an update.
   - [ ] Improve version handling (don't update version.h).
@@ -164,6 +167,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] Lag when leaving the Wi-Fi page due to scanning.
 -[ ] **Web UI**
   -[ ] Can't scroll up while log message are being added
+- [ ] wifi disconnects after a few hours
 
 ### Future Plans
 
