@@ -111,107 +111,66 @@ The web interface provides access to all the clock's settings.
 
 This project is broken down into phases to prioritize a functional base clock before implementing more complex features.
 
-### Phase 1: Core Functionality
+### Completed Features
 
-- [x] **Hardware Integration:** Connect ESP32-S3 with ILI9488 display, DS3231 RTC, and BME280 sensor.
-- [x] **Display Logic:**
-  - [x] Render time, date, day of the week.
-  - [x] Render temperature and humidity.
-  - [x] Implement basic status messages.
-  - [x] Fix TOD flashing
-  - [x] add seconds under TOD
-- [ ] **Timekeeping:**
-  - [x] Initialize RTC and keep time accurately.
-  - [x] Connect to Wi-Fi and sync time with an NTP server on startup.
-  - [X] Implement a daily automatic time sync.
-  - [x] fail soft if sync has been completed once already
-- [x] **Basic Configuration:**
-  - [x] Store and retrieve settings from LittleFS.
-  - [x] Set up initial Wi-Fi credentials via a captive portal.
+- [x] **Core Functionality**
+  - [x] **Hardware Integration:** ESP32-S3 with ILI9488 display, DS3231 RTC, and BME280 sensor.
+  - [x] **Display Logic:** Time, date, day of the week, temperature, humidity, and status messages.
+  - [x] **Timekeeping:** RTC initialization, Wi-Fi time sync with NTP, and daily automatic updates.
+  - [x] **Basic Configuration:** Settings storage in LittleFS and Wi-Fi setup via a captive portal.
+- [x] **Web Interface & Advanced Configuration**
+  - [x] **UI/UX:** Single-page application feel, reboot button, and Wi-Fi network scanning.
+  - [x] **Settings Management:** 12/24-hour format, Celsius/Fahrenheit toggle, manual and automatic brightness.
+  - [x] **Firmware Updates:** OTA updates via file upload and directly from GitHub releases.
+- [x] **Alarms & User Interaction**
+  - [x] **Alarm Management:** Backend logic for multiple alarms, persistent storage, and UI for editing time and repeat days.
+  - [x] **Hardware Interaction:** Physical button for snooze and dismiss functions.
+  - [x] **Audio Feedback:** Progressive alarm volume.
+  - [x] **Display Feedback:** On-screen alarm indicator.
 
-### Phase 2: Web Interface & Advanced Configuration
+### Work in Progress
 
-- [ ] **UI/UX Enhancements:**
-
-  - [x] Create a single-page application (SPA) feel for the web UI.
-  - [x] Add a "Reboot Device" button to the web interface.
-  - [ ] Add option to reset to defaults to the web interface.
-  - [x] Implement WiFi network scanning for easier setup.
-  - [ ] Improve TOD and seconds centering
-  - [ ] Improve lag when trying to leave wifi page due to scanning
-  - [ ] make temp unit smaller and higher up like a superscript
-  - [ ] make degree sign bigger and more degree like
-
-- [ ] **Settings Management:**
-  - [ ] **Display Options:**
-    - [x] Toggle between 12/24-hour format.
-    - [x] Toggle between Celsius/Fahrenheit.
-    - [x] Control manual brightness via a slider.
-    - [x] Enable/disable automatic brightness scheduling.
-    - [ ] Add option to change default page
-  - [ ] **Timezone Configuration:**
-    - [ ] Add a dropdown to select the timezone.
-- [ ] **Firmware Updates:**
-  - [x] Provide OTA updates via file upload.
-  - [x] Provide OTA updates directly from GitHub releases.
-  - [ ] Warn if trying to leave page during update
-  - [x] Better version handling
-    - [ ] Try to improve further (dont change files in codebase)
-
-### Phase 3: Alarms & User Interaction (In Progress)
-
-- [x] **Alarm Management:**
-  - [x] **Backend:**
-    - [x] Define a data structure to store multiple alarms.
-    - [x] Save and load alarms from persistent storage.
-    - [x] Implement logic to trigger an alarm at the set time.
-  - [ ] **Web Interface:**
-    - [x] Create a UI to edit alarms.
-    - [ ] Create a UI to add, and delete alarms.
-    - [x] Allow setting the time for each alarm.
-    - [x] Allow setting which days of the week an alarm repeats.
-    - [ ] Significantly increase 5 alarm limit
+- [ ] **Alarms & User Interaction**
+  - [ ] **Alarm Management:**
+    - [ ] UI for adding and deleting alarms.
+    - [ ] Significantly increase the 5-alarm limit.
   - [ ] **Hardware Interaction:**
-    - [x] Use a physical button to snooze a ringing alarm.
-    - [x] Use a long-press on the physical button to permanently dismiss a ringing alarm for the day.
-    - [ ] Implement a factory reset by long-pressing(1 min) the boot button.
-- [ ] **Audio Feedback:**
-  - [x] Implement progressive alarm volume (ramping).
-  - [ ] Add different sound options for the alarm.
-- [ ] **Display Feedback:**
-  - [x] Show a visual indicator on the display when an alarm is set.
-  - [x] Show a "ringing" screen when an alarm is active.
-  - [ ] Add a snooze countdown
+    - [ ] Implement a factory reset via a long-press of the boot button.
+  - [ ] **Audio Feedback:**
+    - [ ] Add different sound options for the alarm.
+  - [ ] **Display Feedback:**
+    - [ ] Show a "ringing" screen when an alarm is going off.
+    - [ ] Show a snooze countdown.
+    - [ ] Add a visual indicator for how long to hold the snooze button.
+- [ ] **UI/UX Enhancements**
+  - [ ] Add an option to reset to defaults in the web interface.
+  - [ ] Improve TOD and seconds centering.
+  - [ ] Improve the appearance of the temperature unit and degree sign.
+- [ ] **Firmware Updates**
+  - [ ] Warn the user if they try to leave the page during an update.
+  - [ ] Improve version handling (don't update version.h).
+- [ ] **Settings Management**
+  - [ ] Add a dropdown to select the timezone.
+  - [ ] Add an option to change the default page.
 
-### Phase 4: Code Cleanup
+### Known Issues
 
-- [ ] **Cleanup & Organization**
+- [ ] **Alarms & User Interaction**
+  - [ ] Alarms stopping instead of being snoozed.
+- [ ] **UI/UX Enhancements**
+  - [ ] Lag when leaving the Wi-Fi page due to scanning.
 
-  - [ ] Format all code with **`clang-format`**.
-  - [ ] Replace "magic numbers" with `const` or `constexpr`.
-  - [ ] Remove unused `#include` directives in all files.
-  - [ ] Organize project and standardize naming
+### Future Plans
 
-- [ ] **Code Refactoring**
+- [ ] **Code Cleanup**
 
-  - [ ] **Rewrite messy or unsafe code:** Use smart pointers and modern C++ practices.
-  - [ ] **Resolve conflicting code:** Merge or eliminate redundant logic.
-  - [ ] **Reduce complexity:** Simplify algorithms and complex functions.
-  - [ ] **Reduce redundant variables:** Consolidate data to have a single source.
+  - [ ] **Cleanup & Organization:** Format all code with `clang-format`, replace "magic numbers," remove unused `#include` directives, and standardize naming.
+  - [ ] **Code Refactoring:** Rewrite messy code using modern C++ practices, resolve conflicting logic, reduce complexity, and consolidate redundant variables.
 
-- [ ] **Build & Analysis**
+  - [ ] **Documentation:** Update the `README.md` and code comments.
 
-  - [ ] Run static analysis with the **`pio check`** command.
-  - [ ] Perform a clean build using **`pio run -t clean`**.
-
-- [ ] **Documentation**
-  - [ ] Update the **`README.md`** with current build info.
-  - [ ] Update code comments and documentation (Doxygen).
-
-### Phase 5: Add weather page
-
-- [ ] get long and lat from zipcode
-  - [ ] store in fs
-- [ ] Use long and lat to get weather from noaa
-- [ ] Update every ~10 min
-- [ ] add good morning page after alarm goes off that displays weather
+- [ ] **Add Weather Page**
+  - [ ] Get longitude and latitude from a zip code and store it in the filesystem.
+  - [ ] Use location data to get weather from NOAA.
+  - [ ] Update weather information every ~10 minutes.
+  - [ ] Add a "Good Morning" page that displays the weather after an alarm goes off.
