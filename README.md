@@ -124,7 +124,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Initialize RTC and keep time accurately.
   - [x] Connect to Wi-Fi and sync time with an NTP server on startup.
   - [X] Implement a daily automatic time sync.
-  - [ ] fail soft if sync has been completed once already
+  - [x] fail soft if sync has been completed once already
 - [x] **Basic Configuration:**
   - [x] Store and retrieve settings from LittleFS.
   - [x] Set up initial Wi-Fi credentials via a captive portal.
@@ -138,6 +138,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] Add option to reset to defaults to the web interface.
   - [x] Implement WiFi network scanning for easier setup.
   - [ ] Improve TOD and seconds centering
+  - [ ] Improve lag when trying to leave wifi page due to scanning
 
 - [ ] **Settings Management:**
   - [ ] **Display Options:**
@@ -151,6 +152,7 @@ This project is broken down into phases to prioritize a functional base clock be
 - [ ] **Firmware Updates:**
   - [x] Provide OTA updates via file upload.
   - [x] Provide OTA updates directly from GitHub releases.
+  - [ ] Warn if trying to leave page during update
   - [x] Better version handling
     - [ ] Try to improve further (dont change files in codebase)
 
