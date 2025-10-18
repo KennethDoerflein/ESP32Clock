@@ -201,6 +201,11 @@ public:
    */
   void clearDirtyFlag() { _isDirty = false; }
 
+  /**
+   * @brief Resets all settings to their default values.
+   */
+  void factoryReset();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.

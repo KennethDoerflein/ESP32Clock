@@ -34,12 +34,14 @@
 
 // --- Pin Definitions ---
 #define SNOOZE_BUTTON_PIN 5
+#define BOOT_BUTTON_PIN 0
 #define LOOP_INTERVAL 100 // Interval for the main loop in milliseconds
 
 // --- Global Variables for Timers & Button Handling ---
 unsigned long lastLoopTime = 0;
 volatile unsigned long pressDuration = 0;
 volatile bool newPress = false;
+unsigned long bootButtonPressTime = 0;
 
 // --- Interrupt Service Routine (ISR) ---
 void IRAM_ATTR handleButtonInterrupt()
@@ -73,6 +75,38 @@ void IRAM_ATTR handleButtonInterrupt()
 }
 
 /**
+ * @brief Handles the boot button check for factory reset during runtime.
+ */
+void handleBootButton()
+{
+  if (digitalRead(BOOT_BUTTON_PIN) == LOW)
+  {
+    if (bootButtonPressTime == 0)
+    {
+      // Button was just pressed
+      bootButtonPressTime = millis();
+      SerialLog::getInstance().print("Boot button pressed. Timer started for factory reset...\n");
+    }
+    else if (millis() - bootButtonPressTime > 60000)
+    {
+      // Button has been held for 60 seconds
+      SerialLog::getInstance().print("Factory reset triggered by boot button.\n");
+      ConfigManager::getInstance().factoryReset();
+      ESP.restart();
+    }
+  }
+  else
+  {
+    if (bootButtonPressTime > 0)
+    {
+      // Button was released before the 60-second mark
+      SerialLog::getInstance().print("Boot button released. Factory reset cancelled.\n");
+      bootButtonPressTime = 0;
+    }
+  }
+}
+
+/**
  * @brief The main setup function, run once on boot.
  */
 void setup()
@@ -95,6 +129,7 @@ void setup()
   // Initialize the snooze button
   logger.print("Initializing Snooze Button...\n");
   pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
 
   // Initialize the Alarm Manager
@@ -276,4 +311,7 @@ void loop()
     }
     displayManager.drawAlarmIcon(anyAlarmEnabled, anyAlarmSnoozed);
   }
+
+  // --- Handle Boot Button for Factory Reset ---
+  handleBootButton();
 }

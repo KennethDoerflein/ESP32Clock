@@ -3,6 +3,7 @@
 #include "ConfigManager.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include "SerialLog.h"
 
 // Define the path for the configuration file on the LittleFS filesystem.
 #define CONFIG_FILE "/config.json"
@@ -197,4 +198,11 @@ void ConfigManager::setAlarm(int index, const Alarm &alarm)
   }
   _alarms[index] = alarm;
   _isDirty = true;
+}
+
+void ConfigManager::factoryReset()
+{
+  SerialLog::getInstance().print("Performing factory reset...\n");
+  setDefaults();
+  save();
 }
