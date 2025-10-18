@@ -51,7 +51,7 @@ void Display::updateBrightness()
     }
     else
     {
-      dutyCycle = 85; // Dim brightness (about 33%)
+      dutyCycle = 10; // Dim brightness (about 4%)
     }
   }
   else
