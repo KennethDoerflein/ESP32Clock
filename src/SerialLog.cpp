@@ -23,7 +23,7 @@ void SerialLog::print(const String &message)
 {
   if (!_loggingEnabled)
     return;
-  Serial.print(message);
+  Serial.println(message);
   _ws.textAll(message);
 }
 
@@ -36,6 +36,6 @@ void SerialLog::printf(const char *format, ...)
   va_start(args, format);
   vsnprintf(buf, sizeof(buf), format, args);
   va_end(args);
-  Serial.print(buf);
+  Serial.println(buf);
   _ws.textAll(buf);
 }
