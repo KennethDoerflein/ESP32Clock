@@ -13,7 +13,8 @@ void ConfigManager::begin()
   // This is crucial for the first boot or if the filesystem becomes corrupted.
   if (!LittleFS.begin(true))
   {
-    Serial.println("An error occurred while mounting LittleFS. Halting.");
+
+    SerialLog::getInstance().print("An error occurred while mounting LittleFS. Halting.");
     // Halt execution if the filesystem cannot be prepared, as configuration is critical.
     while (1)
       ; // Infinite loop to stop the device
@@ -39,7 +40,7 @@ void ConfigManager::setDefaults()
     _alarms[i].setId(i);
   }
 
-  Serial.println("Loaded default configuration.");
+  SerialLog::getInstance().print("Loaded default configuration.");
 }
 
 void ConfigManager::load()
@@ -47,7 +48,7 @@ void ConfigManager::load()
   // Check if the configuration file exists.
   if (!LittleFS.exists(CONFIG_FILE))
   {
-    Serial.println("Config file not found, creating with defaults.");
+    SerialLog::getInstance().print("Config file not found, creating with defaults.");
     // If it doesn't exist, apply default settings and save them to a new file.
     setDefaults();
     save();
@@ -58,7 +59,7 @@ void ConfigManager::load()
   File configFile = LittleFS.open(CONFIG_FILE, "r");
   if (!configFile)
   {
-    Serial.println("Failed to open config file for reading. Using defaults.");
+    SerialLog::getInstance().print("Failed to open config file for reading. Using defaults.");
     // If the file can't be opened, fall back to default settings.
     setDefaults();
     return;
@@ -76,7 +77,7 @@ void ConfigManager::load()
   if (error)
   {
     Serial.print("Failed to parse config file: ");
-    Serial.println(error.c_str());
+    SerialLog::getInstance().print(error.c_str());
     // If parsing fails, the file is likely corrupt. Use default settings.
     setDefaults();
     return;
@@ -110,7 +111,7 @@ void ConfigManager::load()
     }
   }
 
-  Serial.println("Configuration loaded successfully.");
+  SerialLog::getInstance().print("Configuration loaded successfully.");
 }
 
 bool ConfigManager::save()
@@ -119,7 +120,7 @@ bool ConfigManager::save()
   File configFile = LittleFS.open(CONFIG_FILE, "w");
   if (!configFile)
   {
-    Serial.println("Failed to open config file for writing.");
+    SerialLog::getInstance().print("Failed to open config file for writing.");
     return false;
   }
 
@@ -148,7 +149,7 @@ bool ConfigManager::save()
   // Serialize the JSON document into the file.
   if (serializeJson(doc, configFile) == 0)
   {
-    Serial.println("Failed to write to config file.");
+    SerialLog::getInstance().print("Failed to write to config file.");
     // Close the file and report the failure.
     configFile.close();
     return false;
@@ -156,7 +157,7 @@ bool ConfigManager::save()
 
   // Close the file and confirm the save was successful.
   configFile.close();
-  Serial.println("Configuration saved.");
+  SerialLog::getInstance().print("Configuration saved.");
   return true;
 }
 
@@ -165,7 +166,7 @@ const Alarm &ConfigManager::getAlarm(int index) const
   if (index < 0 || index >= MAX_ALARMS)
   {
     // This is an error, restart the system.
-    Serial.println("FATAL: Alarm index out of bounds!");
+    SerialLog::getInstance().print("FATAL: Alarm index out of bounds!");
     ESP.restart(); // Restart the ESP32 to recover
   }
   return _alarms[index];
@@ -176,7 +177,7 @@ Alarm &ConfigManager::getAlarm(int index)
   if (index < 0 || index >= MAX_ALARMS)
   {
     // This is an error, restart the system.
-    Serial.println("FATAL: Alarm index out of bounds!");
+    SerialLog::getInstance().print("FATAL: Alarm index out of bounds!");
     ESP.restart(); // Restart the ESP32 to recover
   }
   return _alarms[index];
@@ -191,7 +192,7 @@ void ConfigManager::setAlarm(int index, const Alarm &alarm)
 {
   if (index < 0 || index >= MAX_ALARMS)
   {
-    Serial.println("ERROR: Alarm index out of bounds!");
+    SerialLog::getInstance().print("ERROR: Alarm index out of bounds!");
     return;
   }
   _alarms[index] = alarm;
