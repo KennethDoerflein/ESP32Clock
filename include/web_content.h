@@ -743,7 +743,7 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
         <!-- Status and Back Button -->
         <div id="status" class="mt-4"></div>
         <div class="d-grid mt-4">
-          <a href="/" class="btn btn-secondary">Back to Menu</a>
+          <a href="/" id="back-button" class="btn btn-secondary">Back to Menu</a>
         </div>
       </div>
     </div>
@@ -754,12 +754,24 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
     const onlineButton = document.getElementById('online-button');
     const statusDiv = document.getElementById('status');
     const fileInput = document.getElementById('firmware');
+    const backButton = document.getElementById('back-button');
+    const uploadButton = uploadForm.querySelector('button');
 
     function showStatus(message, type = 'info') {
       statusDiv.innerHTML = `<div class="alert alert-${type} d-flex align-items-center" role="alert">
           ${type === 'info' ? '<div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading...</span></div>' : ''}
           <div>${message}</div>
         </div>`;
+    }
+
+    function setButtonsDisabled(disabled) {
+        uploadButton.disabled = disabled;
+        onlineButton.disabled = disabled;
+        if(disabled) {
+            backButton.classList.add('disabled');
+        } else {
+            backButton.classList.remove('disabled');
+        }
     }
 
     uploadForm.addEventListener('submit', function(e) {
@@ -769,6 +781,8 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
         return;
       }
       showStatus('Uploading firmware... Do not close this page.');
+      setButtonsDisabled(true);
+
       const formData = new FormData(this);
       fetch('/update', {
         method: 'POST',
@@ -782,14 +796,18 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
       })
       .then(text => {
         showStatus(text, 'success');
+        setButtonsDisabled(false);
       })
       .catch(error => {
         showStatus(`Upload failed: ${error.message}`, 'danger');
+        setButtonsDisabled(false);
       });
     });
 
     onlineButton.addEventListener('click', function() {
       showStatus('Checking for online updates...');
+      setButtonsDisabled(true);
+
       fetch('/api/update/github', { method: 'POST' })
       .then(response => {
         if (!response.ok) {
@@ -799,9 +817,12 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
       })
       .then(text => {
         showStatus(text, 'success');
+        // Re-enable buttons after the check.
+        setButtonsDisabled(false);
       })
       .catch(error => {
         showStatus(`Online update check failed: ${error.message}`, 'danger');
+        setButtonsDisabled(false);
       });
     });
   </script>
