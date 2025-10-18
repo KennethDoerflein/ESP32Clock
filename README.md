@@ -147,6 +147,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] Improve TOD and seconds centering.
   - [ ] Improve the appearance of the temperature unit and degree sign.
   - [ ] Change display colors from webui
+  - [ ] flip display orientation from webui
 - [ ] **Firmware Updates**
   - [ ] Warn the user if they try to leave the page during an update.
   - [ ] Improve version handling (don't update version.h).
