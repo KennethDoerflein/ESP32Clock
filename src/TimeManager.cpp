@@ -1,5 +1,7 @@
 // TimeManager.cpp
 
+// #define LOG_TICKS
+
 #include "TimeManager.h"
 #include "ntp.h"
 #include "sensors.h"
@@ -25,8 +27,10 @@ bool TimeManager::update()
     return false; // No update occurred.
   }
   lastUpdate = currentMillis;
-
+  
+#ifdef LOG_TICKS
   SerialLog::getInstance().print("TimeManager: Tick\n");
+#endif
   // Perform routine checks, like the daily time sync.
   checkDailySync();
   return true; // An update occurred.
