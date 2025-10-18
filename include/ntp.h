@@ -74,3 +74,12 @@ void startNtpSync();
  * @return The current state of the NTP synchronization process (`NtpSyncState`).
  */
 NtpSyncState updateNtpSync();
+
+/**
+ * @brief Resets the state of the non-blocking NTP synchronization.
+ *
+ * This function sets the NTP sync state back to IDLE. This is useful
+ * after a sync attempt has completed (either successfully or not) to prevent
+ * the system from getting stuck in a SUCCESS or FAILED state.
+ */
+void resetNtpSync();

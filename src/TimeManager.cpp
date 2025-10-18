@@ -44,7 +44,7 @@ void TimeManager::syncWithNTP()
     // If the sync was successful, update the last sync date.
     DateTime now = RTC.now();
     // Store the date as a single integer (e.g., 20231026) for easy comparison.
-    uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
+    uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day(); // -1 from day to test immediately re-sync after initial sync
     lastSyncDate = ymd;
     SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
   }
@@ -60,6 +60,12 @@ void TimeManager::updateNtp()
     uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;
     SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
+    resetNtpSync();
+  }
+  else if (state == NTP_SYNC_FAILED)
+  {
+    SerialLog::getInstance().print("TimeManager: NTP sync failed.\n");
+    resetNtpSync();
   }
 }
 

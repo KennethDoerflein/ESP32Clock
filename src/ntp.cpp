@@ -197,3 +197,12 @@ bool syncTime()
   SerialLog::getInstance().printf("Failed to sync time with NTP server after all retries.\n");
   return false;
 }
+
+/**
+ * @brief Resets the state of the non-blocking NTP synchronization.
+ */
+void resetNtpSync()
+{
+  ntpState = NTP_SYNC_IDLE;
+  SerialLog::getInstance().print("NTP sync state reset to IDLE.");
+}
