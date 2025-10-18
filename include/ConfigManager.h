@@ -93,6 +93,12 @@ public:
    */
   bool isCelsius() const { return useCelsius; }
 
+  /**
+   * @brief Gets the custom hostname.
+   * @return The hostname as a String.
+   */
+  String getHostname() const { return hostname; }
+
   // Setters
   /**
    * @brief Sets the WiFi SSID.
@@ -111,6 +117,16 @@ public:
   void setWifiPassword(const String &password)
   {
     wifiPassword = password;
+    _isDirty = true;
+  }
+
+  /**
+   * @brief Sets the custom hostname.
+   * @param name The new hostname.
+   */
+  void setHostname(const String &name)
+  {
+    hostname = name;
     _isDirty = true;
   }
 
@@ -193,6 +209,7 @@ private:
   // Configuration variables with default values
   String wifiSSID = "";
   String wifiPassword = "";
+  String hostname = "";
   bool autoBrightness = true;
   uint8_t brightness = 255;
   bool use24HourFormat = false;

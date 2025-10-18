@@ -61,12 +61,17 @@ WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr) {}
  */
 bool WiFiManager::begin()
 {
-  // Set a unique hostname based on the last 3 bytes of the MAC address.
-  uint8_t mac[6];
-  WiFi.macAddress(mac);
-  char hostname_cstr[18]; // "ESP32Clock_" + 6 hex chars + null terminator
-  sprintf(hostname_cstr, "ESP32Clock_%02X%02X%02X", mac[3], mac[4], mac[5]);
-  _hostname = hostname_cstr;
+  _hostname = ConfigManager::getInstance().getHostname();
+
+  if (_hostname.length() == 0)
+  {
+    uint8_t mac[6];
+    WiFi.macAddress(mac);
+    char hostname_cstr[18]; // "ESP32Clock_" + 6 hex chars + null terminator
+    sprintf(hostname_cstr, "ESP32Clock_%02X%02X%02X", mac[3], mac[4], mac[5]);
+    _hostname = hostname_cstr;
+  }
+
   WiFi.setHostname(_hostname.c_str());
   SerialLog::getInstance().printf("Hostname set to: %s\n", _hostname.c_str());
 
@@ -249,4 +254,16 @@ void WiFiManager::startCaptivePortal()
 String WiFiManager::getHostname() const
 {
   return _hostname;
+}
+
+void WiFiManager::setHostname(const String &hostname)
+{
+  _hostname = hostname;
+  ConfigManager::getInstance().setHostname(hostname);
+  ConfigManager::getInstance().save();
+  // Update mDNS
+  if (WiFi.isConnected())
+  {
+    ClockWebServer::getInstance().setupMDNS();
+  }
 }

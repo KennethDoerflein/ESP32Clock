@@ -72,6 +72,12 @@ public:
    */
   String getHostname() const;
 
+  /**
+   * @brief Sets the hostname of the device.
+   * @param hostname The new hostname.
+   */
+  void setHostname(const String &hostname);
+
   // Delete copy constructor and assignment operator for singleton pattern.
   WiFiManager(const WiFiManager &) = delete;
   void operator=(const WiFiManager &) = delete;

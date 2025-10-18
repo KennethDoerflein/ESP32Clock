@@ -52,6 +52,9 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           <small>Firmware Version: %FIRMWARE_VERSION%</small>
         </div>
       </div>
+      <div class="card-footer text-center text-muted small">
+        IP: %IP_ADDRESS% &bull; Hostname: %HOSTNAME%
+      </div>
     </div>
   </div>
 </body>
@@ -307,9 +310,29 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 id="celsius"
                 name="useCelsius" />
             </div>
+          </form>
 
-            <div class="d-grid gap-2 mt-4">
-              <a href="/" class="btn btn-secondary">Back to Menu</a>
+          <hr>
+
+          <form id="hostname-form" class="mt-4">
+            <div class="mb-3 p-3 border rounded">
+              <label for="hostname" class="form-label">Hostname</label>
+              <div class="input-group">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="hostname"
+                  name="hostname"
+                  value="%HOSTNAME%" />
+                <button class="btn btn-primary" type="submit">
+                  Save & Reboot
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div class="d-grid gap-2 mt-4">
+            <a href="/" class="btn btn-secondary">Back to Menu</a>
               <button type="button" class="btn btn-danger w-100 mt-3" onclick="rebootDevice()">
                 Reboot Device
               </button>
@@ -428,6 +451,27 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       
       form.addEventListener('input', handleInputChange);
       document.addEventListener("DOMContentLoaded", loadSettings);
+
+      document.getElementById('hostname-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const hostname = document.getElementById('hostname').value;
+        const formData = new FormData();
+        formData.append('hostname', hostname);
+        fetch('/api/settings/hostname', {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => {
+          if (response.ok) {
+            alert('Hostname saved. The device will now reboot.');
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 1000);
+          } else {
+            alert('Error saving hostname.');
+          }
+        });
+      });
     </script>
   </body>
 </html>

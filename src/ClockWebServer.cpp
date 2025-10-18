@@ -174,6 +174,18 @@ void ClockWebServer::begin()
           }
         });
 
+    server.on("/api/settings/hostname", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+        if (request->hasParam("hostname", true)) {
+            String hostname = request->getParam("hostname", true)->value();
+            WiFiManager::getInstance().setHostname(hostname);
+            request->send(200, "text/plain", "Hostname saved. Rebooting...");
+            delay(100);
+            ESP.restart();
+        } else {
+            request->send(400, "text/plain", "Hostname not provided.");
+        } });
+
     server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
               {
       request->send(200, "text/plain", "Rebooting...");
@@ -312,6 +324,10 @@ String ClockWebServer::processor(const String &var)
     return WiFiManager::getInstance().isCaptivePortal() ? "d-none" : "";
   if (var == "FIRMWARE_VERSION")
     return FIRMWARE_VERSION;
+  if (var == "IP_ADDRESS")
+    return WiFi.localIP().toString();
+  if (var == "HOSTNAME")
+    return WiFiManager::getInstance().getHostname();
   if (var == "SERIAL_LOG_BUTTON")
   {
     if (String(FIRMWARE_VERSION).indexOf("dev") != -1)

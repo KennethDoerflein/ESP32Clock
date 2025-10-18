@@ -27,6 +27,7 @@ void ConfigManager::setDefaults()
   // Set all configuration parameters to their default initial state.
   wifiSSID = "";
   wifiPassword = "";
+  hostname = "";
   autoBrightness = true;
   brightness = 128;        // Default brightness at 50%
   use24HourFormat = false; // Default to 12-hour format
@@ -85,6 +86,7 @@ void ConfigManager::load()
   // The `|` operator provides a default value if the key is missing.
   wifiSSID = doc["wifiSSID"] | "";
   wifiPassword = doc["wifiPassword"] | "";
+  hostname = doc["hostname"] | "";
   autoBrightness = doc["autoBrightness"] | true;
   brightness = doc["brightness"] | 128;
   use24HourFormat = doc["use24HourFormat"] | false;
@@ -125,6 +127,7 @@ bool ConfigManager::save()
   JsonDocument doc;
   doc["wifiSSID"] = wifiSSID;
   doc["wifiPassword"] = wifiPassword;
+  doc["hostname"] = hostname;
   doc["autoBrightness"] = autoBrightness;
   doc["brightness"] = brightness;
   doc["use24HourFormat"] = use24HourFormat;
