@@ -11,8 +11,10 @@ public:
   void begin(AsyncWebServer *server);
   void print(const String &message);
   void printf(const char *format, ...);
+  void setLoggingEnabled(bool enabled);
 
 private:
   SerialLog();
   AsyncWebSocket _ws;
+  bool _loggingEnabled = true;
 };

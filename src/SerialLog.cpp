@@ -14,14 +14,23 @@ void SerialLog::begin(AsyncWebServer *server)
   server->addHandler(&_ws);
 }
 
+void SerialLog::setLoggingEnabled(bool enabled)
+{
+  _loggingEnabled = enabled;
+}
+
 void SerialLog::print(const String &message)
 {
+  if (!_loggingEnabled)
+    return;
   Serial.print(message);
   _ws.textAll(message);
 }
 
 void SerialLog::printf(const char *format, ...)
 {
+  if (!_loggingEnabled)
+    return;
   char buf[256];
   va_list args;
   va_start(args, format);

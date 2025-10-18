@@ -30,6 +30,7 @@
 #include "ClockWebServer.h"
 #include "UpdateManager.h"
 #include "SerialLog.h"
+#include "version.h"
 
 // --- Pin Definitions ---
 #define SNOOZE_BUTTON_PIN 5
@@ -62,6 +63,13 @@ void setup()
 {
   Serial.begin(115200);
   auto &logger = SerialLog::getInstance();
+
+  // Disable logging if the version string does not contain "dev"
+  if (String(FIRMWARE_VERSION).indexOf("dev") == -1)
+  {
+    logger.setLoggingEnabled(false);
+  }
+
   logger.print("\n\n--- ESP32 Clock Booting Up ---\n");
 
   // Initialize managers and hardware.
