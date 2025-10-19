@@ -10,7 +10,7 @@
 #include "SerialLog.h"
 
 // --- Static Member Initialization ---
-const char *WiFiManager::AP_SSID = "ESP32-Clock-Setup";
+const char *WiFiManager::AP_SSID = "Clock-Setup";
 volatile bool WiFiManager::_connectionResult = false;
 
 void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)

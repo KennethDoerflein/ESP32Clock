@@ -185,7 +185,7 @@ void setup()
   else
   {
     logger.print("WiFi not connected. Displaying connection message.\n");
-    display.drawStatusMessage("Connect to AP & set WiFi");
+    display.drawMultiLineStatusMessage("Connect to Clock-Setup", "and go to 192.168.4.1");
   }
 
   logger.print("--- Setup Complete ---\n");

@@ -6,7 +6,7 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 
 - **Large Color Display**: A 3.5" 480x320 color TFT display provides a clear and vibrant user interface.
 - **Web-Based Configuration**: A mobile-friendly web UI allows for easy setup and configuration without needing to re-flash the firmware.
-- **WiFi & AP Mode**: Connects to your local WiFi network or starts its own Access Point (`ESP32-Clock-Setup`) if credentials are not set.
+- **WiFi & AP Mode**: Connects to your local WiFi network or starts its own Access Point (`Clock-Setup`) if credentials are not set.
 - **Automatic Time Sync**: An onboard Real-Time Clock (DS3231) with battery backup keeps accurate time, synchronized daily with NTP internet servers.
 - **Environment Sensing**: A BME280 sensor provides live temperature and humidity readings on the display.
 - **Smart Brightness Control**: The display backlight can be controlled manually via the web UI or set to an automatic day/night schedule.
@@ -80,7 +80,7 @@ The following libraries are required and are automatically managed by PlatformIO
 
 ### First-Time Setup
 
-1.  On the first boot, or if WiFi credentials are not configured, the clock will start a Wi-Fi Access Point (AP). The SSID will be **`ESP32-Clock-Setup`**.
+1.  On the first boot, or if WiFi credentials are not configured, the clock will start a Wi-Fi Access Point (AP). The SSID will be **`Clock-Setup`**.
 2.  Connect to this network from your phone or computer.
 3.  Open a web browser and navigate to the clock's static IP address, which is **`http://192.168.4.1`**. This address is fixed when the clock is in AP mode.
 
