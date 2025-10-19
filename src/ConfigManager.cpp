@@ -4,6 +4,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include "SerialLog.h"
+#include "nvs_flash.h"
 
 // Define the path for the configuration file on the LittleFS filesystem.
 #define CONFIG_FILE "/config.json"
@@ -203,6 +204,31 @@ void ConfigManager::setAlarm(int index, const Alarm &alarm)
 void ConfigManager::factoryReset()
 {
   SerialLog::getInstance().print("Performing factory reset...\n");
+
+  // Erase the NVS (Non-Volatile Storage) partition.
+  // This is where the WiFi credentials are saved by the WiFi library.
+  SerialLog::getInstance().print("Erasing NVS to clear WiFi credentials...\n");
+  esp_err_t err = nvs_flash_erase();
+  if (err == ESP_OK)
+  {
+    SerialLog::getInstance().print("NVS erased successfully.\n");
+  }
+  else
+  {
+    SerialLog::getInstance().print("Error erasing NVS.\n");
+  }
+
+  // After erasing, the NVS needs to be re-initialized.
+  err = nvs_flash_init();
+  if (err == ESP_OK)
+  {
+    SerialLog::getInstance().print("NVS re-initialized successfully.\n");
+  }
+  else
+  {
+    SerialLog::getInstance().print("Error re-initializing NVS.\n");
+  }
+
   setDefaults();
   save();
 }
