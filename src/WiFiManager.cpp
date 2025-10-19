@@ -55,6 +55,11 @@ void WiFiManager::handleConnection()
     return;
   }
 
+  if (ConfigManager::getInstance().getWifiSSID().length() == 0)
+  {
+    return;
+  }
+
   unsigned long now = millis();
 
   if (_isReconnecting)
