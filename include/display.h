@@ -40,6 +40,13 @@ public:
   void drawStatusMessage(const char *message);
 
   /**
+   * @brief Displays a two-line status message in the center of the screen.
+   * @param line1 The first line of the message.
+   * @param line2 The second line of the message.
+   */
+  void drawMultiLineStatusMessage(const char *line1, const char *line2);
+
+  /**
    * @brief Gets the last calculated brightness value.
    * @return The current brightness duty cycle (0-255).
    */
