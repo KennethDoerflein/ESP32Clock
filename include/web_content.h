@@ -62,6 +62,199 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 /**
+ * @brief A simple WiFi setup page for the initial configuration.
+ * This page is served in AP mode and has no external dependencies.
+ */
+const char SIMPLE_WIFI_SETUP_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Setup</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #222; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background-color: #333; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); width: 90%; max-width: 400px; }
+        h1 { text-align: center; margin-bottom: 1.5rem; }
+        form div { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 0.75rem; border: 1px solid #555; background-color: #444; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 0.75rem; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 1rem; flex-grow: 1; }
+        .button-group { display: flex; gap: 0.5rem; }
+        #test-button { background-color: #6c757d; }
+        #test-button:hover { background-color: #5a6268; }
+        #save-button { background-color: #007bff; }
+        #save-button:hover { background-color: #0056b3; }
+        hr { border: 1px solid #444; margin: 1.5rem 0; }
+        #networks-list { list-style: none; padding: 0; max-height: 150px; overflow-y: auto; border: 1px solid #555; border-radius: 4px; }
+        #networks-list li { padding: 0.75rem; cursor: pointer; border-bottom: 1px solid #555; }
+        #networks-list li:last-child { border-bottom: none; }
+        #networks-list li:hover { background-color: #444; }
+        #scan-status { text-align: center; margin-top: 1rem; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WiFi Setup</h1>
+        <form action="/wifi/save" method="POST">
+            <div>
+                <label for="ssid">WiFi Name (SSID)</label>
+                <input type="text" id="ssid" name="ssid" required>
+            </div>
+            <div>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password">
+            </div>
+            <div class="button-group">
+                <button type="button" id="test-button">Test Connection</button>
+                <button type="submit" id="save-button">Save & Connect</button>
+            </div>
+        </form>
+        <hr>
+        <h2>Select a Network</h2>
+        <ul id="networks-list"></ul>
+        <div id="scan-status">Scanning for networks...</div>
+    </div>
+    <script>
+        const form = document.querySelector('form');
+        const networksList = document.getElementById('networks-list');
+        const scanStatus = document.getElementById('scan-status');
+        const ssidInput = document.getElementById('ssid');
+        const saveButton = document.getElementById('save-button');
+        const testButton = document.getElementById('test-button');
+        let scanInterval;
+
+        function selectNetwork(ssid) { ssidInput.value = ssid; }
+        
+        async function fetchAndRenderNetworks() {
+            try {
+                const response = await fetch('/api/wifi/scan');
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    clearInterval(scanInterval);
+                    renderNetworks(data);
+                } else if (data.status === 'scanning') {
+                    // Continue polling
+                }
+            } catch (error) {
+                clearInterval(scanInterval);
+                scanStatus.textContent = 'Error scanning networks.';
+            }
+        }
+
+        function renderNetworks(networks) {
+            networksList.innerHTML = '';
+            if (networks.length === 0) {
+                scanStatus.textContent = 'No networks found.';
+                scanStatus.style.display = 'block';
+                return;
+            }
+            scanStatus.style.display = 'none';
+            const uniqueNetworks = Object.values(networks.reduce((acc, net) => {
+                if (!acc[net.ssid] || acc[net.ssid].rssi < net.rssi) { acc[net.ssid] = net; }
+                return acc;
+            }, {}));
+            uniqueNetworks.sort((a, b) => b.rssi - a.rssi);
+            uniqueNetworks.forEach(net => {
+                const listItem = document.createElement('li');
+                listItem.textContent = net.ssid;
+                listItem.onclick = () => selectNetwork(net.ssid);
+                networksList.appendChild(listItem);
+            });
+        }
+
+        function startNetworkFetch() {
+            if (scanInterval) clearInterval(scanInterval);
+            fetchAndRenderNetworks(); // Initial fetch
+            scanInterval = setInterval(fetchAndRenderNetworks, 3000); // Poll for results
+        }
+        
+        document.addEventListener('DOMContentLoaded', startNetworkFetch);
+
+        let pollingInterval = null;
+
+        async function pollStatus(isSave) {
+            try {
+                const response = await fetch('/wifi/status');
+                const status = await response.text();
+
+                if (status === 'success') {
+                    clearInterval(pollingInterval);
+                    alert(isSave ? 'Success! Credentials saved. The device will now reboot.' : 'Connection successful!');
+                    if (isSave) {
+                        saveButton.textContent = 'Rebooting...';
+                    } else {
+                        saveButton.disabled = false;
+                        testButton.disabled = false;
+                        testButton.textContent = 'Test Connection';
+                    }
+                } else if (status === 'failed') {
+                    clearInterval(pollingInterval);
+                    alert('Connection failed. Please check your password and try again.');
+                    saveButton.disabled = false;
+                    testButton.disabled = false;
+                    saveButton.textContent = 'Save & Connect';
+                    testButton.textContent = 'Test Connection';
+                }
+            } catch (error) {
+                clearInterval(pollingInterval);
+                alert('Error checking status. Please try again.');
+                saveButton.disabled = false;
+                testButton.disabled = false;
+                saveButton.textContent = 'Save & Connect';
+                testButton.textContent = 'Test Connection';
+            }
+        }
+
+        async function startTest(endpoint, button, isSave) {
+            if (ssidInput.value.trim() === '') {
+                alert('WiFi Name (SSID) cannot be empty.');
+                return;
+            }
+
+            button.textContent = 'Testing...';
+            saveButton.disabled = true;
+            testButton.disabled = true;
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    pollingInterval = setInterval(() => pollStatus(isSave), 2000);
+                } else {
+                    const errorText = await response.text();
+                    alert(`Error: ${errorText}`);
+                    saveButton.disabled = false;
+                    testButton.disabled = false;
+                    button.textContent = isSave ? 'Save & Connect' : 'Test Connection';
+                }
+            } catch (error) {
+                alert('An unexpected error occurred. Please try again.');
+                saveButton.disabled = false;
+                testButton.disabled = false;
+                button.textContent = isSave ? 'Save & Connect' : 'Test Connection';
+            }
+        }
+        
+        saveButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            startTest('/wifi/save', saveButton, true);
+        });
+
+        testButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            startTest('/wifi/test', testButton, false);
+        });
+    </script>
+</body>
+</html>
+)rawliteral";
+
+/**
  * @brief The WiFi Configuration page.
  * Displays available networks and provides a form to enter credentials.
  * Contains a placeholder `%NETWORKS%` which is replaced by the list of scanned networks.
@@ -78,6 +271,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
     }
     .network-item:hover {
       background-color: #e9ecef;
+      color: #212529;
     }
     #networks-list {
       max-height: 200px;
@@ -90,7 +284,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
     <div class="card shadow-sm">
       <div class="card-body">
         <h1 class="card-title text-center mb-4">%WIFI_PAGE_TITLE%</h1>
-        <form action="/wifi/save" method="POST">
+        <form id="wifi-form" action="/wifi/save" method="POST">
           <div class="mb-3">
             <input type="text" class="form-control" id="ssid" name="ssid" placeholder="SSID" required>
           </div>
@@ -98,9 +292,10 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
             <input type="password" class="form-control" name="password" placeholder="Password">
           </div>
           <div class="d-grid">
-            <button type="submit" class="btn btn-success btn-lg">Save & Connect</button>
+            <button type="submit" id="save-button" class="btn btn-success btn-lg">Save & Connect</button>
           </div>
         </form>
+        <div id="form-status" class="mt-3"></div>
         <hr class="my-4">
         <div class="text-center mb-3">
           <button id="scan-button" class="btn btn-primary">
@@ -119,6 +314,9 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
     const scanButton = document.getElementById('scan-button');
     const networksStatus = document.getElementById('networks-status');
     const networksList = document.getElementById('networks-list');
+    const wifiForm = document.getElementById('wifi-form');
+    const saveButton = document.getElementById('save-button');
+    const formStatus = document.getElementById('form-status');
     let scanInterval;
 
     function selectNetwork(ssid) {
@@ -218,9 +416,36 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
       });
     }
 
+    function showStatus(message, type = 'info') {
+      formStatus.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+    }
+
+    wifiForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      saveButton.disabled = true;
+      showStatus('Saving credentials...', 'info');
+
+      try {
+        const formData = new FormData(wifiForm);
+        const response = await fetch('/wifi/save', {
+          method: 'POST',
+          body: formData
+        });
+
+        const responseText = await response.text();
+        if (response.ok) {
+          showStatus(responseText, 'success');
+        } else {
+          showStatus(`Error: ${responseText}`, 'danger');
+          saveButton.disabled = false;
+        }
+      } catch (error) {
+        showStatus('An unexpected error occurred.', 'danger');
+        saveButton.disabled = false;
+      }
+    });
+
     scanButton.addEventListener('click', startScan);
-    
-    // Automatically start a scan when the page loads
     document.addEventListener('DOMContentLoaded', startScan);
   </script>
 </body>
@@ -984,4 +1209,4 @@ const char SERIAL_LOG_PAGE_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-#endif // web_content.h
+#endif // WEB_CONTENT_H

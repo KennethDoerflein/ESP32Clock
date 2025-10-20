@@ -1,4 +1,4 @@
-// ClockWebServer.cpp
+// src/ClockWebServer.cpp
 
 #include "ClockWebServer.h"
 #include "ConfigManager.h"
@@ -38,8 +38,32 @@ void ClockWebServer::begin()
   // Bind class methods to web server routes
   if (_captivePortalActive)
   {
-    server.onNotFound([this](AsyncWebServerRequest *request)
-                      { onCaptivePortalRequest(request); });
+    // --- Captive Portal Handlers ---
+
+    // First, we handle the specific URLs that operating systems use for their
+    // connectivity checks. Responding correctly to these prevents the OS from
+    // disconnecting or opening its own browser window.
+    server.on("/connecttest.txt", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "text/plain", "Microsoft Connect Test"); });
+    server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(204); });
+    server.on("/hotspot-detect.html", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "text/html", "<!DOCTYPE html><HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"); });
+
+    // Next, we define the actual setup page that the user should see.
+    // This is served from the root URL of the ESP32's IP address.
+    server.on("/", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onCaptivePortalRequest(request); });
+
+    // Finally, we use the onNotFound handler as a catch-all. If the user's browser
+    // requests any other page (e.g., google.com, msn.com), we don't serve content.
+    // Instead, we issue an HTTP 302 Redirect, which tells the browser to go to
+    // our root setup page. This is the key to reliably forcing the setup page to appear.
+    server.onNotFound([](AsyncWebServerRequest *request)
+                      {
+      // Create the full URL for redirection (e.g., "http://192.168.4.1")
+      String redirectUrl = "http://" + request->host();
+      request->redirect(redirectUrl); });
   }
   else
   {
@@ -247,6 +271,12 @@ void ClockWebServer::begin()
   server.on("/wifi/save", HTTP_POST, [this](AsyncWebServerRequest *request)
             { onWifiSaveRequest(request); });
 
+  server.on("/wifi/test", HTTP_POST, [this](AsyncWebServerRequest *request)
+            { onWifiTestRequest(request); });
+
+  server.on("/wifi/status", HTTP_GET, [this](AsyncWebServerRequest *request)
+            { onWifiStatusRequest(request); });
+
   server.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request)
             {
     String json = WiFiManager::getInstance().scanNetworksAsync();
@@ -286,22 +316,85 @@ void ClockWebServer::onAlarmsRequest(AsyncWebServerRequest *request)
 void ClockWebServer::onWifiSaveRequest(AsyncWebServerRequest *request)
 {
   String ssid = request->arg("ssid");
+  if (ssid.length() == 0)
+  {
+    request->send(400, "text/plain", "SSID cannot be empty.");
+    return;
+  }
   String password = request->arg("password");
-  auto &config = ConfigManager::getInstance();
-  config.setWifiSSID(ssid);
-  config.setWifiPassword(password);
-  config.save();
-  request->send(200, "text/plain", "WiFi credentials saved. Rebooting...");
-  delay(1000);
-  ESP.restart();
+
+  auto &wifiManager = WiFiManager::getInstance();
+  if (wifiManager.isCaptivePortal())
+  {
+    // In captive portal, start a non-blocking test and let the client poll for status.
+    wifiManager.startConnectionTest(ssid, password, true);
+    request->send(200, "text/plain", "Test started. Polling for status...");
+  }
+  else
+  {
+    // If not in captive portal, just save, reboot, and apply the new settings.
+    request->send(200, "text/plain", "Credentials saved. Rebooting to connect...");
+    // Add a small delay to ensure the response is sent before rebooting.
+    delay(500);
+    wifiManager.saveCredentialsAndReboot(ssid, password);
+  }
+}
+
+void ClockWebServer::onWifiTestRequest(AsyncWebServerRequest *request)
+{
+  String ssid = request->arg("ssid");
+  if (ssid.length() == 0)
+  {
+    request->send(400, "text/plain", "SSID cannot be empty.");
+    return;
+  }
+  String password = request->arg("password");
+
+  // "Test" only uses polling, it never saves the credentials.
+  WiFiManager::getInstance().startConnectionTest(ssid, password, false);
+  request->send(200, "text/plain", "Test started. Polling for status...");
+}
+
+void ClockWebServer::onWifiStatusRequest(AsyncWebServerRequest *request)
+{
+  auto &wifiManager = WiFiManager::getInstance();
+  auto status = wifiManager.getConnectionTestStatus();
+  switch (status)
+  {
+  case WiFiManager::TEST_IN_PROGRESS:
+    request->send(202, "text/plain", "testing");
+    break;
+  case WiFiManager::TEST_SUCCESS:
+    request->send(200, "text/plain", "success");
+    // Check if a reboot is pending *after* sending the success response.
+    if (wifiManager.isPendingReboot())
+    {
+      delay(500); // Give the client a moment to receive the response
+      ESP.restart();
+    }
+    wifiManager.resetConnectionTestStatus();
+    break;
+  case WiFiManager::TEST_FAILED:
+    request->send(401, "text/plain", "failed");
+    wifiManager.resetConnectionTestStatus();
+    break;
+  case WiFiManager::TEST_IDLE:
+  default:
+    request->send(200, "text/plain", "idle");
+    break;
+  }
 }
 
 void ClockWebServer::onCaptivePortalRequest(AsyncWebServerRequest *request)
 {
-  // Captive portal: any request not for a specific file
-  // will serve the WiFi configuration page.
-  request->send_P(200, "text/html", WIFI_CONFIG_HTML, [this](const String &var)
-                  { return processor(var); });
+  request->send_P(200, "text/html", SIMPLE_WIFI_SETUP_HTML);
+}
+
+void ClockWebServer::onCaptivePortalRedirect(AsyncWebServerRequest *request)
+{
+  AsyncWebServerResponse *response = request->beginResponse(302);
+  response->addHeader("Location", "http://" + WiFi.softAPIP().toString());
+  request->send(response);
 }
 
 // --- Template Processor ---

@@ -87,6 +87,49 @@ public:
    */
   void setHostname(const String &hostname);
 
+  /**
+   * @brief The status of a WiFi connection test.
+   */
+  enum ConnectionTestStatus
+  {
+    TEST_IDLE,
+    TEST_IN_PROGRESS,
+    TEST_SUCCESS,
+    TEST_FAILED
+  };
+
+  /**
+   * @brief Starts a non-blocking test of WiFi credentials.
+   * @param ssid The SSID to test.
+   * @param password The password to test.
+   * @param saveOnSuccess If true, credentials will be saved on success.
+   */
+  void startConnectionTest(const String &ssid, const String &password, bool saveOnSuccess);
+
+  /**
+   * @brief Gets the current status of the connection test.
+   * @return The ConnectionTestStatus.
+   */
+  ConnectionTestStatus getConnectionTestStatus() const;
+
+  /**
+   * @brief Resets the connection test status to idle.
+   */
+  void resetConnectionTestStatus();
+
+  /**
+   * @brief Checks if a reboot is pending after a successful WiFi save.
+   * @return True if a reboot is pending, false otherwise.
+   */
+  bool isPendingReboot() const;
+
+  /**
+   * @brief Saves new WiFi credentials and triggers a reboot. For use outside of captive portal.
+   * @param ssid The SSID to save.
+   * @param password The password to save.
+   */
+  void saveCredentialsAndReboot(const String &ssid, const String &password);
+
   // Delete copy constructor and assignment operator for singleton pattern.
   WiFiManager(const WiFiManager &) = delete;
   void operator=(const WiFiManager &) = delete;
@@ -111,6 +154,18 @@ private:
    */
   static void wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info);
 
+  /**
+   * @brief Flag to tell the event handler to ignore the next disconnect event.
+   * This is used to prevent the intentional disconnect at the start of a test
+   * from being misinterpreted as a connection failure.
+   */
+  volatile bool _ignoreDisconnectEvent = false;
+
+  /**
+   * @brief Flag to indicate that an intentional disconnection is in progress for a connection test.
+   * Used by the event handler's state machine to know when to start a new connection attempt.
+   */
+  volatile bool _disconnectingForTest = false;
   /// @brief The SSID for the Access Point mode, used for initial configuration.
   static const char *AP_SSID;
   /// @brief Flag to signal a successful connection from the event handler.
@@ -125,6 +180,16 @@ private:
   unsigned long _lastReconnectAttempt = 0;
   /// @brief Flag to indicate if a reconnection is in progress.
   bool _isReconnecting = false;
+  /// @brief The current status of the connection test.
+  volatile ConnectionTestStatus _testStatus = TEST_IDLE;
+  /// @brief Flag to trigger a reboot after the client has been notified of success.
+  volatile bool _pendingReboot = false;
+  /// @brief If true, credentials will be saved on successful test.
+  bool _saveOnSuccess = false;
+  /// @brief The SSID being tested.
+  String _testSsid;
+  /// @brief The password being tested.
+  String _testPassword;
 };
 
 #endif // WIFIMANAGER_H

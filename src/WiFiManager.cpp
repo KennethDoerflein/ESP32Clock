@@ -1,4 +1,4 @@
-// WiFiManager.cpp
+// src/WiFiManager.cpp
 
 #include "WiFiManager.h"
 #include <WiFi.h>
@@ -16,6 +16,50 @@ volatile bool WiFiManager::_connectionResult = false;
 void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
 {
   auto &logger = SerialLog::getInstance();
+  auto &instance = getInstance();
+
+  // --- Handle Connection Test Events ---
+  if (instance._testStatus == TEST_IN_PROGRESS)
+  {
+    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
+    {
+      // Check if this is the intentional disconnect from the start of the test.
+      if (instance._ignoreDisconnectEvent)
+      {
+        // If it is, consume the flag and do nothing.
+        // We now wait for either a successful connection or a real failure.
+        instance._ignoreDisconnectEvent = false;
+      }
+      else
+      {
+        // If the flag is already false, this is a genuine failure.
+        logger.print("\nConnection test failed.\n");
+        instance._testStatus = TEST_FAILED;
+        if (instance.isCaptivePortal())
+        {
+          WiFi.mode(WIFI_AP);
+        }
+      }
+    }
+    else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP)
+    {
+      logger.print("\nConnection test successful!\n");
+      instance._testStatus = TEST_SUCCESS;
+      instance._ignoreDisconnectEvent = false; // Reset flag on success, just in case.
+
+      if (instance._saveOnSuccess)
+      {
+        auto &config = ConfigManager::getInstance();
+        config.setWifiSSID(instance._testSsid);
+        config.setWifiPassword(instance._testPassword);
+        config.save();
+        instance._pendingReboot = true;
+      }
+    }
+    return; // Do not fall through to standard handling during a test.
+  }
+
+  // --- Standard Event Handling (for when not testing) ---
   if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP)
   {
     logger.print("\nWiFi connected! Got IP.\n");
@@ -26,6 +70,8 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
     // We need to ensure the web server has been initialized first,
     if (WiFi.isConnected())
     {
+      WiFi.mode(WIFI_STA);
+      logger.print("Switched to STA mode. AP is now off.\n");
       ClockWebServer::getInstance().setupMDNS();
     }
   }
@@ -34,8 +80,7 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
     logger.print("WiFi lost connection.\n");
     _connectionResult = false;
     // Set _isConnected to false directly, but don't trigger reconnection here.
-    // The handle() method will manage the reconnection process.
-    getInstance()._isConnected = false;
+    instance._isConnected = false;
   }
 }
 
@@ -92,7 +137,7 @@ WiFiManager &WiFiManager::getInstance()
  * @brief Private constructor for the WiFiManager.
  * Initializes the connection status to false.
  */
-WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr) {}
+WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr), _pendingReboot(false) {}
 
 // --- Public Methods ---
 /**
@@ -162,6 +207,10 @@ bool WiFiManager::begin()
 
   if (!_isConnected)
   {
+    // Disconnect and stop the station to prevent it from retrying
+    // with bad credentials in the background, which causes log spam.
+    WiFi.disconnect(true);
+
     startCaptivePortal();
     return true; // Captive portal was started
   }
@@ -259,10 +308,8 @@ String WiFiManager::scanNetworksAsync()
       }
     }
 
-    // After retrieving the results, clear them and start a new scan
-    // This makes the "Scan" button on the frontend responsive.
+    // After retrieving the results, clear them.
     WiFi.scanDelete();
-    WiFi.scanNetworks(true);
 
     String jsonOutput;
     serializeJson(doc, jsonOutput);
@@ -280,7 +327,9 @@ void WiFiManager::startCaptivePortal()
   auto &display = Display::getInstance();
   auto &logger = SerialLog::getInstance();
   logger.print("\nStarting Captive Portal.\n");
-  display.drawStatusMessage(("Setup AP: " + String(AP_SSID)).c_str());
+
+  // Set mode to AP + Station
+  WiFi.mode(WIFI_AP_STA);
 
   // Start AP
   WiFi.softAP(AP_SSID);
@@ -289,7 +338,16 @@ void WiFiManager::startCaptivePortal()
 
   // Start DNS Server
   _dnsServer.reset(new DNSServer());
-  _dnsServer->start(53, "*", apIP);
+  const byte DNS_PORT = 53;
+
+  _dnsServer->setErrorReplyCode(DNSReplyCode::NoError);
+  _dnsServer->start(DNS_PORT, "*", apIP);
+
+  // Show a message on the display while scanning
+  logger.print("Starting background WiFi scan...\n");
+  display.drawMultiLineStatusMessage("Please wait...", "Scanning for networks");
+  WiFi.scanNetworks(true); // true = async (non-blocking)
+  delay(5000);
 }
 
 /**
@@ -311,4 +369,62 @@ void WiFiManager::setHostname(const String &hostname)
   {
     ClockWebServer::getInstance().setupMDNS();
   }
+}
+
+void WiFiManager::startConnectionTest(const String &ssid, const String &password, bool saveOnSuccess)
+{
+  if (_pendingReboot)
+  {
+    SerialLog::getInstance().print("Ignoring new connection test, reboot is pending.\n");
+    return;
+  }
+
+  auto &logger = SerialLog::getInstance();
+  logger.printf("Starting connection test for SSID: %s\n", ssid.c_str());
+
+  _testSsid = ssid;
+  _testPassword = password;
+  _saveOnSuccess = saveOnSuccess;
+  _testStatus = TEST_IN_PROGRESS;
+
+  // Set a flag to tell the event handler to ignore the next disconnect event,
+  // which we are about to cause intentionally.
+  _ignoreDisconnectEvent = true;
+
+  WiFi.disconnect(true);
+  delay(100);
+
+  if (isCaptivePortal())
+  {
+    WiFi.mode(WIFI_AP_STA);
+  }
+
+  WiFi.begin(ssid.c_str(), password.c_str());
+}
+
+void WiFiManager::saveCredentialsAndReboot(const String &ssid, const String &password)
+{
+  auto &config = ConfigManager::getInstance();
+  config.setWifiSSID(ssid);
+  config.setWifiPassword(password);
+  config.save();
+
+  // A reboot is the most reliable way to apply new WiFi credentials
+  ESP.restart();
+}
+
+WiFiManager::ConnectionTestStatus WiFiManager::getConnectionTestStatus() const
+{
+  return _testStatus;
+}
+
+bool WiFiManager::isPendingReboot() const
+{
+  return _pendingReboot;
+}
+
+void WiFiManager::resetConnectionTestStatus()
+{
+  _testStatus = TEST_IDLE;
+  _pendingReboot = false;
 }

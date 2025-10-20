@@ -58,9 +58,12 @@ private:
   void onRootRequest(AsyncWebServerRequest *request);
   void onWifiRequest(AsyncWebServerRequest *request);
   void onWifiSaveRequest(AsyncWebServerRequest *request);
+  void onWifiTestRequest(AsyncWebServerRequest *request);
+  void onWifiStatusRequest(AsyncWebServerRequest *request);
   void onSettingsRequest(AsyncWebServerRequest *request);
   void onAlarmsRequest(AsyncWebServerRequest *request);
   void onCaptivePortalRequest(AsyncWebServerRequest *request);
+  void onCaptivePortalRedirect(AsyncWebServerRequest *request);
 
   // --- Template Processor and Helpers ---
   String processor(const String &var);
