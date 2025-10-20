@@ -11,6 +11,7 @@
 
 void ConfigManager::begin()
 {
+  _fileMutex = xSemaphoreCreateMutex();
   // Initialize LittleFS. The `true` parameter formats the filesystem if mounting fails.
   // This is crucial for the first boot or if the filesystem becomes corrupted.
   if (!LittleFS.begin(true))
@@ -120,11 +121,15 @@ void ConfigManager::load()
 
 bool ConfigManager::save()
 {
+  // Take the mutex to ensure exclusive access to the file system.
+  xSemaphoreTake(_fileMutex, portMAX_DELAY);
+
   // Open the configuration file in write mode, which creates/truncates it.
   File configFile = LittleFS.open(CONFIG_FILE, "w");
   if (!configFile)
   {
     SerialLog::getInstance().print("Failed to open config file for writing.");
+    xSemaphoreGive(_fileMutex); // Release the mutex before returning.
     return false;
   }
 
@@ -157,12 +162,14 @@ bool ConfigManager::save()
     SerialLog::getInstance().print("Failed to write to config file.");
     // Close the file and report the failure.
     configFile.close();
+    xSemaphoreGive(_fileMutex); // Release the mutex before returning.
     return false;
   }
 
   // Close the file and confirm the save was successful.
   configFile.close();
   SerialLog::getInstance().print("Configuration saved.");
+  xSemaphoreGive(_fileMutex); // Release the mutex.
   return true;
 }
 

@@ -4,6 +4,8 @@
 
 #include <Arduino.h>
 #include "Alarm.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 const int MAX_ALARMS = 5; // Maximum number of alarms that can be set
 
@@ -244,6 +246,7 @@ private:
   bool useCelsius = false;
   bool _isDirty;
   Alarm _alarms[MAX_ALARMS];
+  SemaphoreHandle_t _fileMutex;
 
   /**
    * @brief Loads the configuration from the JSON file.
