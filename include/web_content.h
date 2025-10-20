@@ -844,7 +844,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
         card.innerHTML = `
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center alarm-header" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+          <div class="d-flex justify-content-between align-items-center alarm-header" data-bs-target="#${collapseId}">
             <div class="d-flex align-items-center">
                 <h5 class="card-title mb-0 me-3">Alarm ${alarm.id + 1}</h5>
                 <span class="status-indicator"></span>
@@ -874,14 +874,16 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         </div>
       `;
 
-        card
-          .querySelector(".form-check")
-          .addEventListener("click", (event) => event.stopPropagation());
-        card
-          .querySelector(".collapse-icon")
-          .addEventListener("click", (event) => event.stopPropagation());
-
         const collapseElement = card.querySelector(`#${collapseId}`);
+        const collapseInstance = new bootstrap.Collapse(collapseElement, {
+          toggle: false
+        });
+
+        card.querySelector(".alarm-header").addEventListener("click", (event) => {
+          if (!event.target.classList.contains("form-check-input")) {
+            collapseInstance.toggle();
+          }
+        });
         const collapseIcon = card.querySelector(".collapse-icon");
         collapseElement.addEventListener("show.bs.collapse", () =>
           collapseIcon.classList.remove("collapsed")
