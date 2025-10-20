@@ -66,6 +66,17 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
     logger.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
     // Set the flag to indicate a successful connection.
     _connectionResult = true;
+
+    // If this is the first successful connection with these credentials,
+    // mark them as valid and save the config.
+    auto &config = ConfigManager::getInstance();
+    if (!config.areWifiCredsValid())
+    {
+      logger.print("WiFi credentials validated. Saving flag.\n");
+      config.setWifiCredsValid(true);
+      config.save();
+    }
+
     // Since we have an IP, it's time to start mDNS.
     // We need to ensure the web server has been initialized first,
     if (WiFi.isConnected())
@@ -211,11 +222,20 @@ bool WiFiManager::begin()
     // with bad credentials in the background, which causes log spam.
     WiFi.disconnect(true);
 
-    startCaptivePortal();
-    return true; // Captive portal was started
+    // Only start captive portal if credentials have not been validated before.
+    if (!ConfigManager::getInstance().areWifiCredsValid())
+    {
+      logger.print("WiFi credentials are not validated. Starting Captive Portal.\n");
+      startCaptivePortal();
+      return true; // Captive portal was started
+    }
+    else
+    {
+      logger.print("WiFi connection failed, but credentials are valid. Skipping captive portal.\n");
+    }
   }
 
-  return false; // WiFi connected successfully
+  return false; // WiFi connected successfully, or skipping captive portal for background retry.
 }
 
 /**

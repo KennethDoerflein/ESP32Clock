@@ -100,6 +100,12 @@ public:
    */
   String getHostname() const { return hostname; }
 
+  /**
+   * @brief Checks if the stored WiFi credentials have been validated.
+   * @return True if the credentials are known to be good, false otherwise.
+   */
+  bool areWifiCredsValid() const { return wifiCredsValid; }
+
   // Setters
   /**
    * @brief Sets the WiFi SSID.
@@ -108,6 +114,7 @@ public:
   void setWifiSSID(const String &ssid)
   {
     wifiSSID = ssid;
+    wifiCredsValid = false; // New credentials need validation
     _isDirty = true;
   }
 
@@ -118,6 +125,7 @@ public:
   void setWifiPassword(const String &password)
   {
     wifiPassword = password;
+    wifiCredsValid = false; // New credentials need validation
     _isDirty = true;
   }
 
@@ -129,6 +137,19 @@ public:
   {
     hostname = name;
     _isDirty = true;
+  }
+
+  /**
+   * @brief Sets the WiFi credential validity.
+   * @param valid True if the credentials are valid, false otherwise.
+   */
+  void setWifiCredsValid(bool valid)
+  {
+    if (wifiCredsValid != valid)
+    {
+      wifiCredsValid = valid;
+      _isDirty = true;
+    }
   }
 
   /**
@@ -216,6 +237,7 @@ private:
   String wifiSSID = "";
   String wifiPassword = "";
   String hostname = "";
+  bool wifiCredsValid = false;
   bool autoBrightness = true;
   uint8_t brightness = 255;
   bool use24HourFormat = false;
