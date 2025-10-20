@@ -1042,6 +1042,14 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
     const fileInput = document.getElementById('firmware');
     const backButton = document.getElementById('back-button');
     const uploadButton = uploadForm.querySelector('button');
+    let isUpdating = false;
+
+    window.addEventListener('beforeunload', (event) => {
+      if (isUpdating) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    });
 
     function showStatus(message, type = 'info') {
       statusDiv.innerHTML = `<div class="alert alert-${type} d-flex align-items-center" role="alert">
@@ -1068,6 +1076,7 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
       }
       showStatus('Uploading firmware... Do not close this page.');
       setButtonsDisabled(true);
+      isUpdating = true;
 
       const formData = new FormData(this);
       fetch('/update', {
@@ -1083,16 +1092,19 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
       .then(text => {
         showStatus(text, 'success');
         setButtonsDisabled(false);
+        isUpdating = false;
       })
       .catch(error => {
         showStatus(`Upload failed: ${error.message}`, 'danger');
         setButtonsDisabled(false);
+        isUpdating = false;
       });
     });
 
     onlineButton.addEventListener('click', function() {
       showStatus('Checking for online updates...');
       setButtonsDisabled(true);
+      isUpdating = true;
 
       fetch('/api/update/github', { method: 'POST' })
       .then(response => {
@@ -1105,10 +1117,12 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
         showStatus(text, 'success');
         // Re-enable buttons after the check.
         setButtonsDisabled(false);
+        isUpdating = false;
       })
       .catch(error => {
         showStatus(`Online update check failed: ${error.message}`, 'danger');
         setButtonsDisabled(false);
+        isUpdating = false;
       });
     });
   </script>

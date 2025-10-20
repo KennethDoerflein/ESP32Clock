@@ -151,7 +151,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] Change display colors from webui
   - [ ] flip display orientation from webui
 - [ ] **Firmware Updates**
-  - [ ] Warn the user if they try to leave the page during an update.
+  - [x] Warn the user if they try to leave the page during an update.
   - [ ] Improve version handling (don't update version.h).
 - [ ] **Settings Management**
   - [ ] Add a dropdown to select the timezone.
@@ -159,9 +159,9 @@ This project is broken down into phases to prioritize a functional base clock be
 
 ### Known Issues
 
-- [ ] **Alarms & User Interaction**
+- [x] **Alarms & User Interaction**
   - [x] Alarms stopping instead of being snoozed.
-  - [ ] Web UI alarm settings opens and closes when enabling or disabling alarm
+  - [x] Web UI alarm settings opens and closes when enabling or disabling alarm
 - [ ] **UI/UX Enhancements**
   - [ ] Lag when leaving the Wi-Fi page due to scanning.
 - [ ] **Web UI**
