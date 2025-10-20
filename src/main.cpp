@@ -202,116 +202,113 @@ void loop()
   // Manage WiFi connection and reconnection.
   wifiManager.handleConnection();
 
-  // Implement a non-blocking delay.
+  // Implement a non-blocking delay to prevent watchdog timeouts.
   unsigned long currentMillis = millis();
   if (currentMillis - lastLoopTime < LOOP_INTERVAL)
   {
-    // Yield to other tasks, especially the web server, when not busy.
-    // A small delay helps prevent watchdog timeouts on ESP32.
-    delay(1);
+    delay(1); // Yield to other tasks.
     return;
   }
   lastLoopTime = currentMillis;
 
-  // Only run the main clock logic if WiFi is connected.
-  if (WiFiManager::getInstance().isConnected())
+  // --- Core Clock Logic (Runs regardless of WiFi connection) ---
+  auto &timeManager = TimeManager::getInstance();
+  auto &display = Display::getInstance();
+  auto &displayManager = DisplayManager::getInstance();
+  auto &alarmManager = AlarmManager::getInstance();
+  auto &config = ConfigManager::getInstance();
+
+  // Perform periodic tasks that don't require WiFi.
+  alarmManager.update();
+  bool timeUpdated = timeManager.update(); // Updates time from the RTC
+  timeManager.checkAlarms();
+  display.updateBrightness();
+  handleSensorUpdates();
+
+  // Update the current display page if the time has changed.
+  if (timeUpdated)
   {
-    auto &timeManager = TimeManager::getInstance();
-    auto &display = Display::getInstance();
-    auto &displayManager = DisplayManager::getInstance();
-    auto &alarmManager = AlarmManager::getInstance();
-
-    // Perform periodic tasks.
-    alarmManager.update();
-    bool timeUpdated = timeManager.update();
-    timeManager.checkAlarms();
-    timeManager.updateNtp();
-    display.updateBrightness();
-    handleSensorUpdates();
-
-    // Update the current display page only if the time has changed.
-    if (timeUpdated)
-    {
-      displayManager.update();
-    }
-
-    // Check if settings have changed and need a reload.
-    auto &config = ConfigManager::getInstance();
-    if (config.isDirty())
-    {
-      // A "soft" refresh is enough to apply settings changes
-      // without blanking the screen.
-      displayManager.refresh();
-      config.clearDirtyFlag();
-      SerialLog::getInstance().print("Settings changed, refreshing display.\n");
-    }
-
-    // --- Button Handling Logic ---
-    if (newPress)
-    {
-      unsigned long duration;
-      // Atomically read and reset the flag
-      noInterrupts();
-      duration = pressDuration;
-      newPress = false;
-      interrupts();
-
-      SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", duration);
-
-      if (alarmManager.isRinging())
-      {
-        int alarmId = alarmManager.getActiveAlarmId();
-        if (alarmId != -1)
-        {
-          auto &config = ConfigManager::getInstance();
-          Alarm alarm = config.getAlarm(alarmId); // Get a copy
-
-          bool isSnooze = duration <= 10000;
-
-          if (isSnooze)
-          {
-            alarm.snooze();
-            DateTime now = TimeManager::getInstance().getRTCTime();
-            DateTime snoozeUntil = now + TimeSpan(SNOOZE_DURATION_MS / 1000);
-            SerialLog::getInstance().printf("Snoozing until: %02d:%02d:%02d\n", snoozeUntil.hour(), snoozeUntil.minute(), snoozeUntil.second());
-          }
-          else // Long press (> 10 seconds) to dismiss
-          {
-            SerialLog::getInstance().print("Long press detected. Dismissing alarm.\n");
-            alarm.dismiss();
-          }
-          config.setAlarm(alarmId, alarm); // Save the updated state
-          config.save();                   // Persist the change to storage
-          alarmManager.stop();             // Stop the physical ringing
-        }
-      }
-      else
-      {
-        // If not ringing, a short press cycles pages.
-        int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
-        SerialLog::getInstance().printf("Cycling to page index: %d\n", newIndex);
-        displayManager.setPage(newIndex);
-      }
-    }
-
-    // --- Update Alarm Icon ---
-    bool anyAlarmEnabled = false;
-    bool anyAlarmSnoozed = false;
-    for (int i = 0; i < config.getNumAlarms(); ++i)
-    {
-      const auto &alarm = config.getAlarm(i);
-      if (alarm.isEnabled())
-      {
-        anyAlarmEnabled = true;
-        if (alarm.isSnoozed())
-        {
-          anyAlarmSnoozed = true;
-        }
-      }
-    }
-    displayManager.drawAlarmIcon(anyAlarmEnabled, anyAlarmSnoozed);
+    displayManager.update();
   }
 
-  // --- Handle Boot Button for Factory Reset ---
+  // Check if settings have changed and need a reload.
+  if (config.isDirty())
+  {
+    displayManager.refresh();
+    config.clearDirtyFlag();
+    SerialLog::getInstance().print("Settings changed, refreshing display.\n");
+  }
+
+  // --- Button Handling Logic (Runs regardless of WiFi connection) ---
+  if (newPress)
+  {
+    unsigned long duration;
+    // Atomically read and reset the flag
+    noInterrupts();
+    duration = pressDuration;
+    newPress = false;
+    interrupts();
+
+    SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", duration);
+
+    if (alarmManager.isRinging())
+    {
+      int alarmId = alarmManager.getActiveAlarmId();
+      if (alarmId != -1)
+      {
+        Alarm alarm = config.getAlarm(alarmId); // Get a copy
+        bool isSnooze = duration <= 10000;
+
+        if (isSnooze)
+        {
+          alarm.snooze();
+          DateTime now = TimeManager::getInstance().getRTCTime();
+          DateTime snoozeUntil = now + TimeSpan(SNOOZE_DURATION_MS / 1000);
+          SerialLog::getInstance().printf("Snoozing until: %02d:%02d:%02d\n", snoozeUntil.hour(), snoozeUntil.minute(), snoozeUntil.second());
+        }
+        else // Long press (> 10 seconds) to dismiss
+        {
+          SerialLog::getInstance().print("Long press detected. Dismissing alarm.\n");
+          alarm.dismiss();
+        }
+        config.setAlarm(alarmId, alarm); // Save the updated state
+        config.save();                   // Persist the change
+        alarmManager.stop();             // Stop the ringing
+      }
+    }
+    else
+    {
+      // If not ringing, a short press cycles pages.
+      int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
+      SerialLog::getInstance().printf("Cycling to page index: %d\n", newIndex);
+      displayManager.setPage(newIndex);
+    }
+  }
+
+  // --- Update Alarm Icon (Runs regardless of WiFi connection) ---
+  bool anyAlarmEnabled = false;
+  bool anyAlarmSnoozed = false;
+  for (int i = 0; i < config.getNumAlarms(); ++i)
+  {
+    const auto &alarm = config.getAlarm(i);
+    if (alarm.isEnabled())
+    {
+      anyAlarmEnabled = true;
+      if (alarm.isSnoozed())
+      {
+        anyAlarmSnoozed = true;
+      }
+    }
+  }
+  displayManager.drawAlarmIcon(anyAlarmEnabled, anyAlarmSnoozed);
+
+  // --- WiFi-Dependent Logic ---
+  if (WiFiManager::getInstance().isConnected())
+  {
+    // Only attempt to sync time with the internet if connected.
+    timeManager.updateNtp();
+  }
+
+  // --- Handle Boot Button for Factory Reset (Runs regardless of WiFi connection) ---
   handleBootButton();
 }
