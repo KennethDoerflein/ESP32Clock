@@ -119,6 +119,14 @@ public:
    */
   bool isTimeSet() const;
 
+  /**
+   * @brief Checks if a daily NTP sync is needed and performs it.
+   *
+   * This is typically run at a specific time of day (e.g., 3 AM) to ensure
+   * the clock remains accurate.
+   */
+  void checkDailySync();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
@@ -135,12 +143,4 @@ private:
   static constexpr unsigned long UPDATE_INTERVAL = 1000; // 1 second
 
   uint32_t _lastTimeChecked = 0; ///< Stores the Unix timestamp of the last alarm check.
-
-  /**
-   * @brief Checks if a daily NTP sync is needed and performs it.
-   *
-   * This is typically run at a specific time of day (e.g., 3 AM) to ensure
-   * the clock remains accurate.
-   */
-  void checkDailySync();
 };

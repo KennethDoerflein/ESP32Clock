@@ -32,7 +32,6 @@ bool TimeManager::update()
   SerialLog::getInstance().print("TimeManager: Tick\n");
 #endif
   // Perform routine checks, like the daily time sync.
-  checkDailySync();
   return true; // An update occurred.
 }
 
