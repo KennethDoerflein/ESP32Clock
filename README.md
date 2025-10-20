@@ -21,7 +21,7 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 | ------------------- | -------------------------------------------------------------------- |
 | **Microcontroller** | **ESP32-S3-WROOM-1 N16R8** Development Board (16MB Flash, 8MB PSRAM) |
 | **Display**         | **3.5" ILI9488 TFT LCD** Display Module (480x320) with SPI interface |
-| **Real-Time Clock** | **DS3231** RTC Module with a CR2032 battery for backup               |
+| **Real-Time Clock** | **DS3231** RTC Module with a LIR2032 battery for backup               |
 | **Sensor**          | **BME280** Temperature, Humidity, and Pressure Sensor Module (I2C)   |
 | **Power Supply**    | A reliable 5V USB-C power supply                                     |
 
@@ -144,7 +144,6 @@ This project is broken down into phases to prioritize a functional base clock be
     - [ ] Show a "ringing" screen when an alarm is going off.
     - [ ] Show a snooze countdown.
     - [ ] Add a visual indicator for how long to hold the snooze button.
-    - [ ] Display when RTC battery needs to be replaced
 - [ ] **UI/UX Enhancements**
   - [x] Add an option to reset to defaults in the web interface.
   - [ ] Improve TOD and seconds centering.
