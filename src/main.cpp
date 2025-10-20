@@ -173,18 +173,37 @@ void setup()
   displayManager.addPage(std::make_unique<ClockPage>(&display.getTft()));
   displayManager.addPage(std::make_unique<InfoPage>());
 
-  // If connected, set up the main display and sync time.
-  if (WiFiManager::getInstance().isConnected())
+  // --- Post-WiFi Initialization Logic ---
+  auto &timeManager = TimeManager::getInstance();
+
+  // If the captive portal was started, the device needs configuration.
+  // This takes precedence over any other mode.
+  if (captivePortalStarted)
+  {
+    logger.print("Captive portal is active. Displaying setup instructions.\n");
+    display.drawMultiLineStatusMessage("Connect to Clock-Setup", "Go to http://192.168.4.1");
+  }
+  // If not in captive portal mode, check for a successful connection.
+  else if (WiFiManager::getInstance().isConnected())
   {
     logger.print("WiFi connected. Syncing time...\n");
     display.drawStatusMessage("Syncing Time...");
-    TimeManager::getInstance().begin();
-    // Set the initial page
+    timeManager.begin(); // This will perform the initial NTP sync.
     displayManager.setPage(0);
   }
+  // If no captive portal and no connection, it's a network outage.
+  // Fall back to RTC if the time is valid.
+  else if (timeManager.isTimeSet())
+  {
+    logger.print("WiFi connection failed, but RTC is set. Starting in offline mode.\n");
+    display.drawMultiLineStatusMessage("Offline Mode", "AP: Clock-Setup");
+    delay(5000); // Show the message for 5 seconds.
+    displayManager.setPage(0);
+  }
+  // This case should rarely be hit, but as a fallback, show setup.
   else
   {
-    logger.print("WiFi not connected. Displaying connection message.\n");
+    logger.print("WiFi connection failed and RTC not set. Displaying setup instructions.\n");
     display.drawMultiLineStatusMessage("Connect to Clock-Setup", "Go to http://192.168.4.1");
   }
 

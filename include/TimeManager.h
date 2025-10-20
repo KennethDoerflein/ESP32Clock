@@ -113,6 +113,12 @@ public:
    */
   DateTime getRTCTime() const;
 
+  /**
+   * @brief Checks if the RTC has been set to a valid time.
+   * @return True if the time is valid (year > 2000), false otherwise.
+   */
+  bool isTimeSet() const;
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
