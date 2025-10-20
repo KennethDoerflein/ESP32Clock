@@ -21,7 +21,7 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 | ------------------- | -------------------------------------------------------------------- |
 | **Microcontroller** | **ESP32-S3-WROOM-1 N16R8** Development Board (16MB Flash, 8MB PSRAM) |
 | **Display**         | **3.5" ILI9488 TFT LCD** Display Module (480x320) with SPI interface |
-| **Real-Time Clock** | **DS3231** RTC Module with a LIR2032 battery for backup               |
+| **Real-Time Clock** | **DS3231** RTC Module with a LIR2032 battery for backup              |
 | **Sensor**          | **BME280** Temperature, Humidity, and Pressure Sensor Module (I2C)   |
 | **Power Supply**    | A reliable 5V USB-C power supply                                     |
 
@@ -160,12 +160,12 @@ This project is broken down into phases to prioritize a functional base clock be
 ### Known Issues
 
 - [ ] **Alarms & User Interaction**
-  - [ ] Alarms stopping instead of being snoozed.
+  - [x] Alarms stopping instead of being snoozed.
   - [ ] Web UI alarm settings opens and closes when enabling or disabling alarm
 - [ ] **UI/UX Enhancements**
   - [ ] Lag when leaving the Wi-Fi page due to scanning.
--[ ] **Web UI**
-  -[ ] Can't scroll up while log message are being added
+  - [ ] **Web UI**
+    - [ ] Can't scroll up while log message are being added
 - [ ] wifi disconnects after a few hours
 
 ### Future Plans
