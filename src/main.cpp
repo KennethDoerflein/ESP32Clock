@@ -188,6 +188,15 @@ void setup()
   {
     logger.print("WiFi connected. Syncing time...\n");
     display.drawStatusMessage("Syncing Time...");
+    // Log RTC time validity before syncing
+    if (timeManager.isTimeSet())
+    {
+      logger.print("RTC time is valid.\n");
+    }
+    else
+    {
+      logger.print("RTC time is not set or invalid.\n");
+    }
     timeManager.begin(); // This will perform the initial NTP sync.
     displayManager.setPage(0);
   }
@@ -195,7 +204,7 @@ void setup()
   // Fall back to RTC if the time is valid.
   else if (timeManager.isTimeSet())
   {
-    logger.print("WiFi connection failed, but RTC is set. Starting in offline mode.\n");
+    logger.print("WiFi connection failed. RTC time is valid. Starting in offline mode.\n");
     display.drawMultiLineStatusMessage("Offline Mode", "AP: Clock-Setup");
     delay(5000); // Show the message for 5 seconds.
     displayManager.setPage(0);
