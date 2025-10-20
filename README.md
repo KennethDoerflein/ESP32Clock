@@ -164,9 +164,10 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] Web UI alarm settings opens and closes when enabling or disabling alarm
 - [ ] **UI/UX Enhancements**
   - [ ] Lag when leaving the Wi-Fi page due to scanning.
-  - [ ] **Web UI**
-    - [ ] Can't scroll up while log message are being added
-- [ ] wifi disconnects after a few hours
+- [ ] **Web UI**
+  - [ ] Can't scroll up while log message are being added
+- [ ] **General Problems**
+  - [ ] wifi disconnects after a few hours
 
 ### Future Plans
 
