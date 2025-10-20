@@ -561,6 +561,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
               <button type="button" class="btn btn-danger w-100 mt-3" onclick="rebootDevice()">
                 Reboot Device
               </button>
+              <button type="button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()">
+                Factory Reset
+              </button>
             </div>
           </form>
         </div>
@@ -661,6 +664,18 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
               alert("Device is rebooting...");
             } else {
               alert("Failed to send reboot command.");
+            }
+          });
+        }
+      }
+
+      function factoryReset() {
+        if (confirm("Are you sure you want to perform a factory reset? This will erase all settings.")) {
+          fetch("/factory-reset").then((response) => {
+            if (response.ok) {
+              alert("Factory reset successful. Device is rebooting...");
+            } else {
+              alert("Failed to send factory reset command.");
             }
           });
         }

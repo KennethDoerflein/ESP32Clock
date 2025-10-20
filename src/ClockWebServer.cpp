@@ -223,6 +223,13 @@ void ClockWebServer::begin()
       delay(100);
       ESP.restart(); });
 
+    server.on("/factory-reset", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      request->send(200, "text/plain", "Performing factory reset...");
+      ConfigManager::getInstance().factoryReset();
+      delay(100);
+      ESP.restart(); });
+
     server.on("/update", HTTP_GET, [this](AsyncWebServerRequest *request)
               { request->send_P(200, "text/html", UPDATE_PAGE_HTML, [this](const String &var)
                                 { return processor(var); }); });

@@ -136,8 +136,8 @@ This project is broken down into phases to prioritize a functional base clock be
     - [ ] Significantly increase the 5-alarm limit.
     - [ ] Let user set snooze duration
     - [ ] Let user set hold to dismiss alarm duration
-  - [ ] **Hardware Interaction:**
-    - [ ] Implement a factory reset via a long-press of the boot button.
+  - [x] **Hardware Interaction:**
+    - [x] Implement a factory reset via a long-press of the boot button.
   - [ ] **Audio Feedback:**
     - [ ] Add different sound options for the alarm.
   - [ ] **Display Feedback:**
@@ -146,7 +146,7 @@ This project is broken down into phases to prioritize a functional base clock be
     - [ ] Add a visual indicator for how long to hold the snooze button.
     - [ ] Display when RTC battery needs to be replaced
 - [ ] **UI/UX Enhancements**
-  - [ ] Add an option to reset to defaults in the web interface.
+  - [x] Add an option to reset to defaults in the web interface.
   - [ ] Improve TOD and seconds centering.
   - [ ] Improve the appearance of the temperature unit and degree sign.
   - [ ] Change display colors from webui
