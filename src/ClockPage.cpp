@@ -217,13 +217,13 @@ void ClockPage::drawDate(TFT_eSPI &tft)
 void ClockPage::drawTemperature(TFT_eSPI &tft)
 {
   float temp = getTemperature(); // Use the cached value
-  if (abs(temp - lastTemp) < 0.1)
+  if (fabs(temp - lastTemp) < 0.1)
     return;
 
   sprTemp.fillSprite(TFT_BLACK); // Clear sprite
 
   // Draw temperature value
-  char tempBuf[8];
+  char tempBuf[16];
   snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
   sprTemp.drawString(tempBuf, 0, sprTemp.height() / 2);
 
@@ -251,10 +251,10 @@ void ClockPage::drawTemperature(TFT_eSPI &tft)
 void ClockPage::drawHumidity(TFT_eSPI &tft)
 {
   float humidity = getHumidity(); // Use the cached value
-  if (abs(humidity - lastHumidity) < 0.1)
+  if (fabs(humidity - lastHumidity) < 0.1)
     return;
 
-  char buf[16];
+  char buf[24];
   snprintf(buf, sizeof(buf), "%.0f%%", humidity);
   sprHumidity.fillSprite(TFT_BLACK);
   sprHumidity.drawString(buf, sprHumidity.width(), sprHumidity.height() / 2);
