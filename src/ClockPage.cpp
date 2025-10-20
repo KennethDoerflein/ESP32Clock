@@ -28,12 +28,12 @@ ClockPage::~ClockPage()
 void ClockPage::onEnter(TFT_eSPI &tft)
 {
   tft.fillScreen(TFT_BLACK);
-  setupLayout(tft);
   if (!_spritesCreated)
   {
     setupSprites(tft);
     _spritesCreated = true;
   }
+  setupLayout(tft);
 
   // Force a redraw of all elements
   lastTime = "";
@@ -57,11 +57,12 @@ void ClockPage::update()
 
 void ClockPage::render(TFT_eSPI &tft)
 {
+  drawSeconds(tft);
+  drawTemperature(tft);
+  drawHumidity(tft);
   drawClock(tft);
   drawDate(tft);
   drawDayOfWeek(tft);
-  drawTemperature(tft);
-  drawHumidity(tft);
 }
 
 void ClockPage::setupLayout(TFT_eSPI &tft)
@@ -69,6 +70,10 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   int screenHeight = tft.height();
   tft.loadFont(DSEG14ModernBold32);
   int fontHeight = tft.fontHeight();
+
+  clockX = (tft.width() - (sprClock.width() + sprTOD.width())) / 2 - 40;
+  if (clockX < 0)
+    clockX = 0;
 
   clockY = MARGIN;
   dateY = screenHeight - (fontHeight * 2 + MARGIN + 40);
@@ -120,10 +125,6 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   bool is24Hour = timeManager.is24HourFormat();
   String timeStr = timeManager.getFormattedTime();
   String todStr = timeManager.getTOD();
-  String secondsStr = timeManager.getFormattedSeconds();
-  int clockX = (tft.width() - (sprClock.width() + sprTOD.width())) / 2 - 40;
-  if (clockX < 0)
-    clockX = 0;
 
   int secondsX = clockX + sprClock.width() + 15;
   int todX = secondsX + sprSeconds.width() * 0.15;
@@ -165,19 +166,26 @@ void ClockPage::drawClock(TFT_eSPI &tft)
       lastTOD = ""; // Mark as cleared
     }
   }
+}
 
-  // Draw the seconds if they have changed
-  if (secondsStr != lastSeconds)
+void ClockPage::drawSeconds(TFT_eSPI &tft)
+{
+  String secondsStr = TimeManager::getInstance().getFormattedSeconds();
+  if (secondsStr == lastSeconds)
   {
-    sprSeconds.fillSprite(TFT_BLACK);
-    sprSeconds.drawString(secondsStr.c_str(), sprSeconds.width(), 0);
-#ifdef DEBUG_BORDERS
-    sprSeconds.drawRect(0, 0, sprSeconds.width(), sprSeconds.height(), TFT_MAGENTA);
-#endif
-    // Position the seconds sprite under the AM/PM sprite's location
-    sprSeconds.pushSprite(secondsX, clockY + 20 + sprTOD.height());
-    lastSeconds = secondsStr;
+    return; // No change
   }
+
+  int secondsX = clockX + sprClock.width() + 15;
+
+  sprSeconds.fillSprite(TFT_BLACK);
+  sprSeconds.drawString(secondsStr.c_str(), sprSeconds.width(), 0);
+#ifdef DEBUG_BORDERS
+  sprSeconds.drawRect(0, 0, sprSeconds.width(), sprSeconds.height(), TFT_MAGENTA);
+#endif
+  // Position the seconds sprite under the AM/PM sprite's location
+  sprSeconds.pushSprite(secondsX, clockY + 20 + sprTOD.height());
+  lastSeconds = secondsStr;
 }
 
 void ClockPage::drawDayOfWeek(TFT_eSPI &tft)

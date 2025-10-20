@@ -30,6 +30,7 @@ private:
   void drawDayOfWeek(TFT_eSPI &tft);
   void drawTemperature(TFT_eSPI &tft);
   void drawHumidity(TFT_eSPI &tft);
+  void drawSeconds(TFT_eSPI &tft);
 
   // Flag to track sprite creation
   bool _spritesCreated = false;
@@ -53,6 +54,7 @@ private:
   float lastHumidity = -999;
 
   // Layout position variables
+  int clockX;
   int clockY;
   int dateY;
   int sensorY;
