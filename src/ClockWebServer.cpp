@@ -337,6 +337,11 @@ void ClockWebServer::begin()
         [](AsyncWebServerRequest *request, String filename, size_t index,
            uint8_t *data, size_t len, bool final)
         {
+          if (UpdateManager::getInstance().isUpdateInProgress() && index == 0)
+          {
+            request->send(409, "text/plain", "An update is already in progress.");
+            return;
+          }
           UpdateManager::getInstance().handleFileUpload(data, len, index, request->contentLength());
           if (final)
           {

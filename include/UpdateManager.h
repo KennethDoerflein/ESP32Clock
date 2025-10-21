@@ -15,6 +15,7 @@ public:
   void handleFileUpload(uint8_t *data, size_t len, size_t index, size_t total);
   bool endUpdate();
   String handleGithubUpdate();
+  bool isUpdateInProgress();
 
 private:
   UpdateManager();
@@ -22,6 +23,7 @@ private:
   UpdateManager &operator=(const UpdateManager &) = delete;
 
   bool _updateFailed = false;
+  bool _updateInProgress = false;
 
   static void runGithubUpdateTask(void *pvParameters);
 };

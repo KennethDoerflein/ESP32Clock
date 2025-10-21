@@ -26,6 +26,7 @@ void UpdateManager::handleFileUpload(uint8_t *data, size_t len, size_t index, si
   if (index == 0)
   {
     Serial.println("Update Start");
+    _updateInProgress = true;
     _updateFailed = false; // Reset flag for new update
     // For multipart forms, the total size is unknown, so use UPDATE_SIZE_UNKNOWN
     if (!Update.begin(UPDATE_SIZE_UNKNOWN))
@@ -67,11 +68,22 @@ bool UpdateManager::endUpdate()
   }
 
   _updateFailed = false; // Reset state for the next update attempt
+  _updateInProgress = false;
   return success;
+}
+
+bool UpdateManager::isUpdateInProgress()
+{
+  return _updateInProgress;
 }
 
 String UpdateManager::handleGithubUpdate()
 {
+  if (_updateInProgress)
+  {
+    return "An update is already in progress.";
+  }
+
   HTTPClient http;
   WiFiClientSecure client;
   client.setCACert(GITHUB_ROOT_CA);
@@ -147,6 +159,8 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
 {
   String *downloadUrl = (String *)pvParameters;
 
+  getInstance()._updateInProgress = true;
+
   HTTPClient http;
   WiFiClientSecure client;
   client.setCACert(GITHUB_ROOT_CA);
@@ -207,5 +221,6 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
 
   http.end();
   delete downloadUrl; // Free the memory for the URL
-  vTaskDelete(NULL);  // Delete the task
+  getInstance()._updateInProgress = false;
+  vTaskDelete(NULL); // Delete the task
 }
