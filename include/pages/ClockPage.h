@@ -2,6 +2,7 @@
 
 #include "Page.h"
 #include <TFT_eSPI.h>
+#include <cstdint>
 
 /**
  * @class ClockPage
@@ -20,7 +21,7 @@ public:
   void onExit() override;
   void update() override;
   void render(TFT_eSPI &tft) override;
-  void refresh() override;
+  void refresh(TFT_eSPI &tft, bool fullRefresh) override;
 
 private:
   void setupSprites(TFT_eSPI &tft);
@@ -31,6 +32,7 @@ private:
   void drawTemperature(TFT_eSPI &tft);
   void drawHumidity(TFT_eSPI &tft);
   void drawSeconds(TFT_eSPI &tft);
+  void updateSpriteColors();
 
   // Flag to track sprite creation
   bool _spritesCreated = false;
@@ -58,4 +60,7 @@ private:
   int clockY;
   int dateY;
   int sensorY;
+
+  // Cached background color
+  uint16_t _bgColor;
 };

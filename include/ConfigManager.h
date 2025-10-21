@@ -20,6 +20,16 @@ const int MAX_ALARMS = 5; // Maximum number of alarms that can be set
 class ConfigManager
 {
 public:
+  // Default Colors
+  static constexpr const char *DEFAULT_BACKGROUND_COLOR = "#000000";
+  static constexpr const char *DEFAULT_TIME_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_TOD_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_SECONDS_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_DAY_OF_WEEK_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_DATE_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_TEMP_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_HUMIDITY_COLOR = "#FFFFFF";
+
   /**
    * @brief Gets the singleton instance of the ConfigManager.
    * @return A reference to the singleton ConfigManager instance.
@@ -101,6 +111,16 @@ public:
    * @return The hostname as a String.
    */
   String getHostname() const { return hostname; }
+
+  // Display Colors
+  String getBackgroundColor() const { return backgroundColor; }
+  String getTimeColor() const { return timeColor; }
+  String getTodColor() const { return todColor; }
+  String getSecondsColor() const { return secondsColor; }
+  String getDayOfWeekColor() const { return dayOfWeekColor; }
+  String getDateColor() const { return dateColor; }
+  String getTempColor() const { return tempColor; }
+  String getHumidityColor() const { return humidityColor; }
 
   /**
    * @brief Checks if the stored WiFi credentials have been validated.
@@ -213,6 +233,78 @@ public:
    */
   void setAlarm(int index, const Alarm &alarm);
 
+  void setBackgroundColor(const String &color)
+  {
+    if (backgroundColor != color)
+    {
+      backgroundColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setTimeColor(const String &color)
+  {
+    if (timeColor != color)
+    {
+      timeColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setTodColor(const String &color)
+  {
+    if (todColor != color)
+    {
+      todColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setSecondsColor(const String &color)
+  {
+    if (secondsColor != color)
+    {
+      secondsColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setDayOfWeekColor(const String &color)
+  {
+    if (dayOfWeekColor != color)
+    {
+      dayOfWeekColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setDateColor(const String &color)
+  {
+    if (dateColor != color)
+    {
+      dateColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setTempColor(const String &color)
+  {
+    if (tempColor != color)
+    {
+      tempColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setHumidityColor(const String &color)
+  {
+    if (humidityColor != color)
+    {
+      humidityColor = color;
+      _isDirty = true;
+    }
+  }
+
   /**
    * @brief Checks if the configuration has been modified since the last save.
    * @return True if the configuration is "dirty", false otherwise.
@@ -229,6 +321,11 @@ public:
    */
   void factoryReset();
 
+  /**
+   * @brief Resets all display settings to their default values.
+   */
+  void resetDisplayToDefaults();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
@@ -244,6 +341,17 @@ private:
   uint8_t brightness = 255;
   bool use24HourFormat = false;
   bool useCelsius = false;
+
+  // Colors
+  String backgroundColor = DEFAULT_BACKGROUND_COLOR;
+  String timeColor = DEFAULT_TIME_COLOR;
+  String todColor = DEFAULT_TOD_COLOR;
+  String secondsColor = DEFAULT_SECONDS_COLOR;
+  String dayOfWeekColor = DEFAULT_DAY_OF_WEEK_COLOR;
+  String dateColor = DEFAULT_DATE_COLOR;
+  String tempColor = DEFAULT_TEMP_COLOR;
+  String humidityColor = DEFAULT_HUMIDITY_COLOR;
+
   bool _isDirty;
   Alarm _alarms[MAX_ALARMS];
   SemaphoreHandle_t _fileMutex;

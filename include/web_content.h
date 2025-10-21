@@ -17,6 +17,10 @@
  * This is injected into every page using the `%HEAD%` placeholder.
  */
 const char BOOTSTRAP_HEAD[] PROGMEM = R"rawliteral(
+<meta charset="UTF-8">
+<meta http-equiv="content-language" content="en-US">
+<meta name="language" content="English">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
@@ -42,10 +46,11 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <div class="card-body text-center">
         <h1 class="card-title mb-4">Control Panel</h1>
         <div class="d-grid gap-3">
-          <a href="/wifi" class="btn btn-primary btn-lg">Configure WiFi</a>
-          <a href="/settings" class="btn btn-secondary btn-lg">Clock Settings</a>
-          <a href="/alarms" class="btn btn-warning btn-lg">Alarm Settings</a>
-          <a href="/update" class="btn btn-info btn-lg">Update Firmware</a>
+          <a href="/wifi" class="btn btn-primary btn-lg" title="Configure WiFi network settings.">Configure WiFi</a>
+          <a href="/settings" class="btn btn-secondary btn-lg" title="Adjust general clock settings.">Clock Settings</a>
+          <a href="/display" class="btn btn-info btn-lg" title="Customize the display colors.">Display Settings</a>
+          <a href="/alarms" class="btn btn-warning btn-lg" title="Set and manage alarms.">Alarm Settings</a>
+          <a href="/update" class="btn btn-danger btn-lg" title="Update the device firmware.">Update Firmware</a>
           %SERIAL_LOG_BUTTON%
         </div>
         <div class="mt-4 text-center text-muted">
@@ -106,8 +111,8 @@ const char SIMPLE_WIFI_SETUP_HTML[] PROGMEM = R"rawliteral(
                 <input type="password" id="password" name="password">
             </div>
             <div class="button-group">
-                <button type="button" id="test-button">Test Connection</button>
-                <button type="submit" id="save-button">Save & Connect</button>
+                <button type="button" id="test-button" title="Test the WiFi connection without saving.">Test Connection</button>
+                <button type="submit" id="save-button" title="Save the WiFi credentials and connect.">Save & Connect</button>
             </div>
         </form>
         <hr>
@@ -292,20 +297,20 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
             <input type="password" class="form-control" name="password" placeholder="Password">
           </div>
           <div class="d-grid">
-            <button type="submit" id="save-button" class="btn btn-success btn-lg">Save & Connect</button>
+            <button type="submit" id="save-button" class="btn btn-success btn-lg" title="Save the selected WiFi network credentials and connect.">Save & Connect</button>
           </div>
         </form>
         <div id="form-status" class="mt-3"></div>
         <hr class="my-4">
         <div class="text-center mb-3">
-          <button id="scan-button" class="btn btn-primary">
+          <button id="scan-button" class="btn btn-primary" title="Scan for available WiFi networks.">
             <i class="bi bi-wifi"></i> Scan for Networks
           </button>
         </div>
         <div id="networks-status" class="text-center text-muted mb-2 d-none"></div>
         <div id="networks-list" class="list-group"></div>
         <div class="d-grid mt-4 %BACK_BUTTON_CLASS%">
-          <a href="/" class="btn btn-secondary">Back to Menu</a>
+          <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
         </div>
       </div>
     </div>
@@ -491,7 +496,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           <form id="settings-form">
             <div
               class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-              <label class="form-check-label" for="auto-brightness">Auto Brightness</label>
+              <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
               <input
                 class="form-check-input"
                 type="checkbox"
@@ -502,7 +507,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
             <div class="mb-3 p-3 border rounded">
               <label for="brightness" class="form-label d-flex justify-content-between">
-                <span>Manual Brightness</span>
+                <span title="Set the display brightness manually.">Manual Brightness</span>
                 <span id="brightness-value">255</span>
               </label>
               <input
@@ -511,12 +516,13 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 id="brightness"
                 name="brightness"
                 min="10"
-                max="255" />
+                max="255"
+                title="Adjust the manual brightness level." />
             </div>
 
             <div
               class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-              <label class="form-check-label" for="24hour">24-Hour Format</label>
+              <label class="form-check-label" for="24hour" title="Switch between 12-hour and 24-hour time formats.">24-Hour Format</label>
               <input
                 class="form-check-input"
                 type="checkbox"
@@ -527,7 +533,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
             <div
               class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-              <label class="form-check-label" for="celsius">Use Celsius (&deg;C)</label>
+              <label class="form-check-label" for="celsius" title="Switch between Celsius and Fahrenheit temperature units.">Use Celsius (&deg;C)</label>
               <input
                 class="form-check-input"
                 type="checkbox"
@@ -541,15 +547,16 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
           <form id="hostname-form" class="mt-4">
             <div class="mb-3 p-3 border rounded">
-              <label for="hostname" class="form-label">Hostname</label>
+              <label for="hostname" class="form-label" title="Set the network hostname for the device.">Hostname</label>
               <div class="input-group">
                 <input
                   type="text"
                   class="form-control"
                   id="hostname"
                   name="hostname"
-                  value="%HOSTNAME%" />
-                <button class="btn btn-primary" type="submit">
+                  value="%HOSTNAME%"
+                  title="Enter the desired hostname." />
+                <button class="btn btn-primary" type="submit" title="Save the new hostname and reboot the device.">
                   Save & Reboot
                 </button>
               </div>
@@ -557,11 +564,11 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           </form>
 
           <div class="d-grid gap-2 mt-4">
-            <a href="/" class="btn btn-secondary">Back to Menu</a>
-              <button type="button" class="btn btn-danger w-100 mt-3" onclick="rebootDevice()">
+            <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
+              <button type="button" class="btn btn-danger w-100 mt-3" onclick="rebootDevice()" title="Reboot the device.">
                 Reboot Device
               </button>
-              <button type="button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()">
+              <button type="button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()" title="Reset all settings to factory defaults.">
                 Factory Reset
               </button>
             </div>
@@ -718,6 +725,199 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 /**
+ * @brief The Display Settings page.
+ * Contains color pickers to customize the clock's appearance.
+ * Fetches data from /api/display and auto-saves on change.
+ */
+const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <title>Display Settings</title>
+  %HEAD%
+  <style>
+      .status-indicator {
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-width: 95px;
+      }
+      .color-picker-wrapper {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 1px solid #444;
+        border-radius: 0.375rem;
+      }
+      .color-picker-wrapper label {
+        margin-bottom: 0;
+      }
+      input[type="color"] {
+        min-width: 100px;
+        height: 40px;
+        padding: 0.2rem;
+        border-radius: 0.375rem;
+        border: none;
+        cursor: pointer;
+      }
+  </style>
+</head>
+  <body>
+    <div class="container mt-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="card-title m-0">Display Settings</h1>
+            <div class="status-indicator"></div>
+          </div>
+          
+          <div class="alert alert-info d-flex align-items-center" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <div>Heads up! All your changes are saved automatically.</div>
+          </div>
+
+          <form id="display-settings-form">
+            <div class="color-picker-wrapper">
+              <label for="background-color" title="Set the main background color.">Background Color</label>
+              <input type="color" id="background-color" name="backgroundColor" title="Select a background color.">
+            </div>
+            <div class="color-picker-wrapper">
+              <label for="time-color" title="Set the color for the time display.">Time Color</label>
+              <input type="color" id="time-color" name="timeColor" title="Select a color for the time.">
+            </div>
+            <div class="color-picker-wrapper">
+              <label for="tod-color" title="Set the color for the AM/PM indicator.">TOD Color</label>
+              <input type="color" id="tod-color" name="todColor" title="Select a color for the AM/PM indicator.">
+            </div>
+             <div class="color-picker-wrapper">
+              <label for="seconds-color" title="Set the color for the seconds display.">Seconds Color</label>
+              <input type="color" id="seconds-color" name="secondsColor" title="Select a color for the seconds.">
+            </div>
+            <div class="color-picker-wrapper">
+              <label for="day-of-week-color" title="Set the color for the day of the week.">Day of Week Color</label>
+              <input type="color" id="day-of-week-color" name="dayOfWeekColor" title="Select a color for the day of the week.">
+            </div>
+            <div class="color-picker-wrapper">
+              <label for="date-color" title="Set the color for the date display.">Date Color</label>
+              <input type="color" id="date-color" name="dateColor" title="Select a color for the date.">
+            </div>
+            <div class="color-picker-wrapper">
+              <label for="temp-color" title="Set the color for the temperature display.">Temperature Color</label>
+              <input type="color" id="temp-color" name="tempColor" title="Select a color for the temperature.">
+            </div>
+            <div class="color-picker-wrapper">
+              <label for="humidity-color" title="Set the color for the humidity display.">Humidity Color</label>
+              <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity.">
+            </div>
+          </form>
+
+          <div class="d-grid gap-2 mt-4">
+            <button type="button" id="reset-colors-btn" class="btn btn-danger" title="Reset all colors to their default values.">Reset Colors</button>
+            <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const DEBOUNCE_DELAY_MS = 1500;
+      const ERROR_DISPLAY_MS = 3000;
+      let saveTimeout;
+      let statusClearTimeout;
+
+      const statusEl = document.querySelector(".status-indicator");
+      const form = document.getElementById("display-settings-form");
+      
+      const colorPickers = form.querySelectorAll('input[type="color"]');
+
+      const STATUS_INDICATORS = {
+        SAVED:
+          '<i class="bi bi-check-circle-fill text-success"></i> <span class="text-muted">Saved</span>',
+        UNSAVED:
+          '<i class="bi bi-pencil-fill text-warning"></i> <span class="text-warning">Unsaved</span>',
+        SAVING:
+          '<div class="spinner-border spinner-border-sm text-primary" role="status"></div> <span class="text-primary">Saving...</span>',
+        ERROR:
+          '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
+      };
+
+      function setStatus(status) {
+        statusEl.innerHTML = status;
+      }
+
+      function handleInputChange() {
+        clearTimeout(saveTimeout);
+        setStatus(STATUS_INDICATORS.UNSAVED);
+        saveTimeout = setTimeout(saveSettings, DEBOUNCE_DELAY_MS);
+      }
+
+      async function loadSettings() {
+        try {
+          const response = await fetch('/api/display');
+          const settings = await response.json();
+          for (const key in settings) {
+              const el = document.querySelector(`[name="${key}"]`);
+              if (el) {
+                  el.value = settings[key];
+              }
+          }
+          setStatus(STATUS_INDICATORS.SAVED);
+        } catch (e) {
+          setStatus(STATUS_INDICATORS.ERROR);
+        }
+      }
+
+      async function saveSettings() {
+        setStatus(STATUS_INDICATORS.SAVING);
+        
+        const settings = {};
+        colorPickers.forEach(picker => {
+            settings[picker.name] = picker.value;
+        });
+
+        try {
+          await fetch('/api/display/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(settings)
+          });
+          setStatus(STATUS_INDICATORS.SAVED);
+        } catch (e) {
+          setStatus(STATUS_INDICATORS.ERROR);
+          setTimeout(() => {
+            setStatus(STATUS_INDICATORS.UNSAVED);
+          }, ERROR_DISPLAY_MS);
+        }
+      }
+      
+      form.addEventListener('input', handleInputChange);
+      document.addEventListener("DOMContentLoaded", loadSettings);
+
+      document.getElementById('reset-colors-btn').addEventListener('click', async () => {
+        if (confirm('Are you sure you want to reset all colors to their default values?')) {
+          setStatus(STATUS_INDICATORS.SAVING);
+          try {
+            const response = await fetch('/api/display/reset', { method: 'POST' });
+            if (response.ok) {
+              await loadSettings(); // Reload settings to show the defaults
+              setStatus(STATUS_INDICATORS.SAVED);
+            } else {
+              throw new Error('Failed to reset colors');
+            }
+          } catch (e) {
+            setStatus(STATUS_INDICATORS.ERROR);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
+)rawliteral";
+
+/**
  * @brief The Alarm Settings page, enhanced with a modern, responsive UI.
  * Features auto-saving, collapsible sections, and clear status indicators.
  * Communicates with the device's backend via the original /api/alarms endpoints.
@@ -788,7 +988,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
             <p class="text-center">Loading alarms...</p>
           </div>
           <div class="d-grid gap-2 mt-4">
-            <a href="/" class="btn btn-secondary">Back to Menu</a>
+            <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
           </div>
         </div>
       </div>
@@ -839,12 +1039,12 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
           const isActive = (alarm.days & value) > 0;
           daysHtml += `<button type="button" class="btn ${
             isActive ? "btn-primary" : "btn-outline-secondary"
-          } day-btn" data-value="${value}">${label}</button>`;
+          } day-btn" data-value="${value}" title="Toggle ${label}">${label}</button>`;
         });
 
         card.innerHTML = `
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center alarm-header" data-bs-target="#${collapseId}">
+          <div class="d-flex justify-content-between align-items-center alarm-header" data-bs-target="#${collapseId}" title="Expand or collapse alarm settings.">
             <div class="d-flex align-items-center">
                 <h5 class="card-title mb-0 me-3">Alarm ${alarm.id + 1}</h5>
                 <span class="status-indicator"></span>
@@ -854,7 +1054,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
                  <div class="form-check form-switch">
                    <input class="form-check-input" type="checkbox" role="switch" ${
                      alarm.enabled ? "checked" : ""
-                   }>
+                   } title="Enable or disable this alarm.">
                  </div>
             </div>
           </div>
@@ -864,7 +1064,10 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
               <label class="form-label">Time</label>
               <input type="time" class="form-control" value="${String(
                 alarm.hour
-              ).padStart(2, "0")}:${String(alarm.minute).padStart(2, "0")}">
+              ).padStart(2, "0")}:${String(alarm.minute).padStart(
+                2,
+                "0"
+              )}" title="Set the alarm time.">
             </div>
             <div>
               <label class="form-label">Repeat on</label>
@@ -1008,8 +1211,8 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
             <p class="card-text text-muted small">Select a .bin file from your computer to upload and flash.</p>
             <form id="upload-form">
               <div class="input-group">
-                <input type="file" class="form-control" id="firmware" name="firmware" accept=".bin" required>
-                <button class="btn btn-primary" type="submit">Upload</button>
+                <input type="file" class="form-control" id="firmware" name="firmware" accept=".bin" required title="Select a .bin firmware file.">
+                <button class="btn btn-primary" type="submit" title="Upload the selected firmware file.">Upload</button>
               </div>
             </form>
           </div>
@@ -1021,7 +1224,7 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
             <h5 class="card-title d-flex align-items-center"><i class="bi bi-cloud-download me-2"></i>Online Update (Untested)</h5>
             <p class="card-text text-muted small">Check for the latest release and update automatically.</p>
             <div class="d-grid">
-              <button id="online-button" class="btn btn-success">Check for Updates</button>
+              <button id="online-button" class="btn btn-success" title="Check for and apply updates from the internet.">Check for Updates</button>
             </div>
           </div>
         </div>
@@ -1029,7 +1232,7 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
         <!-- Status and Back Button -->
         <div id="status" class="mt-4"></div>
         <div class="d-grid mt-4">
-          <a href="/" id="back-button" class="btn btn-secondary">Back to Menu</a>
+          <a href="/" id="back-button" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
         </div>
       </div>
     </div>
@@ -1189,8 +1392,8 @@ const char SERIAL_LOG_PAGE_HTML[] PROGMEM = R"rawliteral(
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h1 class="h3 retro-header">Serial LOG</h1>
             <div>
-                <button id="download-btn" class="btn btn-retro me-2">Download Log</button>
-                <a href="/" class="btn btn-retro">Back to Menu</a>
+                <button id="download-btn" class="btn btn-retro me-2" title="Download the current log as a text file.">Download Log</button>
+                <a href="/" class="btn btn-retro" title="Return to the main menu.">Back to Menu</a>
             </div>
         </div>
         <div id="log" class="p-3"></div>

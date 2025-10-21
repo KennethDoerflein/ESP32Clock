@@ -2,6 +2,7 @@
 // #define DEBUG_BORDERS
 
 #include "pages/ClockPage.h"
+#include "utils.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
 #include "sensors.h"
@@ -27,7 +28,9 @@ ClockPage::~ClockPage()
 
 void ClockPage::onEnter(TFT_eSPI &tft)
 {
-  tft.fillScreen(TFT_BLACK);
+  updateSpriteColors();
+  tft.fillScreen(_bgColor);
+
   if (!_spritesCreated)
   {
     setupSprites(tft);
@@ -86,37 +89,53 @@ void ClockPage::setupSprites(TFT_eSPI &tft)
   sprClock.createSprite(350, 106);
   sprClock.loadFont(DSEG7ModernBold104);
   sprClock.setTextDatum(MR_DATUM);
-  sprClock.setTextColor(TFT_SKYBLUE, TFT_BLACK);
 
   sprTOD.createSprite(45, 34);
   sprTOD.loadFont(DSEG14ModernBold32);
   sprTOD.setTextDatum(TR_DATUM);
-  sprTOD.setTextColor(TFT_SKYBLUE, TFT_BLACK);
 
   sprSeconds.createSprite(70, 50);
   sprSeconds.loadFont(DSEG7ModernBold48);
   sprSeconds.setTextDatum(TR_DATUM);
-  sprSeconds.setTextColor(TFT_SKYBLUE, TFT_BLACK);
 
   sprDayOfWeek.createSprite(tft.width() / 2 - MARGIN, 50);
   sprDayOfWeek.loadFont(DSEG14ModernBold48);
   sprDayOfWeek.setTextDatum(ML_DATUM);
-  sprDayOfWeek.setTextColor(TFT_WHITE, TFT_BLACK);
 
   sprDate.createSprite(tft.width() / 2 - MARGIN, 50);
   sprDate.loadFont(DSEG14ModernBold48);
   sprDate.setTextDatum(MR_DATUM);
-  sprDate.setTextColor(TFT_WHITE, TFT_BLACK);
 
   sprTemp.createSprite(tft.width() / 2 - MARGIN, 50);
   sprTemp.loadFont(DSEG14ModernBold48);
   sprTemp.setTextDatum(ML_DATUM);
-  sprTemp.setTextColor(TFT_WHITE, TFT_BLACK);
 
   sprHumidity.createSprite(tft.width() / 2 - MARGIN, 50);
   sprHumidity.loadFont(DSEG14ModernBold48);
   sprHumidity.setTextDatum(MR_DATUM);
-  sprHumidity.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  updateSpriteColors();
+}
+
+void ClockPage::updateSpriteColors()
+{
+  auto &config = ConfigManager::getInstance();
+  _bgColor = hexToRGB565(config.getBackgroundColor());
+  uint16_t timeColor = hexToRGB565(config.getTimeColor());
+  uint16_t todColor = hexToRGB565(config.getTodColor());
+  uint16_t secondsColor = hexToRGB565(config.getSecondsColor());
+  uint16_t dayOfWeekColor = hexToRGB565(config.getDayOfWeekColor());
+  uint16_t dateColor = hexToRGB565(config.getDateColor());
+  uint16_t tempColor = hexToRGB565(config.getTempColor());
+  uint16_t humidityColor = hexToRGB565(config.getHumidityColor());
+
+  sprClock.setTextColor(timeColor, _bgColor);
+  sprTOD.setTextColor(todColor, _bgColor);
+  sprSeconds.setTextColor(secondsColor, _bgColor);
+  sprDayOfWeek.setTextColor(dayOfWeekColor, _bgColor);
+  sprDate.setTextColor(dateColor, _bgColor);
+  sprTemp.setTextColor(tempColor, _bgColor);
+  sprHumidity.setTextColor(humidityColor, _bgColor);
 }
 
 void ClockPage::drawClock(TFT_eSPI &tft)
@@ -132,7 +151,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   // Draw the main time (HH:MM) if it has changed
   if (timeStr != lastTime)
   {
-    sprClock.fillSprite(TFT_BLACK);
+    sprClock.fillSprite(_bgColor);
     sprClock.drawString(timeStr.c_str(), sprClock.width(), sprClock.height() / 2);
 #ifdef DEBUG_BORDERS
     sprClock.drawRect(0, 0, sprClock.width(), sprClock.height(), TFT_RED);
@@ -147,23 +166,13 @@ void ClockPage::drawClock(TFT_eSPI &tft)
     // In 12-hour mode, draw the TOD if it has changed
     if (todStr != lastTOD)
     {
-      sprTOD.fillSprite(TFT_BLACK);
+      sprTOD.fillSprite(_bgColor);
       sprTOD.drawString(todStr.c_str(), sprTOD.width(), 0);
 #ifdef DEBUG_BORDERS
       sprTOD.drawRect(0, 0, sprTOD.width(), sprTOD.height(), TFT_GREEN);
 #endif
       sprTOD.pushSprite(todX, clockY);
       lastTOD = todStr;
-    }
-  }
-  else
-  {
-    // In 24-hour mode, clear the TOD if it was previously displayed
-    if (lastTOD != "")
-    {
-      sprTOD.fillSprite(TFT_BLACK);
-      sprTOD.pushSprite(todX, clockY);
-      lastTOD = ""; // Mark as cleared
     }
   }
 }
@@ -178,7 +187,7 @@ void ClockPage::drawSeconds(TFT_eSPI &tft)
 
   int secondsX = clockX + sprClock.width() + 15;
 
-  sprSeconds.fillSprite(TFT_BLACK);
+  sprSeconds.fillSprite(_bgColor);
   sprSeconds.drawString(secondsStr.c_str(), sprSeconds.width(), 0);
 #ifdef DEBUG_BORDERS
   sprSeconds.drawRect(0, 0, sprSeconds.width(), sprSeconds.height(), TFT_MAGENTA);
@@ -193,7 +202,7 @@ void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
   String dayStr = TimeManager::getInstance().getDayOfWeek();
   if (dayStr != lastDayOfWeek)
   {
-    sprDayOfWeek.fillSprite(TFT_BLACK);
+    sprDayOfWeek.fillSprite(_bgColor);
     sprDayOfWeek.drawString(dayStr.c_str(), 0, sprDayOfWeek.height() / 2);
 
 #ifdef DEBUG_BORDERS
@@ -210,7 +219,7 @@ void ClockPage::drawDate(TFT_eSPI &tft)
   String dateStr = TimeManager::getInstance().getFormattedDate();
   if (dateStr != lastDate)
   {
-    sprDate.fillSprite(TFT_BLACK);
+    sprDate.fillSprite(_bgColor);
     sprDate.drawString(dateStr.c_str(), sprDate.width(), sprDate.height() / 2);
 
 #ifdef DEBUG_BORDERS
@@ -228,7 +237,10 @@ void ClockPage::drawTemperature(TFT_eSPI &tft)
   if (fabs(temp - lastTemp) < 0.1)
     return;
 
-  sprTemp.fillSprite(TFT_BLACK); // Clear sprite
+  auto &config = ConfigManager::getInstance();
+  uint16_t tempColor = hexToRGB565(config.getTempColor());
+
+  sprTemp.fillSprite(_bgColor); // Clear sprite
 
   // Draw temperature value
   char tempBuf[16];
@@ -240,10 +252,10 @@ void ClockPage::drawTemperature(TFT_eSPI &tft)
   int circleX = tempWidth + 4;
   int circleY = sprTemp.height() / 2 - 20;
   int circleRadius = 3;
-  sprTemp.fillCircle(circleX, circleY, circleRadius, TFT_WHITE);
+  sprTemp.fillCircle(circleX, circleY, circleRadius, tempColor);
 
   // Draw the unit (C/F)
-  char unit = ConfigManager::getInstance().isCelsius() ? 'C' : 'F';
+  char unit = config.isCelsius() ? 'C' : 'F';
   char unitBuf[2] = {unit, '\0'};
   int unitX = circleX + circleRadius * 2; // Position it after the circle
   sprTemp.drawString(unitBuf, unitX, sprTemp.height() / 2);
@@ -264,7 +276,7 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
 
   char buf[24];
   snprintf(buf, sizeof(buf), "%.0f%%", humidity);
-  sprHumidity.fillSprite(TFT_BLACK);
+  sprHumidity.fillSprite(_bgColor);
   sprHumidity.drawString(buf, sprHumidity.width(), sprHumidity.height() / 2);
 
 #ifdef DEBUG_BORDERS
@@ -275,14 +287,31 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
   lastHumidity = humidity;
 }
 
-void ClockPage::refresh()
+void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
 {
+  auto &config = ConfigManager::getInstance();
+  updateSpriteColors();
+
+  if (fullRefresh)
+  {
+    tft.fillScreen(_bgColor);
+  }
+
+  if (config.is24HourFormat())
+  {
+    // In 24-hour mode, ensure the TOD sprite is cleared immediately on refresh.
+    sprTOD.fillSprite(_bgColor);
+    int secondsX = clockX + sprClock.width() + 15;
+    int todX = secondsX + sprSeconds.width() * 0.15;
+    sprTOD.pushSprite(todX, clockY);
+  }
+
   // Force a redraw of all elements by resetting their last known values
   lastTime = "";
   lastDate = "";
   lastDayOfWeek = "";
   lastTemp = -999;
   lastHumidity = -999;
-  // lastTOD is not reset here, to allow the logic in drawClock
-  // to correctly clear the sprite when switching from 12 to 24-hour mode.
+  lastTOD = "";
+  lastSeconds = "";
 }

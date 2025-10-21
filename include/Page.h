@@ -42,8 +42,10 @@ public:
   virtual void render(TFT_eSPI &tft) = 0;
 
   /**
-   * @brief Called to force a refresh of the page's content without a full redraw.
+   * @brief Called to force a refresh of the page's content.
    * This is useful for applying settings changes that affect the display.
+   * @param tft A reference to the main TFT_eSPI object.
+   * @param fullRefresh If true, a full redraw is required.
    */
-  virtual void refresh() {}
+  virtual void refresh(TFT_eSPI &tft, bool fullRefresh) {}
 };

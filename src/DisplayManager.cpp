@@ -1,4 +1,6 @@
 #include "DisplayManager.h"
+#include "utils.h"
+#include "ConfigManager.h"
 
 void DisplayManager::begin(TFT_eSPI &tft_instance)
 {
@@ -41,6 +43,24 @@ void DisplayManager::setPage(int index, bool forceRedraw)
 
 void DisplayManager::update()
 {
+  if (_fullRefresh)
+  {
+    if (currentPage)
+    {
+      currentPage->refresh(*tft, true);
+    }
+    _fullRefresh = false;
+    _partialRefresh = false; // A full refresh implies a partial one
+  }
+  else if (_partialRefresh)
+  {
+    if (currentPage)
+    {
+      currentPage->refresh(*tft, false);
+    }
+    _partialRefresh = false;
+  }
+
   if (currentPage)
   {
     currentPage->update();
@@ -48,12 +68,21 @@ void DisplayManager::update()
   }
 }
 
+void DisplayManager::requestPartialRefresh()
+{
+  _partialRefresh = true;
+}
+
+void DisplayManager::requestFullRefresh()
+{
+  _fullRefresh = true;
+}
+
 void DisplayManager::refresh()
 {
-  if (currentPage)
-  {
-    currentPage->refresh();
-  }
+  // This method is now deprecated, but we can keep it for compatibility.
+  // For now, we'll just trigger a partial refresh.
+  requestPartialRefresh();
 }
 
 int DisplayManager::getPagesSize()

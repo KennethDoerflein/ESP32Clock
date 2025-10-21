@@ -38,6 +38,15 @@ void ConfigManager::setDefaults()
   use24HourFormat = false; // Default to 12-hour format
   useCelsius = false;      // Default to Fahrenheit
 
+  backgroundColor = DEFAULT_BACKGROUND_COLOR;
+  timeColor = DEFAULT_TIME_COLOR;
+  todColor = DEFAULT_TOD_COLOR;
+  secondsColor = DEFAULT_SECONDS_COLOR;
+  dayOfWeekColor = DEFAULT_DAY_OF_WEEK_COLOR;
+  dateColor = DEFAULT_DATE_COLOR;
+  tempColor = DEFAULT_TEMP_COLOR;
+  humidityColor = DEFAULT_HUMIDITY_COLOR;
+
   for (int i = 0; i < MAX_ALARMS; ++i)
   {
     _alarms[i] = Alarm(); // Reset to default constructor
@@ -98,6 +107,15 @@ void ConfigManager::load()
   use24HourFormat = doc["use24HourFormat"] | false;
   useCelsius = doc["useCelsius"] | false;
 
+  backgroundColor = doc["backgroundColor"] | DEFAULT_BACKGROUND_COLOR;
+  timeColor = doc["timeColor"] | DEFAULT_TIME_COLOR;
+  todColor = doc["todColor"] | DEFAULT_TOD_COLOR;
+  secondsColor = doc["secondsColor"] | DEFAULT_SECONDS_COLOR;
+  dayOfWeekColor = doc["dayOfWeekColor"] | DEFAULT_DAY_OF_WEEK_COLOR;
+  dateColor = doc["dateColor"] | DEFAULT_DATE_COLOR;
+  tempColor = doc["tempColor"] | DEFAULT_TEMP_COLOR;
+  humidityColor = doc["humidityColor"] | DEFAULT_HUMIDITY_COLOR;
+
   // Deserialize the alarms array
   JsonArray alarmsArray = doc["alarms"];
   if (!alarmsArray.isNull())
@@ -143,6 +161,15 @@ bool ConfigManager::save()
   doc["brightness"] = brightness;
   doc["use24HourFormat"] = use24HourFormat;
   doc["useCelsius"] = useCelsius;
+
+  doc["backgroundColor"] = backgroundColor;
+  doc["timeColor"] = timeColor;
+  doc["todColor"] = todColor;
+  doc["secondsColor"] = secondsColor;
+  doc["dayOfWeekColor"] = dayOfWeekColor;
+  doc["dateColor"] = dateColor;
+  doc["tempColor"] = tempColor;
+  doc["humidityColor"] = humidityColor;
 
   // Serialize the alarms array
   JsonArray alarmsArray = doc["alarms"].to<JsonArray>();
@@ -241,4 +268,17 @@ void ConfigManager::factoryReset()
 
   setDefaults();
   save();
+}
+
+void ConfigManager::resetDisplayToDefaults()
+{
+  backgroundColor = DEFAULT_BACKGROUND_COLOR;
+  timeColor = DEFAULT_TIME_COLOR;
+  todColor = DEFAULT_TOD_COLOR;
+  secondsColor = DEFAULT_SECONDS_COLOR;
+  dayOfWeekColor = DEFAULT_DAY_OF_WEEK_COLOR;
+  dateColor = DEFAULT_DATE_COLOR;
+  tempColor = DEFAULT_TEMP_COLOR;
+  humidityColor = DEFAULT_HUMIDITY_COLOR;
+  _isDirty = true;
 }

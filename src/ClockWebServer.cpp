@@ -2,6 +2,7 @@
 
 #include "ClockWebServer.h"
 #include "ConfigManager.h"
+#include "DisplayManager.h"
 #include "WiFiManager.h"
 #include "web_content.h"
 #include <ArduinoJson.h>
@@ -73,6 +74,9 @@ void ClockWebServer::begin()
               { onWifiRequest(request); });
     server.on("/settings", HTTP_GET, [this](AsyncWebServerRequest *request)
               { onSettingsRequest(request); });
+
+    server.on("/display", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onDisplayRequest(request); });
 
     server.on("/alarms", HTTP_GET, [this](AsyncWebServerRequest *request)
               { onAlarmsRequest(request); });
@@ -205,6 +209,86 @@ void ClockWebServer::begin()
           }
         });
 
+    server.on("/api/display/reset", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+      auto &config = ConfigManager::getInstance();
+      config.resetDisplayToDefaults();
+      config.save();
+      DisplayManager::getInstance().requestFullRefresh();
+      request->send(200, "text/plain", "Display settings reset!"); });
+
+    // --- API Handlers for Display ---
+    server.on("/api/display", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      auto& config = ConfigManager::getInstance();
+      JsonDocument doc;
+      doc["backgroundColor"] = config.getBackgroundColor();
+      doc["timeColor"] = config.getTimeColor();
+      doc["todColor"] = config.getTodColor();
+      doc["secondsColor"] = config.getSecondsColor();
+      doc["dayOfWeekColor"] = config.getDayOfWeekColor();
+      doc["dateColor"] = config.getDateColor();
+      doc["tempColor"] = config.getTempColor();
+      doc["humidityColor"] = config.getHumidityColor();
+      
+      String response;
+      serializeJson(doc, response);
+      request->send(200, "application/json", response); });
+
+    server.on(
+        "/api/display/save", HTTP_POST, [](AsyncWebServerRequest *request) {},
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total)
+        {
+          if (index == 0)
+          {
+            request->_tempObject = new std::vector<uint8_t>();
+          }
+
+          std::vector<uint8_t> *buffer =
+              (std::vector<uint8_t> *)request->_tempObject;
+          buffer->insert(buffer->end(), data, data + len);
+
+          if (index + len == total)
+          {
+            JsonDocument doc;
+            if (deserializeJson(doc, buffer->data(), buffer->size()))
+            {
+              request->send(400, "text/plain", "Invalid JSON");
+            }
+            else
+            {
+              auto &config = ConfigManager::getInstance();
+              String oldBgColor = config.getBackgroundColor();
+              String newBgColor = doc["backgroundColor"].as<String>();
+
+              config.setBackgroundColor(newBgColor);
+              config.setTimeColor(doc["timeColor"].as<String>());
+              config.setTodColor(doc["todColor"].as<String>());
+              config.setSecondsColor(doc["secondsColor"].as<String>());
+              config.setDayOfWeekColor(doc["dayOfWeekColor"].as<String>());
+              config.setDateColor(doc["dateColor"].as<String>());
+              config.setTempColor(doc["tempColor"].as<String>());
+              config.setHumidityColor(doc["humidityColor"].as<String>());
+              config.save();
+
+              if (oldBgColor != newBgColor)
+              {
+                DisplayManager::getInstance().requestFullRefresh();
+              }
+              else
+              {
+                DisplayManager::getInstance().requestPartialRefresh();
+              }
+
+              request->send(200, "text/plain", "Display settings saved!");
+            }
+            delete buffer;
+            request->_tempObject = nullptr;
+          }
+        });
+
     server.on("/api/settings/hostname", HTTP_POST, [](AsyncWebServerRequest *request)
               {
         if (request->hasParam("hostname", true)) {
@@ -311,6 +395,12 @@ void ClockWebServer::onWifiRequest(AsyncWebServerRequest *request)
 void ClockWebServer::onSettingsRequest(AsyncWebServerRequest *request)
 {
   request->send_P(200, "text/html", SETTINGS_PAGE_HTML, [this](const String &var)
+                  { return processor(var); });
+}
+
+void ClockWebServer::onDisplayRequest(AsyncWebServerRequest *request)
+{
+  request->send_P(200, "text/html", DISPLAY_PAGE_HTML, [this](const String &var)
                   { return processor(var); });
 }
 

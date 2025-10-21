@@ -61,6 +61,7 @@ private:
   void onWifiTestRequest(AsyncWebServerRequest *request);
   void onWifiStatusRequest(AsyncWebServerRequest *request);
   void onSettingsRequest(AsyncWebServerRequest *request);
+  void onDisplayRequest(AsyncWebServerRequest *request);
   void onAlarmsRequest(AsyncWebServerRequest *request);
   void onCaptivePortalRequest(AsyncWebServerRequest *request);
   void onCaptivePortalRedirect(AsyncWebServerRequest *request);
