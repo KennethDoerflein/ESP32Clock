@@ -275,7 +275,15 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
     return;
 
   char buf[24];
-  snprintf(buf, sizeof(buf), "%.0f%%", humidity);
+  if (humidity < 0)
+  {
+    snprintf(buf, sizeof(buf), "N/A");
+  }
+  else
+  {
+    snprintf(buf, sizeof(buf), "%.0f%%", humidity);
+  }
+
   sprHumidity.fillSprite(_bgColor);
   sprHumidity.drawString(buf, sprHumidity.width(), sprHumidity.height() / 2);
 

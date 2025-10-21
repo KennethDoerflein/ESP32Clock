@@ -46,25 +46,6 @@ const unsigned long SENSOR_UPDATE_INTERVAL = 3000; // 3 seconds
 void handleSensorUpdates(bool force = false);
 
 /**
- * @brief Prints the current BME280 sensor data to the Serial monitor.
- * @param useCelsius True to print temperature in Celsius, false for Fahrenheit.
- */
-void printBME280Data(bool useCelsius);
-
-/**
- * @brief Reads the current temperature directly from the BME280 sensor.
- * @param useCelsius True to return the temperature in Celsius, false for Fahrenheit.
- * @return The current temperature as a float.
- */
-float readTemperature(bool useCelsius);
-
-/**
- * @brief Reads the current humidity directly from the BME280 sensor.
- * @return The current relative humidity as a float.
- */
-float readHumidity();
-
-/**
  * @brief Gets the last cached temperature reading.
  * @return The cached temperature, converted to the user's preferred unit.
  */

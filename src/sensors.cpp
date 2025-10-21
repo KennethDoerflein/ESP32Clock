@@ -10,17 +10,18 @@ RTC_Type RTC;
 // Static variables to cache the latest sensor readings.
 static float cached_temp_c = 0.0;
 static float cached_humidity = 0.0;
+static bool bme280_found = false; // Track BME280 sensor status
 
 /// @brief Stores the timestamp of the last sensor update for interval timing.
 static unsigned long prevSensorMillis = 0;
 
 void setupSensors()
 {
-  if (!BME.begin(0x76))
+  bme280_found = BME.begin(0x76);
+  if (!bme280_found)
   {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
-    while (1)
-      ;
+    // The device will now rely on the RTC for temperature.
   }
 
   if (!RTC.begin())
@@ -31,21 +32,6 @@ void setupSensors()
   }
   // Perform an initial sensor read to populate cached values.
   handleSensorUpdates(true);
-}
-
-float readTemperature(bool useCelsius)
-{
-  float temperature = BME.readTemperature();
-  if (!useCelsius)
-  {
-    temperature = (temperature * 9.0 / 5.0) + 32.0;
-  }
-  return temperature;
-}
-
-float readHumidity()
-{
-  return BME.readHumidity();
 }
 
 // Cached-value getter functions
@@ -73,7 +59,16 @@ void handleSensorUpdates(bool force)
   if (force || (now - prevSensorMillis >= SENSOR_UPDATE_INTERVAL))
   {
     prevSensorMillis = now;
-    cached_temp_c = BME.readTemperature();
-    cached_humidity = BME.readHumidity();
+    if (bme280_found)
+    {
+      cached_temp_c = BME.readTemperature();
+      cached_humidity = BME.readHumidity();
+    }
+    else
+    {
+      // Fallback to RTC temperature if BME280 is not available
+      cached_temp_c = RTC.getTemperature();
+      cached_humidity = -1; // Indicate that humidity is not available
+    }
   }
 }
