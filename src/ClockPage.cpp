@@ -70,15 +70,48 @@ void ClockPage::render(TFT_eSPI &tft)
 
 void ClockPage::setupLayout(TFT_eSPI &tft)
 {
+  int screenWidth = tft.width();
   int screenHeight = tft.height();
+
+  // --- Clock Block Layout ---
+  clockY = MARGIN;
+
+  // Calculate the width of the side elements column (AM/PM and seconds)
+  int sideWidth = max(sprTOD.width(), sprSeconds.width());
+  int timeSideGap = 15; // Gap between HH:MM and the side elements
+
+  // Calculate the total width of the entire clock display
+  int totalWidth = sprClock.width() + timeSideGap + sideWidth;
+
+  // Calculate the starting X position to center the clock display
+  int startX = (screenWidth - totalWidth) / 2;
+  if (startX < 0)
+    startX = 0;
+
+  // Set the position for the main clock sprite
+  clockX = startX - 15;
+
+  // Calculate the starting X for the side elements
+  sideX = clockX + sprClock.width() + timeSideGap;
+
+  // Calculate the total height of the side elements stack
+  int sideElementsVGap = 15;
+  int sideElementsHeight = sprTOD.height() + sideElementsVGap + sprSeconds.height();
+
+  // Calculate the starting Y to vertically center the side elements against the main clock
+  int sideStartY = clockY + (sprClock.height() - sideElementsHeight) / 2;
+  if (sideStartY < clockY)
+    sideStartY = clockY;
+
+  // Set positions for AM/PM and Seconds sprites
+  todX = sideX + sideElementsVGap;
+  todY = sideStartY;
+  secondsX = todX + (sprTOD.width() - sprSeconds.width()) / 2;
+  secondsY = todY + sprTOD.height() + sideElementsVGap + 3;
+
+  // --- Bottom Rows Layout (Date and Sensors) ---
   tft.loadFont(DSEG14ModernBold32);
   int fontHeight = tft.fontHeight();
-
-  clockX = (tft.width() - (sprClock.width() + sprTOD.width())) / 2 - 40;
-  if (clockX < 0)
-    clockX = 0;
-
-  clockY = MARGIN;
   dateY = screenHeight - (fontHeight * 2 + MARGIN + 40);
   sensorY = screenHeight - (fontHeight + MARGIN + 10);
 }
@@ -86,7 +119,7 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
 void ClockPage::setupSprites(TFT_eSPI &tft)
 {
   // Create the sprites and configure them
-  sprClock.createSprite(350, 106);
+  sprClock.createSprite(343, 106);
   sprClock.loadFont(DSEG7ModernBold104);
   sprClock.setTextDatum(MR_DATUM);
 
@@ -145,9 +178,6 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   String timeStr = timeManager.getFormattedTime();
   String todStr = timeManager.getTOD();
 
-  int secondsX = clockX + sprClock.width() + 15;
-  int todX = secondsX + sprSeconds.width() * 0.15;
-
   // Draw the main time (HH:MM) if it has changed
   if (timeStr != lastTime)
   {
@@ -171,7 +201,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
 #ifdef DEBUG_BORDERS
       sprTOD.drawRect(0, 0, sprTOD.width(), sprTOD.height(), TFT_GREEN);
 #endif
-      sprTOD.pushSprite(todX, clockY);
+      sprTOD.pushSprite(todX, todY);
       lastTOD = todStr;
     }
   }
@@ -185,15 +215,13 @@ void ClockPage::drawSeconds(TFT_eSPI &tft)
     return; // No change
   }
 
-  int secondsX = clockX + sprClock.width() + 15;
-
   sprSeconds.fillSprite(_bgColor);
   sprSeconds.drawString(secondsStr.c_str(), sprSeconds.width(), 0);
 #ifdef DEBUG_BORDERS
   sprSeconds.drawRect(0, 0, sprSeconds.width(), sprSeconds.height(), TFT_MAGENTA);
 #endif
   // Position the seconds sprite under the AM/PM sprite's location
-  sprSeconds.pushSprite(secondsX, clockY + 20 + sprTOD.height());
+  sprSeconds.pushSprite(secondsX, secondsY);
   lastSeconds = secondsStr;
 }
 
@@ -242,23 +270,37 @@ void ClockPage::drawTemperature(TFT_eSPI &tft)
 
   sprTemp.fillSprite(_bgColor); // Clear sprite
 
+  // Set the font for the temperature value
+  sprTemp.loadFont(DSEG14ModernBold48);
+
   // Draw temperature value
   char tempBuf[16];
   snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
   sprTemp.drawString(tempBuf, 0, sprTemp.height() / 2);
 
-  // Calculate position and draw degree circle
+  // --- Draw degree symbol ---
   int tempWidth = sprTemp.textWidth(tempBuf);
-  int circleX = tempWidth + 4;
-  int circleY = sprTemp.height() / 2 - 20;
-  int circleRadius = 3;
+  int fontHeight = sprTemp.fontHeight();
+
+  // Scale the circle's size and position based on the font
+  int circleRadius = max(2, fontHeight / 14);
+  int circleX = tempWidth + circleRadius + 2;
+  // Position the circle near the top of the temperature digits
+  int circleY = (sprTemp.height() / 2) - (fontHeight / 2) + circleRadius;
   sprTemp.fillCircle(circleX, circleY, circleRadius, tempColor);
 
-  // Draw the unit (C/F)
+  // --- Draw the unit (C/F) ---
+  sprTemp.loadFont(DSEG14ModernBold32);
+  sprTemp.setTextDatum(TL_DATUM); // Set datum to Top-Left for correct alignment
   char unit = config.isCelsius() ? 'C' : 'F';
   char unitBuf[2] = {unit, '\0'};
-  int unitX = circleX + circleRadius * 2; // Position it after the circle
-  sprTemp.drawString(unitBuf, unitX, sprTemp.height() / 2);
+
+  // Position unit after the degree symbol, aligning its top with the temperature's top
+  int unitX = circleX + circleRadius + 2;
+  int unitY = (sprTemp.height() / 2) - (fontHeight / 2);
+  sprTemp.drawString(unitBuf, unitX, unitY);
+
+  sprTemp.setTextDatum(ML_DATUM); // Restore the original datum
 
 #ifdef DEBUG_BORDERS
   sprTemp.drawRect(0, 0, sprTemp.width(), sprTemp.height(), TFT_ORANGE);
@@ -309,9 +351,7 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   {
     // In 24-hour mode, ensure the TOD sprite is cleared immediately on refresh.
     sprTOD.fillSprite(_bgColor);
-    int secondsX = clockX + sprClock.width() + 15;
-    int todX = secondsX + sprSeconds.width() * 0.15;
-    sprTOD.pushSprite(todX, clockY);
+    sprTOD.pushSprite(todX, todY);
   }
 
   // Force a redraw of all elements by resetting their last known values

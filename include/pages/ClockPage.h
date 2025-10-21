@@ -58,6 +58,11 @@ private:
   // Layout position variables
   int clockX;
   int clockY;
+  int sideX;
+  int todX;
+  int todY;
+  int secondsX;
+  int secondsY;
   int dateY;
   int sensorY;
 
