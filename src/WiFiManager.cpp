@@ -269,15 +269,22 @@ bool WiFiManager::isCaptivePortal() const
   return _dnsServer != nullptr;
 }
 
-String WiFiManager::scanNetworksAsync()
+void WiFiManager::startScan()
+{
+  // Start a non-blocking scan.
+  // The results will be retrieved asynchronously by getScanResults().
+  WiFi.scanNetworks(true);
+}
+
+String WiFiManager::getScanResults()
 {
   int16_t scanResult = WiFi.scanComplete();
 
   if (scanResult == WIFI_SCAN_FAILED)
   {
-    // Scan failed, so start a new one
-    WiFi.scanNetworks(true); // true = async
-    return "{\"status\":\"scanning\"}";
+    // Scan failed, but we don't start a new one here.
+    // We just report that the scan is not running.
+    return "{\"status\":\"idle\"}";
   }
   else if (scanResult == WIFI_SCAN_RUNNING)
   {

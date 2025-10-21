@@ -73,7 +73,17 @@ public:
    * This is designed to be non-blocking.
    * @return A JSON formatted string.
    */
-  String scanNetworksAsync();
+  void startScan();
+
+  /**
+   * @brief Manages an asynchronous WiFi scan.
+   *
+   * Initiates a scan if not already started. Returns a JSON string with
+   * the scan results or a status indicating the scan is in progress.
+   * This is designed to be non-blocking.
+   * @return A JSON formatted string.
+   */
+  String getScanResults();
 
   /**
    * @brief Gets the configured hostname of the device.

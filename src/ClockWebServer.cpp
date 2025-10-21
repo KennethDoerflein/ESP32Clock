@@ -380,8 +380,18 @@ void ClockWebServer::begin()
 
   server.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request)
             {
-    String json = WiFiManager::getInstance().scanNetworksAsync();
-    request->send(200, "application/json", json); });
+    auto &wifiManager = WiFiManager::getInstance();
+    if (request->hasParam("start") && request->getParam("start")->value() == "true")
+    {
+      wifiManager.startScan();
+      // Immediately return a scanning status
+      request->send(200, "application/json", "{\"status\":\"scanning\"}");
+    }
+    else
+    {
+      String json = wifiManager.getScanResults();
+      request->send(200, "application/json", json);
+    } });
 
   server.begin();
 }

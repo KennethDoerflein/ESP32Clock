@@ -368,10 +368,16 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
         <span class="ms-2">Scanning for networks...</span>`;
       networksList.innerHTML = '';
 
-      // Immediately try to fetch results
-      await fetchAndRenderNetworks();
+      // Start the scan on the backend
+      try {
+        await fetch('/api/wifi/scan?start=true');
+      } catch (error) {
+        networksStatus.innerHTML = 'Error starting scan.';
+        scanButton.disabled = false;
+        return;
+      }
 
-      // Start polling
+      // Start polling for results
       scanInterval = setInterval(fetchAndRenderNetworks, 2000);
     }
 
@@ -468,7 +474,6 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
     });
 
     scanButton.addEventListener('click', startScan);
-    document.addEventListener('DOMContentLoaded', startScan);
 
     document.getElementById('hostname-form').addEventListener('submit', function(e) {
       e.preventDefault();
