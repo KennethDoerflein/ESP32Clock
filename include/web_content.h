@@ -314,6 +314,23 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
         </div>
       </div>
     </div>
+    <form id="hostname-form" class="mt-4">
+      <div class="mb-3 p-3 border rounded">
+        <label for="hostname" class="form-label" title="Set the network hostname for the device.">Hostname</label>
+        <div class="input-group">
+          <input
+            type="text"
+            class="form-control"
+            id="hostname"
+            name="hostname"
+            value="%HOSTNAME%"
+            title="Enter the desired hostname." />
+          <button class="btn btn-primary" type="submit" title="Save the new hostname and reboot the device.">
+            Save & Reboot
+          </button>
+        </div>
+      </div>
+    </form>
   </div>
   <script>
     const scanButton = document.getElementById('scan-button');
@@ -452,6 +469,27 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 
     scanButton.addEventListener('click', startScan);
     document.addEventListener('DOMContentLoaded', startScan);
+
+    document.getElementById('hostname-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const hostname = document.getElementById('hostname').value;
+      const formData = new FormData();
+      formData.append('hostname', hostname);
+      fetch('/api/wifi/hostname', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        if (response.ok) {
+          alert('Hostname saved. The device will now reboot.');
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1000);
+        } else {
+          alert('Error saving hostname.');
+        }
+      });
+    });
   </script>
 </body>
 </html>
@@ -555,24 +593,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           </form>
 
           <hr>
-
-          <form id="hostname-form" class="mt-4">
-            <div class="mb-3 p-3 border rounded">
-              <label for="hostname" class="form-label" title="Set the network hostname for the device.">Hostname</label>
-              <div class="input-group">
-                <input
-                  type="text"
-                  class="form-control"
-                  id="hostname"
-                  name="hostname"
-                  value="%HOSTNAME%"
-                  title="Enter the desired hostname." />
-                <button class="btn btn-primary" type="submit" title="Save the new hostname and reboot the device.">
-                  Save & Reboot
-                </button>
-              </div>
-            </div>
-          </form>
 
           <div class="d-grid gap-2 mt-4">
             <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
@@ -712,27 +732,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       
       form.addEventListener('input', handleInputChange);
       document.addEventListener("DOMContentLoaded", loadSettings);
-
-      document.getElementById('hostname-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const hostname = document.getElementById('hostname').value;
-        const formData = new FormData();
-        formData.append('hostname', hostname);
-        fetch('/api/settings/hostname', {
-          method: 'POST',
-          body: formData
-        })
-        .then(response => {
-          if (response.ok) {
-            alert('Hostname saved. The device will now reboot.');
-            setTimeout(() => {
-              window.location.href = '/';
-            }, 1000);
-          } else {
-            alert('Error saving hostname.');
-          }
-        });
-      });
     </script>
   </body>
 </html>

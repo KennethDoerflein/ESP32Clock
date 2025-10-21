@@ -299,7 +299,7 @@ void ClockWebServer::begin()
           }
         });
 
-    server.on("/api/settings/hostname", HTTP_POST, [](AsyncWebServerRequest *request)
+    server.on("/api/wifi/hostname", HTTP_POST, [](AsyncWebServerRequest *request)
               {
         if (request->hasParam("hostname", true)) {
             String hostname = request->getParam("hostname", true)->value();
