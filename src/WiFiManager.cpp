@@ -178,6 +178,7 @@ bool WiFiManager::begin()
 
   // Register the event handler
   WiFi.onEvent(wifiEventHandler);
+  WiFi.setSleep(false);
 
   // --- WiFi Connection Logic ---
   String ssid = ConfigManager::getInstance().getWifiSSID();
