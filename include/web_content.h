@@ -541,6 +541,17 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 id="celsius"
                 name="useCelsius" />
             </div>
+
+            <div
+              class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
+              <label class="form-check-label" for="screen-flipped" title="Flip the screen orientation 180 degrees.">Flip Screen</label>
+              <input
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                id="screen-flipped"
+                name="screenFlipped" />
+            </div>
           </form>
 
           <hr>
@@ -588,6 +599,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const brightnessValueEl = document.getElementById("brightness-value");
       const twentyFourHourEl = document.getElementById("24hour");
       const celsiusEl = document.getElementById("celsius");
+      const screenFlippedEl = document.getElementById("screen-flipped");
 
       const STATUS_INDICATORS = {
         SAVED:
@@ -623,6 +635,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           
           twentyFourHourEl.checked = settings.use24HourFormat;
           celsiusEl.checked = settings.useCelsius;
+          screenFlippedEl.checked = settings.screenFlipped;
           
           // Update the slider's enabled/disabled state
           toggleBrightnessSlider(); 
@@ -641,7 +654,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
             // When saving, send the slider's current value as the user's preference
             brightness: parseInt(brightnessEl.value), 
             use24HourFormat: twentyFourHourEl.checked,
-            useCelsius: celsiusEl.checked
+            useCelsius: celsiusEl.checked,
+            screenFlipped: screenFlippedEl.checked
         };
 
         try {

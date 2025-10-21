@@ -21,8 +21,13 @@ void Display::begin()
 
   // Initialize the TFT display driver.
   tft.init();
-  tft.setRotation(3); // Set screen rotation.
+  updateRotation();
   tft.fillScreen(TFT_BLACK);
+}
+
+void Display::updateRotation()
+{
+  tft.setRotation(ConfigManager::getInstance().isScreenFlipped() ? 1 : 3);
 }
 
 void Display::drawStatusMessage(const char *message)

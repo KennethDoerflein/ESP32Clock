@@ -112,6 +112,12 @@ public:
    */
   String getHostname() const { return hostname; }
 
+  /**
+   * @brief Checks if the screen orientation is flipped.
+   * @return True if the screen is flipped, false otherwise.
+   */
+  bool isScreenFlipped() const { return screenFlipped; }
+
   // Display Colors
   String getBackgroundColor() const { return backgroundColor; }
   String getTimeColor() const { return timeColor; }
@@ -170,6 +176,20 @@ public:
     if (wifiCredsValid != valid)
     {
       wifiCredsValid = valid;
+      _isDirty = true;
+    }
+  }
+
+  /**
+   * @brief Sets the screen orientation.
+   * @param flipped True to flip the screen, false for normal.
+   */
+
+  void setScreenFlipped(bool flipped)
+  {
+    if (screenFlipped != flipped)
+    {
+      screenFlipped = flipped;
       _isDirty = true;
     }
   }
@@ -341,6 +361,7 @@ private:
   uint8_t brightness = 255;
   bool use24HourFormat = false;
   bool useCelsius = false;
+  bool screenFlipped = false;
 
   // Colors
   String backgroundColor = DEFAULT_BACKGROUND_COLOR;

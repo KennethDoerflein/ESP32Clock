@@ -37,6 +37,7 @@ void ConfigManager::setDefaults()
   brightness = 128;        // Default brightness at 50%
   use24HourFormat = false; // Default to 12-hour format
   useCelsius = false;      // Default to Fahrenheit
+  screenFlipped = false;
 
   backgroundColor = DEFAULT_BACKGROUND_COLOR;
   timeColor = DEFAULT_TIME_COLOR;
@@ -106,6 +107,7 @@ void ConfigManager::load()
   brightness = doc["brightness"] | 128;
   use24HourFormat = doc["use24HourFormat"] | false;
   useCelsius = doc["useCelsius"] | false;
+  screenFlipped = doc["screenFlipped"] | false;
 
   backgroundColor = doc["backgroundColor"] | DEFAULT_BACKGROUND_COLOR;
   timeColor = doc["timeColor"] | DEFAULT_TIME_COLOR;
@@ -161,6 +163,7 @@ bool ConfigManager::save()
   doc["brightness"] = brightness;
   doc["use24HourFormat"] = use24HourFormat;
   doc["useCelsius"] = useCelsius;
+  doc["screenFlipped"] = screenFlipped;
 
   doc["backgroundColor"] = backgroundColor;
   doc["timeColor"] = timeColor;

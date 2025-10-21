@@ -166,6 +166,7 @@ void ClockWebServer::begin()
       doc["actualBrightness"] = Display::getInstance().getActualBrightness();
       doc["use24HourFormat"] = config.is24HourFormat();
       doc["useCelsius"] = config.isCelsius();
+      doc["screenFlipped"] = config.isScreenFlipped();
       
       String response;
       serializeJson(doc, response);
@@ -197,11 +198,20 @@ void ClockWebServer::begin()
             else
             {
               auto &config = ConfigManager::getInstance();
+              bool oldScreenFlipped = config.isScreenFlipped();
               config.setAutoBrightness(doc["autoBrightness"]);
               config.setBrightness(doc["brightness"]);
               config.set24HourFormat(doc["use24HourFormat"]);
               config.setCelsius(doc["useCelsius"]);
+              config.setScreenFlipped(doc["screenFlipped"]);
               config.save();
+
+              if (oldScreenFlipped != config.isScreenFlipped())
+              {
+                Display::getInstance().updateRotation();
+                DisplayManager::getInstance().requestFullRefresh();
+              }
+
               request->send(200, "text/plain", "Settings saved!");
             }
             delete buffer;

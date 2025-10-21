@@ -29,6 +29,11 @@ public:
   void begin();
 
   /**
+   * @brief Updates the screen's rotation based on the current configuration.
+   */
+  void updateRotation();
+
+  /**
    * @brief Updates the screen's backlight brightness.
    */
   void updateBrightness();
