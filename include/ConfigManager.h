@@ -22,9 +22,9 @@ class ConfigManager
 public:
   // Default Colors
   static constexpr const char *DEFAULT_BACKGROUND_COLOR = "#000000";
-  static constexpr const char *DEFAULT_TIME_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_TIME_COLOR = "#079ae4";
   static constexpr const char *DEFAULT_TOD_COLOR = "#FFFFFF";
-  static constexpr const char *DEFAULT_SECONDS_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_SECONDS_COLOR = "#02e3ab";
   static constexpr const char *DEFAULT_DAY_OF_WEEK_COLOR = "#FFFFFF";
   static constexpr const char *DEFAULT_DATE_COLOR = "#FFFFFF";
   static constexpr const char *DEFAULT_TEMP_COLOR = "#FFFFFF";
