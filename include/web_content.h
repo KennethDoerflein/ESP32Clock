@@ -745,16 +745,15 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
         min-width: 95px;
       }
       .color-picker-wrapper {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
         margin-bottom: 1rem;
-        padding: 1rem;
+        padding: 0.75rem;
         border: 1px solid #444;
         border-radius: 0.375rem;
+        text-align: center;
       }
       .color-picker-wrapper label {
-        margin-bottom: 0;
+        margin-bottom: 0.5rem;
+        display: block;
       }
       input[type="color"] {
         min-width: 100px;
@@ -781,37 +780,55 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
           </div>
 
           <form id="display-settings-form">
-            <div class="color-picker-wrapper">
-              <label for="background-color" title="Set the main background color.">Background Color</label>
-              <input type="color" id="background-color" name="backgroundColor" title="Select a background color.">
-            </div>
-            <div class="color-picker-wrapper">
-              <label for="time-color" title="Set the color for the time display.">Time Color</label>
-              <input type="color" id="time-color" name="timeColor" title="Select a color for the time.">
-            </div>
-            <div class="color-picker-wrapper">
-              <label for="tod-color" title="Set the color for the AM/PM indicator.">TOD Color</label>
-              <input type="color" id="tod-color" name="todColor" title="Select a color for the AM/PM indicator.">
-            </div>
-             <div class="color-picker-wrapper">
-              <label for="seconds-color" title="Set the color for the seconds display.">Seconds Color</label>
-              <input type="color" id="seconds-color" name="secondsColor" title="Select a color for the seconds.">
-            </div>
-            <div class="color-picker-wrapper">
-              <label for="day-of-week-color" title="Set the color for the day of the week.">Day of Week Color</label>
-              <input type="color" id="day-of-week-color" name="dayOfWeekColor" title="Select a color for the day of the week.">
-            </div>
-            <div class="color-picker-wrapper">
-              <label for="date-color" title="Set the color for the date display.">Date Color</label>
-              <input type="color" id="date-color" name="dateColor" title="Select a color for the date.">
-            </div>
-            <div class="color-picker-wrapper">
-              <label for="temp-color" title="Set the color for the temperature display.">Temperature Color</label>
-              <input type="color" id="temp-color" name="tempColor" title="Select a color for the temperature.">
-            </div>
-            <div class="color-picker-wrapper">
-              <label for="humidity-color" title="Set the color for the humidity display.">Humidity Color</label>
-              <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity.">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="color-picker-wrapper">
+                  <label for="background-color" title="Set the main background color.">Background Color</label>
+                  <input type="color" id="background-color" name="backgroundColor" title="Select a background color.">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="color-picker-wrapper">
+                  <label for="time-color" title="Set the color for the time display.">Time Color</label>
+                  <input type="color" id="time-color" name="timeColor" title="Select a color for the time.">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="color-picker-wrapper">
+                  <label for="tod-color" title="Set the color for the AM/PM indicator.">TOD Color</label>
+                  <input type="color" id="tod-color" name="todColor" title="Select a color for the AM/PM indicator.">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="color-picker-wrapper">
+                  <label for="seconds-color" title="Set the color for the seconds display.">Seconds Color</label>
+                  <input type="color" id="seconds-color" name="secondsColor" title="Select a color for the seconds.">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="color-picker-wrapper">
+                  <label for="day-of-week-color" title="Set the color for the day of the week.">Day of Week Color</label>
+                  <input type="color" id="day-of-week-color" name="dayOfWeekColor" title="Select a color for the day of the week.">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="color-picker-wrapper">
+                  <label for="date-color" title="Set the color for the date display.">Date Color</label>
+                  <input type="color" id="date-color" name="dateColor" title="Select a color for the date.">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="color-picker-wrapper">
+                  <label for="temp-color" title="Set the color for the temperature display.">Temperature Color</label>
+                  <input type="color" id="temp-color" name="tempColor" title="Select a color for the temperature.">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="color-picker-wrapper">
+                  <label for="humidity-color" title="Set the color for the humidity display.">Humidity Color</label>
+                  <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity.">
+                </div>
+              </div>
             </div>
           </form>
 
