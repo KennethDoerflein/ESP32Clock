@@ -140,9 +140,25 @@ void setup()
   logger.print("Initializing Display...\n");
   display.begin();
 
+  auto &displayManager = DisplayManager::getInstance();
+  logger.print("Initializing DisplayManager...\n");
+  displayManager.begin(display.getTft());
+  display.drawStatusMessage("Initializing...");
+
   logger.print("Initializing Sensors...\n");
   setupSensors();
-  display.drawStatusMessage("Initializing...");
+
+  // --- Critical Hardware Checks ---
+  // Check if the RTC was initialized. This is a critical failure.
+  if (!isRtcFound())
+  {
+    logger.print("CRITICAL: RTC module not found. Halting execution.\n");
+    displayManager.showErrorScreen("RTC MODULE NOT FOUND");
+    while (1)
+    {
+      delay(1000);
+    }
+  }
 
   // Initialize WiFi. This will connect or start an AP.
   // The begin method returns true if it started the captive portal.
@@ -162,11 +178,6 @@ void setup()
 
   // Add a small delay for web server to stabilize before mDNS announcement.
   delay(100);
-
-  // Initialize the Display Manager
-  logger.print("Initializing DisplayManager...\n");
-  auto &displayManager = DisplayManager::getInstance();
-  displayManager.begin(display.getTft());
 
   // Add pages to the manager. Ownership is moved to the manager.
   logger.print("Adding pages to DisplayManager...\n");

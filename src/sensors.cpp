@@ -11,6 +11,7 @@ RTC_Type RTC;
 static float cached_temp_c = 0.0;
 static float cached_humidity = 0.0;
 static bool bme280_found = false; // Track BME280 sensor status
+static bool rtc_found = false;    // Track RTC status
 
 /// @brief Stores the timestamp of the last sensor update for interval timing.
 static unsigned long prevSensorMillis = 0;
@@ -24,14 +25,20 @@ void setupSensors()
     // The device will now rely on the RTC for temperature.
   }
 
-  if (!RTC.begin())
+  rtc_found = RTC.begin();
+  if (!rtc_found)
   {
     Serial.println("Couldn't find RTC");
-    while (1)
-      ;
+    // The main loop will now handle the error message.
+    return; // Exit early, no point in continuing
   }
   // Perform an initial sensor read to populate cached values.
   handleSensorUpdates(true);
+}
+
+bool isRtcFound()
+{
+  return rtc_found;
 }
 
 // Cached-value getter functions

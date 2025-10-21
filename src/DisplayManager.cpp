@@ -134,3 +134,15 @@ void DisplayManager::showAlarmScreen()
   tft->setTextDatum(TL_DATUM);
   tft->setTextColor(TFT_WHITE);
 }
+
+void DisplayManager::showErrorScreen(const char *message)
+{
+  tft->fillScreen(TFT_BLACK);
+  tft->setTextDatum(MC_DATUM);
+  tft->setTextColor(TFT_RED);
+  tft->drawString(message, tft->width() / 2, tft->height() / 2, 4); // Use font 4 for a clear message
+
+  // Reset text datum and color for any potential subsequent drawing
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextColor(TFT_WHITE);
+}

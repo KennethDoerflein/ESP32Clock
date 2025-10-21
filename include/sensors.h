@@ -46,6 +46,12 @@ const unsigned long SENSOR_UPDATE_INTERVAL = 3000; // 3 seconds
 void handleSensorUpdates(bool force = false);
 
 /**
+ * @brief Checks if the RTC module was successfully initialized.
+ * @return True if the RTC is available, false otherwise.
+ */
+bool isRtcFound();
+
+/**
  * @brief Gets the last cached temperature reading.
  * @return The cached temperature, converted to the user's preferred unit.
  */

@@ -90,6 +90,13 @@ public:
    */
   void showAlarmScreen();
 
+  /**
+   * @brief Displays a critical error message on the screen.
+   * This is a blocking call and will halt further execution.
+   * @param message The error message to display.
+   */
+  void showErrorScreen(const char *message);
+
 private:
   DisplayManager() : tft(nullptr), currentPage(nullptr) {}
 
