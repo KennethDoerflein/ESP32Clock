@@ -148,8 +148,8 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Add an option to reset to defaults in the web interface.
   - [ ] Improve TOD and seconds centering.
   - [ ] Improve the appearance of the temperature unit and degree sign.
-  - [ ] Change display colors from webui
-  - [ ] flip display orientation from webui
+  - [x] Change display colors from webui
+  - [x] flip display orientation from webui
 - [ ] **Firmware Updates**
   - [x] Warn the user if they try to leave the page during an update.
   - [ ] Improve version handling (don't update version.h).
@@ -162,8 +162,8 @@ This project is broken down into phases to prioritize a functional base clock be
 - [x] **Alarms & User Interaction**
   - [x] Alarms stopping instead of being snoozed.
   - [x] Web UI alarm settings opens and closes when enabling or disabling alarm
-- [ ] **UI/UX Enhancements**
-  - [ ] Lag when leaving the Wi-Fi page due to scanning.
+- [x] **UI/UX Enhancements**
+  - [x] Lag when leaving the Wi-Fi page due to scanning.
 - [ ] **Web UI**
   - [ ] Can't scroll up while log message are being added
 - [ ] **General Problems**
