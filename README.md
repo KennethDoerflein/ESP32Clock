@@ -144,10 +144,10 @@ This project is broken down into phases to prioritize a functional base clock be
     - [ ] Show a "ringing" screen when an alarm is going off.
     - [ ] Show a snooze countdown.
     - [ ] Add a visual indicator for how long to hold the snooze button.
-- [ ] **UI/UX Enhancements**
+- [x] **UI/UX Enhancements**
   - [x] Add an option to reset to defaults in the web interface.
-  - [ ] Improve TOD and seconds centering.
-  - [ ] Improve the appearance of the temperature unit and degree sign.
+  - [x] Improve TOD and seconds centering.
+  - [x] Improve the appearance of the temperature unit and degree sign.
   - [x] Change display colors from webui
   - [x] flip display orientation from webui
 - [ ] **Firmware Updates**
@@ -164,8 +164,8 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Web UI alarm settings opens and closes when enabling or disabling alarm
 - [x] **UI/UX Enhancements**
   - [x] Lag when leaving the Wi-Fi page due to scanning.
-- [ ] **Web UI**
-  - [ ] Can't scroll up while log message are being added
+- [x] **Web UI**
+  - [x] Can't scroll up while log message are being added
 - [ ] **General Problems**
   - [ ] wifi disconnects after a few hours
 
