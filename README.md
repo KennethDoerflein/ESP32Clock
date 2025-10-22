@@ -150,9 +150,9 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Improve the appearance of the temperature unit and degree sign.
   - [x] Change display colors from webui
   - [x] flip display orientation from webui
-- [ ] **Firmware Updates**
+- [x] **Firmware Updates**
   - [x] Warn the user if they try to leave the page during an update.
-  - [ ] Improve version handling (don't update version.h).
+  - [x] Improve version handling (don't update version.h).
 - [ ] **Settings Management**
   - [ ] Add a dropdown to select the timezone.
   - [ ] Add an option to change the default page.

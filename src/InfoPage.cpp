@@ -1,7 +1,13 @@
 #include "pages/InfoPage.h"
 #include "fonts/DSEG14ModernBold24.h"
 #include <WiFi.h>
+#if __has_include("version.h")
+// This file exists, so we'll include it.
 #include "version.h"
+#else
+// "version.h" was not found, so we'll include the backup.
+#include "version.h.default"
+#endif
 
 InfoPage::InfoPage() {}
 

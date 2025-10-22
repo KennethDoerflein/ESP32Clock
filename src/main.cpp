@@ -30,7 +30,13 @@
 #include "ClockWebServer.h"
 #include "UpdateManager.h"
 #include "SerialLog.h"
+#if __has_include("version.h")
+// This file exists, so we'll include it.
 #include "version.h"
+#else
+// "version.h" was not found, so we'll include the backup.
+#include "version.h.default"
+#endif
 
 // --- Pin Definitions ---
 #define SNOOZE_BUTTON_PIN 5

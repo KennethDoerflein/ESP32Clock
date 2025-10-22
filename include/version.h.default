@@ -1,0 +1,5 @@
+#pragma once
+
+// This is a default template.
+// The real version.h is generated at build time.
+#define FIRMWARE_VERSION "dev-unknown"

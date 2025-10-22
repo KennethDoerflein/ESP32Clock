@@ -1,11 +1,18 @@
 #include "UpdateManager.h"
 #include <Update.h>
 #include <ArduinoJson.h>
-#include "version.h"
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include "github_ca.h"
 #include "SerialLog.h"
+#if __has_include("version.h")
+// This file exists, so we'll include it.
+#include "version.h"
+#else
+// "version.h" was not found, so we'll include the backup.
+#include "version.h.default"
+#endif 
+
 
 UpdateManager &UpdateManager::getInstance()
 {

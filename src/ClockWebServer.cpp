@@ -10,8 +10,15 @@
 #include <WiFi.h>
 #include "display.h"
 #include "UpdateManager.h"
-#include "version.h"
 #include "SerialLog.h"
+
+#if __has_include("version.h")
+// This file exists, so we'll include it.
+#include "version.h"
+#else
+// "version.h" was not found, so we'll include the backup.
+#include "version.h.default"
+#endif 
 
 // --- Singleton Implementation ---
 ClockWebServer &ClockWebServer::getInstance()

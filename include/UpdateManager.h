@@ -3,7 +3,13 @@
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#if __has_include("version.h")
+// This file exists, so we'll include it.
 #include "version.h"
+#else
+// "version.h" was not found, so we'll include the backup.
+#include "version.h.default"
+#endif
 
 #define GITHUB_REPO "KennethDoerflein/ESP32Clock"
 
