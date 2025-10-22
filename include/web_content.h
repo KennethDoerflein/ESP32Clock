@@ -644,7 +644,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
             <div class="tab-pane fade show active p-3" id="general" role="tabpanel" aria-labelledby="general-tab">
               <form id="settings-form">
                 <div id="auto-brightness-section" class="mb-3 p-3 border rounded">
-                  <div class="form-check form-switch d-flex justify-content-between align-items-center">
+                  <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
                     <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
                     <input class="form-check-input" type="checkbox" role="switch" id="auto-brightness" name="autoBrightness" />
                   </div>
@@ -763,6 +763,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const ERROR_DISPLAY_MS = 3000;
       let saveTimeout;
 
+      const BRIGHTNESS_MIN = 10;
+      const BRIGHTNESS_MAX = 255;
+
       const statusEl = document.querySelector(".status-indicator");
       const settingsForm = document.getElementById("settings-form");
       const displaySettingsForm = document.getElementById("display-settings-form");
@@ -793,6 +796,17 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       function setStatus(status) {
         statusEl.innerHTML = status;
+      }
+
+      function clamp(v, a, b) {
+        return Math.max(a, Math.min(b, v));
+      }
+
+      function toPercent(value, min = BRIGHTNESS_MIN, max = BRIGHTNESS_MAX) {
+        const num = Number(value);
+        const clamped = clamp(num, min, max);
+        const pct = Math.round(((clamped - min) / (max - min)) * 100);
+        return `${pct}%`;
       }
 
       function formatHour(hour, is24Hour) {
@@ -828,8 +842,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           const displaySettings = await displayRes.json();
           
           autoBrightnessEl.checked = settings.autoBrightness;
+          // raw values go into sliders; displayed values are percentages
           brightnessEl.value = settings.actualBrightness;
-          brightnessValueEl.textContent = settings.actualBrightness;
+          brightnessValueEl.textContent = toPercent(settings.actualBrightness);
           const is24Hour = settings.use24HourFormat;
           twentyFourHourEl.checked = is24Hour;
           autoBrightnessStartHourEl.value = settings.autoBrightnessStartHour;
@@ -837,9 +852,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           autoBrightnessEndHourEl.value = settings.autoBrightnessEndHour;
           autoBrightnessEndHourValueEl.textContent = formatHour(settings.autoBrightnessEndHour, is24Hour);
           dayBrightnessEl.value = settings.dayBrightness;
-          dayBrightnessValueEl.textContent = settings.dayBrightness;
+          dayBrightnessValueEl.textContent = toPercent(settings.dayBrightness);
           nightBrightnessEl.value = settings.nightBrightness;
-          nightBrightnessValueEl.textContent = settings.nightBrightness;
+          nightBrightnessValueEl.textContent = toPercent(settings.nightBrightness);
           celsiusEl.checked = settings.useCelsius;
           screenFlippedEl.checked = settings.screenFlipped;
           toggleBrightnessSlider();
@@ -853,6 +868,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           
           setStatus(STATUS_INDICATORS.SAVED);
         } catch (e) {
+          console.error(e);
           setStatus(STATUS_INDICATORS.ERROR);
         }
       }
@@ -862,6 +878,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         
         const settings = {
           autoBrightness: autoBrightnessEl.checked,
+          // send numeric raw values to the server
           brightness: parseInt(brightnessEl.value),
           autoBrightnessStartHour: parseInt(autoBrightnessStartHourEl.value),
           autoBrightnessEndHour: parseInt(autoBrightnessEndHourEl.value),
@@ -893,6 +910,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           setStatus(STATUS_INDICATORS.SAVED);
           setTimeout(loadAllSettings, 500);
         } catch (e) {
+          console.error(e);
           setStatus(STATUS_INDICATORS.ERROR);
           setTimeout(() => {
             setStatus(STATUS_INDICATORS.UNSAVED);
@@ -900,8 +918,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         }
       }
       
+      // update displayed percentages while sliding
       brightnessEl.addEventListener('input', () => {
-        brightnessValueEl.textContent = brightnessEl.value;
+        brightnessValueEl.textContent = toPercent(brightnessEl.value);
       });
       autoBrightnessStartHourEl.addEventListener('input', () => {
         autoBrightnessStartHourValueEl.textContent = formatHour(autoBrightnessStartHourEl.value, twentyFourHourEl.checked);
@@ -914,10 +933,10 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, twentyFourHourEl.checked);
       });
       dayBrightnessEl.addEventListener('input', () => {
-        dayBrightnessValueEl.textContent = dayBrightnessEl.value;
+        dayBrightnessValueEl.textContent = toPercent(dayBrightnessEl.value);
       });
       nightBrightnessEl.addEventListener('input', () => {
-        nightBrightnessValueEl.textContent = nightBrightnessEl.value;
+        nightBrightnessValueEl.textContent = toPercent(nightBrightnessEl.value);
       });
 
       autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
@@ -938,11 +957,13 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
               throw new Error('Failed to reset colors');
             }
           } catch (e) {
+            console.error(e);
             setStatus(STATUS_INDICATORS.ERROR);
           }
         }
       });
     </script>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
