@@ -27,8 +27,8 @@ public:
   static constexpr const char *DEFAULT_SECONDS_COLOR = "#02e3ab";
   static constexpr const char *DEFAULT_DAY_OF_WEEK_COLOR = "#FFFFFF";
   static constexpr const char *DEFAULT_DATE_COLOR = "#FFFFFF";
-  static constexpr const char *DEFAULT_TEMP_COLOR = "#FFFFFF";
-  static constexpr const char *DEFAULT_HUMIDITY_COLOR = "#FFFFFF";
+  static constexpr const char *DEFAULT_TEMP_COLOR = "#02e3ab";
+  static constexpr const char *DEFAULT_HUMIDITY_COLOR = "#079ae4";
 
   /**
    * @brief Gets the singleton instance of the ConfigManager.
