@@ -60,14 +60,29 @@ void Display::updateBrightness()
   if (config.isAutoBrightness())
   {
     uint8_t hour = TimeManager::getInstance().getHour();
-    // Simple time-based schedule: bright during the day, dim at night.
-    if (hour >= 7 && hour < 21)
+    uint8_t startHour = config.getAutoBrightnessStartHour();
+    uint8_t endHour = config.getAutoBrightnessEndHour();
+
+    // Determine if the current time is within the "day" period.
+    bool isDayTime;
+    if (startHour < endHour)
     {
-      dutyCycle = 255; // Max brightness
+      // Standard day period (e.g., 7 AM to 9 PM)
+      isDayTime = (hour >= startHour && hour < endHour);
     }
     else
     {
-      dutyCycle = 10; // Dim brightness (about 4%)
+      // Overnight day period (e.g., 9 PM to 7 AM)
+      isDayTime = (hour >= startHour || hour < endHour);
+    }
+
+    if (isDayTime)
+    {
+      dutyCycle = config.getDayBrightness();
+    }
+    else
+    {
+      dutyCycle = config.getNightBrightness();
     }
   }
   else

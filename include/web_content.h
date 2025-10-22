@@ -643,9 +643,34 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           <div class="tab-content" id="settingsTabsContent">
             <div class="tab-pane fade show active p-3" id="general" role="tabpanel" aria-labelledby="general-tab">
               <form id="settings-form">
-                <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-                  <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
-                  <input class="form-check-input" type="checkbox" role="switch" id="auto-brightness" name="autoBrightness" />
+                <div id="auto-brightness-section" class="mb-3 p-3 border rounded">
+                  <div class="form-check form-switch d-flex justify-content-between align-items-center">
+                    <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
+                    <input class="form-check-input" type="checkbox" role="switch" id="auto-brightness" name="autoBrightness" />
+                  </div>
+                  <div id="auto-brightness-controls" class="mt-3">
+                    <hr>
+                    <label for="auto-brightness-start-hour" class="form-label d-flex justify-content-between">
+                      <span>Start Hour</span>
+                      <span id="auto-brightness-start-hour-value">7</span>
+                    </label>
+                    <input type="range" class="form-range" id="auto-brightness-start-hour" name="autoBrightnessStartHour" min="0" max="23" />
+                    <label for="auto-brightness-end-hour" class="form-label d-flex justify-content-between mt-2">
+                      <span>End Hour</span>
+                      <span id="auto-brightness-end-hour-value">21</span>
+                    </label>
+                    <input type="range" class="form-range" id="auto-brightness-end-hour" name="autoBrightnessEndHour" min="0" max="23" />
+                    <label for="day-brightness" class="form-label d-flex justify-content-between mt-2">
+                      <span>Day Brightness</span>
+                      <span id="day-brightness-value">255</span>
+                    </label>
+                    <input type="range" class="form-range" id="day-brightness" name="dayBrightness" min="10" max="255" />
+                    <label for="night-brightness" class="form-label d-flex justify-content-between mt-2">
+                      <span>Night Brightness</span>
+                      <span id="night-brightness-value">10</span>
+                    </label>
+                    <input type="range" class="form-range" id="night-brightness" name="nightBrightness" min="10" max="255" />
+                  </div>
                 </div>
                 <div class="mb-3 p-3 border rounded">
                   <label for="brightness" class="form-label d-flex justify-content-between">
@@ -745,6 +770,15 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const autoBrightnessEl = document.getElementById("auto-brightness");
       const brightnessEl = document.getElementById("brightness");
       const brightnessValueEl = document.getElementById("brightness-value");
+      const autoBrightnessControlsEl = document.getElementById("auto-brightness-controls");
+      const autoBrightnessStartHourEl = document.getElementById("auto-brightness-start-hour");
+      const autoBrightnessStartHourValueEl = document.getElementById("auto-brightness-start-hour-value");
+      const autoBrightnessEndHourEl = document.getElementById("auto-brightness-end-hour");
+      const autoBrightnessEndHourValueEl = document.getElementById("auto-brightness-end-hour-value");
+      const dayBrightnessEl = document.getElementById("day-brightness");
+      const dayBrightnessValueEl = document.getElementById("day-brightness-value");
+      const nightBrightnessEl = document.getElementById("night-brightness");
+      const nightBrightnessValueEl = document.getElementById("night-brightness-value");
       const twentyFourHourEl = document.getElementById("24hour");
       const celsiusEl = document.getElementById("celsius");
       const screenFlippedEl = document.getElementById("screen-flipped");
@@ -761,6 +795,17 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         statusEl.innerHTML = status;
       }
 
+      function formatHour(hour, is24Hour) {
+        if (is24Hour) {
+          return hour;
+        }
+        const h = parseInt(hour);
+        if (h === 0) return '12 AM';
+        if (h === 12) return '12 PM';
+        if (h < 12) return `${h} AM`;
+        return `${h - 12} PM`;
+      }
+
       function handleInputChange() {
         clearTimeout(saveTimeout);
         setStatus(STATUS_INDICATORS.UNSAVED);
@@ -769,6 +814,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       function toggleBrightnessSlider() {
         brightnessEl.disabled = autoBrightnessEl.checked;
+        autoBrightnessControlsEl.style.display = autoBrightnessEl.checked ? 'block' : 'none';
       }
 
       async function loadAllSettings() {
@@ -784,7 +830,16 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           autoBrightnessEl.checked = settings.autoBrightness;
           brightnessEl.value = settings.actualBrightness;
           brightnessValueEl.textContent = settings.actualBrightness;
-          twentyFourHourEl.checked = settings.use24HourFormat;
+          const is24Hour = settings.use24HourFormat;
+          twentyFourHourEl.checked = is24Hour;
+          autoBrightnessStartHourEl.value = settings.autoBrightnessStartHour;
+          autoBrightnessStartHourValueEl.textContent = formatHour(settings.autoBrightnessStartHour, is24Hour);
+          autoBrightnessEndHourEl.value = settings.autoBrightnessEndHour;
+          autoBrightnessEndHourValueEl.textContent = formatHour(settings.autoBrightnessEndHour, is24Hour);
+          dayBrightnessEl.value = settings.dayBrightness;
+          dayBrightnessValueEl.textContent = settings.dayBrightness;
+          nightBrightnessEl.value = settings.nightBrightness;
+          nightBrightnessValueEl.textContent = settings.nightBrightness;
           celsiusEl.checked = settings.useCelsius;
           screenFlippedEl.checked = settings.screenFlipped;
           toggleBrightnessSlider();
@@ -808,6 +863,10 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         const settings = {
           autoBrightness: autoBrightnessEl.checked,
           brightness: parseInt(brightnessEl.value),
+          autoBrightnessStartHour: parseInt(autoBrightnessStartHourEl.value),
+          autoBrightnessEndHour: parseInt(autoBrightnessEndHourEl.value),
+          dayBrightness: parseInt(dayBrightnessEl.value),
+          nightBrightness: parseInt(nightBrightnessEl.value),
           use24HourFormat: twentyFourHourEl.checked,
           useCelsius: celsiusEl.checked,
           screenFlipped: screenFlippedEl.checked
@@ -843,6 +902,22 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       
       brightnessEl.addEventListener('input', () => {
         brightnessValueEl.textContent = brightnessEl.value;
+      });
+      autoBrightnessStartHourEl.addEventListener('input', () => {
+        autoBrightnessStartHourValueEl.textContent = formatHour(autoBrightnessStartHourEl.value, twentyFourHourEl.checked);
+      });
+      autoBrightnessEndHourEl.addEventListener('input', () => {
+        autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, twentyFourHourEl.checked);
+      });
+      twentyFourHourEl.addEventListener('change', () => {
+        autoBrightnessStartHourValueEl.textContent = formatHour(autoBrightnessStartHourEl.value, twentyFourHourEl.checked);
+        autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, twentyFourHourEl.checked);
+      });
+      dayBrightnessEl.addEventListener('input', () => {
+        dayBrightnessValueEl.textContent = dayBrightnessEl.value;
+      });
+      nightBrightnessEl.addEventListener('input', () => {
+        nightBrightnessValueEl.textContent = nightBrightnessEl.value;
       });
 
       autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);

@@ -34,7 +34,11 @@ void ConfigManager::setDefaults()
   hostname = "";
   wifiCredsValid = false;
   autoBrightness = true;
-  brightness = 128;        // Default brightness at 50%
+  brightness = 128; // Default brightness at 50%
+  autoBrightnessStartHour = 7;
+  autoBrightnessEndHour = 21;
+  dayBrightness = 255;
+  nightBrightness = 10;
   use24HourFormat = false; // Default to 12-hour format
   useCelsius = false;      // Default to Fahrenheit
   screenFlipped = false;
@@ -105,6 +109,10 @@ void ConfigManager::load()
   wifiCredsValid = doc["wifiCredsValid"] | false;
   autoBrightness = doc["autoBrightness"] | true;
   brightness = doc["brightness"] | 128;
+  autoBrightnessStartHour = doc["autoBrightnessStartHour"] | 7;
+  autoBrightnessEndHour = doc["autoBrightnessEndHour"] | 21;
+  dayBrightness = doc["dayBrightness"] | 255;
+  nightBrightness = doc["nightBrightness"] | 10;
   use24HourFormat = doc["use24HourFormat"] | false;
   useCelsius = doc["useCelsius"] | false;
   screenFlipped = doc["screenFlipped"] | false;
@@ -161,6 +169,10 @@ bool ConfigManager::save()
   doc["wifiCredsValid"] = wifiCredsValid;
   doc["autoBrightness"] = autoBrightness;
   doc["brightness"] = brightness;
+  doc["autoBrightnessStartHour"] = autoBrightnessStartHour;
+  doc["autoBrightnessEndHour"] = autoBrightnessEndHour;
+  doc["dayBrightness"] = dayBrightness;
+  doc["nightBrightness"] = nightBrightness;
   doc["use24HourFormat"] = use24HourFormat;
   doc["useCelsius"] = useCelsius;
   doc["screenFlipped"] = screenFlipped;

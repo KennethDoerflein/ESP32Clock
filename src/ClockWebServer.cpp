@@ -160,6 +160,10 @@ void ClockWebServer::begin()
       JsonDocument doc;
       doc["autoBrightness"] = config.isAutoBrightness();
       doc["brightness"] = config.getBrightness();
+      doc["autoBrightnessStartHour"] = config.getAutoBrightnessStartHour();
+      doc["autoBrightnessEndHour"] = config.getAutoBrightnessEndHour();
+      doc["dayBrightness"] = config.getDayBrightness();
+      doc["nightBrightness"] = config.getNightBrightness();
       doc["actualBrightness"] = Display::getInstance().getActualBrightness();
       doc["use24HourFormat"] = config.is24HourFormat();
       doc["useCelsius"] = config.isCelsius();
@@ -198,6 +202,10 @@ void ClockWebServer::begin()
               bool oldScreenFlipped = config.isScreenFlipped();
               config.setAutoBrightness(doc["autoBrightness"]);
               config.setBrightness(doc["brightness"]);
+              config.setAutoBrightnessStartHour(doc["autoBrightnessStartHour"]);
+              config.setAutoBrightnessEndHour(doc["autoBrightnessEndHour"]);
+              config.setDayBrightness(doc["dayBrightness"]);
+              config.setNightBrightness(doc["nightBrightness"]);
               config.set24HourFormat(doc["use24HourFormat"]);
               config.setCelsius(doc["useCelsius"]);
               config.setScreenFlipped(doc["screenFlipped"]);

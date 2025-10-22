@@ -95,6 +95,30 @@ public:
   uint8_t getBrightness() const { return brightness; }
 
   /**
+   * @brief Gets the auto brightness start hour.
+   * @return The start hour (0-23).
+   */
+  uint8_t getAutoBrightnessStartHour() const { return autoBrightnessStartHour; }
+
+  /**
+   * @brief Gets the auto brightness end hour.
+   * @return The end hour (0-23).
+   */
+  uint8_t getAutoBrightnessEndHour() const { return autoBrightnessEndHour; }
+
+  /**
+   * @brief Gets the day brightness level.
+   * @return The brightness level (0-255).
+   */
+  uint8_t getDayBrightness() const { return dayBrightness; }
+
+  /**
+   * @brief Gets the night brightness level.
+   * @return The brightness level (0-255).
+   */
+  uint8_t getNightBrightness() const { return nightBrightness; }
+
+  /**
    * @brief Checks if the clock is in 24-hour format.
    * @return True if 24-hour format is enabled, false otherwise.
    */
@@ -216,6 +240,58 @@ public:
     if (brightness != value)
     {
       brightness = value;
+      _isDirty = true;
+    }
+  }
+
+  /**
+   * @brief Sets the auto brightness start hour.
+   * @param value The start hour (0-23).
+   */
+  void setAutoBrightnessStartHour(uint8_t value)
+  {
+    if (autoBrightnessStartHour != value)
+    {
+      autoBrightnessStartHour = value;
+      _isDirty = true;
+    }
+  }
+
+  /**
+   * @brief Sets the auto brightness end hour.
+   * @param value The end hour (0-23).
+   */
+  void setAutoBrightnessEndHour(uint8_t value)
+  {
+    if (autoBrightnessEndHour != value)
+    {
+      autoBrightnessEndHour = value;
+      _isDirty = true;
+    }
+  }
+
+  /**
+   * @brief Sets the day brightness level.
+   * @param value The brightness level (0-255).
+   */
+  void setDayBrightness(uint8_t value)
+  {
+    if (dayBrightness != value)
+    {
+      dayBrightness = value;
+      _isDirty = true;
+    }
+  }
+
+  /**
+   * @brief Sets the night brightness level.
+   * @param value The brightness level (0-255).
+   */
+  void setNightBrightness(uint8_t value)
+  {
+    if (nightBrightness != value)
+    {
+      nightBrightness = value;
       _isDirty = true;
     }
   }
@@ -359,6 +435,10 @@ private:
   bool wifiCredsValid = false;
   bool autoBrightness = true;
   uint8_t brightness = 255;
+  uint8_t autoBrightnessStartHour = 7;
+  uint8_t autoBrightnessEndHour = 21;
+  uint8_t dayBrightness = 255;
+  uint8_t nightBrightness = 10;
   bool use24HourFormat = false;
   bool useCelsius = false;
   bool screenFlipped = false;
