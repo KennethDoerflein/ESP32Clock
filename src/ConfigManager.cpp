@@ -29,19 +29,19 @@ void ConfigManager::begin()
 void ConfigManager::setDefaults()
 {
   // Set all configuration parameters to their default initial state.
-  wifiSSID = "";
-  wifiPassword = "";
-  hostname = "";
-  wifiCredsValid = false;
-  autoBrightness = true;
-  brightness = 128; // Default brightness at 50%
-  autoBrightnessStartHour = 7;
-  autoBrightnessEndHour = 21;
-  dayBrightness = 255;
-  nightBrightness = 10;
-  use24HourFormat = false; // Default to 12-hour format
-  useCelsius = false;      // Default to Fahrenheit
-  screenFlipped = false;
+  wifiSSID = DEFAULT_WIFI_SSID;
+  wifiPassword = DEFAULT_WIFI_PASSWORD;
+  hostname = DEFAULT_HOSTNAME;
+  wifiCredsValid = DEFAULT_WIFI_CREDS_VALID;
+  autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
+  brightness = DEFAULT_BRIGHTNESS;
+  autoBrightnessStartHour = DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
+  autoBrightnessEndHour = DEFAULT_AUTO_BRIGHTNESS_END_HOUR;
+  dayBrightness = DEFAULT_DAY_BRIGHTNESS;
+  nightBrightness = DEFAULT_NIGHT_BRIGHTNESS;
+  use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
+  useCelsius = DEFAULT_USE_CELSIUS;
+  screenFlipped = DEFAULT_SCREEN_FLIPPED;
 
   backgroundColor = DEFAULT_BACKGROUND_COLOR;
   timeColor = DEFAULT_TIME_COLOR;
@@ -51,6 +51,10 @@ void ConfigManager::setDefaults()
   dateColor = DEFAULT_DATE_COLOR;
   tempColor = DEFAULT_TEMP_COLOR;
   humidityColor = DEFAULT_HUMIDITY_COLOR;
+  alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
+  snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
+  alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
+  errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
 
   for (int i = 0; i < MAX_ALARMS; ++i)
   {
@@ -103,19 +107,19 @@ void ConfigManager::load()
 
   // Load each setting from the JSON document.
   // The `|` operator provides a default value if the key is missing.
-  wifiSSID = doc["wifiSSID"] | "";
-  wifiPassword = doc["wifiPassword"] | "";
-  hostname = doc["hostname"] | "";
-  wifiCredsValid = doc["wifiCredsValid"] | false;
-  autoBrightness = doc["autoBrightness"] | true;
-  brightness = doc["brightness"] | 128;
-  autoBrightnessStartHour = doc["autoBrightnessStartHour"] | 7;
-  autoBrightnessEndHour = doc["autoBrightnessEndHour"] | 21;
-  dayBrightness = doc["dayBrightness"] | 255;
-  nightBrightness = doc["nightBrightness"] | 10;
-  use24HourFormat = doc["use24HourFormat"] | false;
-  useCelsius = doc["useCelsius"] | false;
-  screenFlipped = doc["screenFlipped"] | false;
+  wifiSSID = doc["wifiSSID"] | DEFAULT_WIFI_SSID;
+  wifiPassword = doc["wifiPassword"] | DEFAULT_WIFI_PASSWORD;
+  hostname = doc["hostname"] | DEFAULT_HOSTNAME;
+  wifiCredsValid = doc["wifiCredsValid"] | DEFAULT_WIFI_CREDS_VALID;
+  autoBrightness = doc["autoBrightness"] | DEFAULT_AUTO_BRIGHTNESS;
+  brightness = doc["brightness"] | DEFAULT_BRIGHTNESS;
+  autoBrightnessStartHour = doc["autoBrightnessStartHour"] | DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
+  autoBrightnessEndHour = doc["autoBrightnessEndHour"] | DEFAULT_AUTO_BRIGHTNESS_END_HOUR;
+  dayBrightness = doc["dayBrightness"] | DEFAULT_DAY_BRIGHTNESS;
+  nightBrightness = doc["nightBrightness"] | DEFAULT_NIGHT_BRIGHTNESS;
+  use24HourFormat = doc["use24HourFormat"] | DEFAULT_USE_24_HOUR_FORMAT;
+  useCelsius = doc["useCelsius"] | DEFAULT_USE_CELSIUS;
+  screenFlipped = doc["screenFlipped"] | DEFAULT_SCREEN_FLIPPED;
 
   backgroundColor = doc["backgroundColor"] | DEFAULT_BACKGROUND_COLOR;
   timeColor = doc["timeColor"] | DEFAULT_TIME_COLOR;
@@ -125,6 +129,10 @@ void ConfigManager::load()
   dateColor = doc["dateColor"] | DEFAULT_DATE_COLOR;
   tempColor = doc["tempColor"] | DEFAULT_TEMP_COLOR;
   humidityColor = doc["humidityColor"] | DEFAULT_HUMIDITY_COLOR;
+  alarmIconColor = doc["alarmIconColor"] | DEFAULT_ALARM_ICON_COLOR;
+  snoozeIconColor = doc["snoozeIconColor"] | DEFAULT_SNOOZE_ICON_COLOR;
+  alarmTextColor = doc["alarmTextColor"] | DEFAULT_ALARM_TEXT_COLOR;
+  errorTextColor = doc["errorTextColor"] | DEFAULT_ERROR_TEXT_COLOR;
 
   // Deserialize the alarms array
   JsonArray alarmsArray = doc["alarms"];
@@ -185,6 +193,10 @@ bool ConfigManager::save()
   doc["dateColor"] = dateColor;
   doc["tempColor"] = tempColor;
   doc["humidityColor"] = humidityColor;
+  doc["alarmIconColor"] = alarmIconColor;
+  doc["snoozeIconColor"] = snoozeIconColor;
+  doc["alarmTextColor"] = alarmTextColor;
+  doc["errorTextColor"] = errorTextColor;
 
   // Serialize the alarms array
   JsonArray alarmsArray = doc["alarms"].to<JsonArray>();
@@ -295,5 +307,9 @@ void ConfigManager::resetDisplayToDefaults()
   dateColor = DEFAULT_DATE_COLOR;
   tempColor = DEFAULT_TEMP_COLOR;
   humidityColor = DEFAULT_HUMIDITY_COLOR;
+  alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
+  snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
+  alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
+  errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
   _isDirty = true;
 }

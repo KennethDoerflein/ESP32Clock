@@ -29,6 +29,25 @@ public:
   static constexpr const char *DEFAULT_DATE_COLOR = "#FFFFFF";
   static constexpr const char *DEFAULT_TEMP_COLOR = "#02e3ab";
   static constexpr const char *DEFAULT_HUMIDITY_COLOR = "#079ae4";
+  static constexpr const char *DEFAULT_ALARM_ICON_COLOR = "#FFFF00";
+  static constexpr const char *DEFAULT_SNOOZE_ICON_COLOR = "#0000FF";
+  static constexpr const char *DEFAULT_ALARM_TEXT_COLOR = "#FF0000";
+  static constexpr const char *DEFAULT_ERROR_TEXT_COLOR = "#FF0000";
+
+  // Default System Settings
+  static constexpr const char *DEFAULT_WIFI_SSID = "";
+  static constexpr const char *DEFAULT_WIFI_PASSWORD = "";
+  static constexpr const char *DEFAULT_HOSTNAME = "";
+  static constexpr bool DEFAULT_WIFI_CREDS_VALID = false;
+  static constexpr bool DEFAULT_AUTO_BRIGHTNESS = true;
+  static constexpr uint8_t DEFAULT_BRIGHTNESS = 128;
+  static constexpr uint8_t DEFAULT_AUTO_BRIGHTNESS_START_HOUR = 7;
+  static constexpr uint8_t DEFAULT_AUTO_BRIGHTNESS_END_HOUR = 21;
+  static constexpr uint8_t DEFAULT_DAY_BRIGHTNESS = 255;
+  static constexpr uint8_t DEFAULT_NIGHT_BRIGHTNESS = 10;
+  static constexpr bool DEFAULT_USE_24_HOUR_FORMAT = false;
+  static constexpr bool DEFAULT_USE_CELSIUS = false;
+  static constexpr bool DEFAULT_SCREEN_FLIPPED = false;
 
   /**
    * @brief Gets the singleton instance of the ConfigManager.
@@ -151,6 +170,10 @@ public:
   String getDateColor() const { return dateColor; }
   String getTempColor() const { return tempColor; }
   String getHumidityColor() const { return humidityColor; }
+  String getAlarmIconColor() const { return alarmIconColor; }
+  String getSnoozeIconColor() const { return snoozeIconColor; }
+  String getAlarmTextColor() const { return alarmTextColor; }
+  String getErrorTextColor() const { return errorTextColor; }
 
   /**
    * @brief Checks if the stored WiFi credentials have been validated.
@@ -401,6 +424,42 @@ public:
     }
   }
 
+  void setAlarmIconColor(const String &color)
+  {
+    if (alarmIconColor != color)
+    {
+      alarmIconColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setSnoozeIconColor(const String &color)
+  {
+    if (snoozeIconColor != color)
+    {
+      snoozeIconColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setAlarmTextColor(const String &color)
+  {
+    if (alarmTextColor != color)
+    {
+      alarmTextColor = color;
+      _isDirty = true;
+    }
+  }
+
+  void setErrorTextColor(const String &color)
+  {
+    if (errorTextColor != color)
+    {
+      errorTextColor = color;
+      _isDirty = true;
+    }
+  }
+
   /**
    * @brief Checks if the configuration has been modified since the last save.
    * @return True if the configuration is "dirty", false otherwise.
@@ -429,19 +488,19 @@ private:
   ConfigManager() : _isDirty(false) {}
 
   // Configuration variables with default values
-  String wifiSSID = "";
-  String wifiPassword = "";
-  String hostname = "";
-  bool wifiCredsValid = false;
-  bool autoBrightness = true;
-  uint8_t brightness = 255;
-  uint8_t autoBrightnessStartHour = 7;
-  uint8_t autoBrightnessEndHour = 21;
-  uint8_t dayBrightness = 255;
-  uint8_t nightBrightness = 10;
-  bool use24HourFormat = false;
-  bool useCelsius = false;
-  bool screenFlipped = false;
+  String wifiSSID = DEFAULT_WIFI_SSID;
+  String wifiPassword = DEFAULT_WIFI_PASSWORD;
+  String hostname = DEFAULT_HOSTNAME;
+  bool wifiCredsValid = DEFAULT_WIFI_CREDS_VALID;
+  bool autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
+  uint8_t brightness = DEFAULT_BRIGHTNESS;
+  uint8_t autoBrightnessStartHour = DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
+  uint8_t autoBrightnessEndHour = DEFAULT_AUTO_BRIGHTNESS_END_HOUR;
+  uint8_t dayBrightness = DEFAULT_DAY_BRIGHTNESS;
+  uint8_t nightBrightness = DEFAULT_NIGHT_BRIGHTNESS;
+  bool use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
+  bool useCelsius = DEFAULT_USE_CELSIUS;
+  bool screenFlipped = DEFAULT_SCREEN_FLIPPED;
 
   // Colors
   String backgroundColor = DEFAULT_BACKGROUND_COLOR;
@@ -452,6 +511,10 @@ private:
   String dateColor = DEFAULT_DATE_COLOR;
   String tempColor = DEFAULT_TEMP_COLOR;
   String humidityColor = DEFAULT_HUMIDITY_COLOR;
+  String alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
+  String snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
+  String alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
+  String errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
 
   bool _isDirty;
   Alarm _alarms[MAX_ALARMS];

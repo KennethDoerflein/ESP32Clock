@@ -107,18 +107,19 @@ void DisplayManager::drawAlarmIcon(bool enabled, bool snoozing)
 
   if (enabled)
   {
-    uint16_t color = snoozing ? TFT_BLUE : TFT_YELLOW;
+    String colorHex = snoozing ? ConfigManager::getInstance().getSnoozeIconColor() : ConfigManager::getInstance().getAlarmIconColor();
+    uint16_t color = hexToRGB565(colorHex.c_str());
     // Bell body using a rounded rectangle
     tft->fillRoundRect(icon_x + 2, icon_y, 12, 11, 4, color);
     // Bell lip/flare
     tft->fillRect(icon_x, icon_y + 10, 16, 3, color);
     // Clapper (small circle inside)
-    tft->fillCircle(icon_x + 8, icon_y + 12, 2, TFT_BLACK);
+    tft->fillCircle(icon_x + 8, icon_y + 12, 2, hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str()));
   }
   else
   {
     // Erase the icon by drawing a black rectangle over its bounding box
-    tft->fillRect(icon_x, icon_y, icon_w, icon_h, TFT_BLACK);
+    tft->fillRect(icon_x, icon_y, icon_w, icon_h, hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str()));
   }
 }
 
@@ -127,22 +128,22 @@ void DisplayManager::showAlarmScreen()
   // This is a simple overlay, it doesn't create a new page.
   // It draws a large "RINGING!" message in the center of the screen.
   tft->setTextDatum(MC_DATUM);
-  tft->setTextColor(TFT_RED);
+  tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getAlarmTextColor().c_str()));
   tft->drawString("RINGING!", tft->width() / 2, tft->height() / 2, 7);
 
   // Reset text datum and color for other components
   tft->setTextDatum(TL_DATUM);
-  tft->setTextColor(TFT_WHITE);
+  tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getTimeColor().c_str()));
 }
 
 void DisplayManager::showErrorScreen(const char *message)
 {
-  tft->fillScreen(TFT_BLACK);
+  tft->fillScreen(hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str()));
   tft->setTextDatum(MC_DATUM);
-  tft->setTextColor(TFT_RED);
+  tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getErrorTextColor().c_str()));
   tft->drawString(message, tft->width() / 2, tft->height() / 2, 4); // Use font 4 for a clear message
 
   // Reset text datum and color for any potential subsequent drawing
   tft->setTextDatum(TL_DATUM);
-  tft->setTextColor(TFT_WHITE);
+  tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getTimeColor().c_str()));
 }
