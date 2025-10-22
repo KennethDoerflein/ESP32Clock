@@ -618,7 +618,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
   </style>
 </head>
   <body>
-    <div class="container mt-5">
+    <div class="container my-5">
       <div class="card shadow-sm">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-4">
@@ -641,8 +641,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           </ul>
 
           <div class="tab-content" id="settingsTabsContent">
-            <div class="tab-pane fade show active p-3" id="general" role="tabpanel" aria-labelledby="general-tab">
-              <form id="settings-form">
+            <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
+              <form id="settings-form" class="p-3">
                 <div id="auto-brightness-section" class="mb-3 p-3 border rounded">
                   <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
                     <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
@@ -692,9 +692,12 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   <input class="form-check-input" type="checkbox" role="switch" id="screen-flipped" name="screenFlipped" />
                 </div>
               </form>
+              <div class="d-grid gap-2 mt-3">
+                <button type="button" id="reset-general-btn" class="btn btn-warning" title="Reset all general settings to their default values.">Reset General Settings</button>
+              </div>
             </div>
-            <div class="tab-pane fade p-3" id="display" role="tabpanel" aria-labelledby="display-tab">
-              <form id="display-settings-form">
+            <div class="tab-pane fade" id="display" role="tabpanel" aria-labelledby="display-tab">
+              <form id="display-settings-form" class="p-3">
                 <div class="row">
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
@@ -752,7 +755,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
             </div>
           </div>
 
-          <div class="d-grid gap-2 mt-0">
+          <div class="d-grid gap-2 mt-4">
             <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
           </div>
         </div>
@@ -955,6 +958,24 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
               setStatus(STATUS_INDICATORS.SAVED);
             } else {
               throw new Error('Failed to reset colors');
+            }
+          } catch (e) {
+            console.error(e);
+            setStatus(STATUS_INDICATORS.ERROR);
+          }
+        }
+      });
+
+      document.getElementById('reset-general-btn').addEventListener('click', async () => {
+        if (confirm('Are you sure you want to reset all general settings to their default values?')) {
+          setStatus(STATUS_INDICATORS.SAVING);
+          try {
+            const response = await fetch('/api/settings/reset', { method: 'POST' });
+            if (response.ok) {
+              await loadAllSettings();
+              setStatus(STATUS_INDICATORS.SAVED);
+            } else {
+              throw new Error('Failed to reset general settings');
             }
           } catch (e) {
             console.error(e);

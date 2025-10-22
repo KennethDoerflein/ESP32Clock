@@ -224,13 +224,18 @@ void ClockWebServer::begin()
           }
         });
 
-    server.on("/api/display/reset", HTTP_POST, [](AsyncWebServerRequest *request)
+    server.on("/api/settings/reset", HTTP_POST, [](AsyncWebServerRequest *request)
               {
       auto &config = ConfigManager::getInstance();
-      config.resetDisplayToDefaults();
+      bool oldScreenFlipped = config.isScreenFlipped();
+      config.resetGeneralSettingsToDefaults();
       config.save();
+      if (oldScreenFlipped != config.isScreenFlipped())
+      {
+        Display::getInstance().updateRotation();
+      }
       DisplayManager::getInstance().requestFullRefresh();
-      request->send(200, "text/plain", "Display settings reset!"); });
+      request->send(200, "text/plain", "General settings reset!"); });
 
     // --- API Handlers for Display ---
     server.on("/api/display", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -303,6 +308,14 @@ void ClockWebServer::begin()
             request->_tempObject = nullptr;
           }
         });
+
+    server.on("/api/display/reset", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+      auto &config = ConfigManager::getInstance();
+      config.resetDisplayToDefaults();
+      config.save();
+      DisplayManager::getInstance().requestFullRefresh();
+      request->send(200, "text/plain", "Display settings reset!"); });
 
     server.on("/api/wifi/hostname", HTTP_POST, [](AsyncWebServerRequest *request)
               {

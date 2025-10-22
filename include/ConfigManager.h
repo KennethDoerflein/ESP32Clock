@@ -481,6 +481,11 @@ public:
    */
   void resetDisplayToDefaults();
 
+  /**
+   * @brief Resets all general settings to their default values.
+   */
+  void resetGeneralSettingsToDefaults();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.

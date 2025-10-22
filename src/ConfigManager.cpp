@@ -313,3 +313,17 @@ void ConfigManager::resetDisplayToDefaults()
   errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
   _isDirty = true;
 }
+
+void ConfigManager::resetGeneralSettingsToDefaults()
+{
+  autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
+  brightness = DEFAULT_BRIGHTNESS;
+  autoBrightnessStartHour = DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
+  autoBrightnessEndHour = DEFAULT_AUTO_BRIGHTNESS_END_HOUR;
+  dayBrightness = DEFAULT_DAY_BRIGHTNESS;
+  nightBrightness = DEFAULT_NIGHT_BRIGHTNESS;
+  use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
+  useCelsius = DEFAULT_USE_CELSIUS;
+  screenFlipped = DEFAULT_SCREEN_FLIPPED;
+  _isDirty = true;
+}
