@@ -75,9 +75,6 @@ void ClockWebServer::begin()
     server.on("/settings", HTTP_GET, [this](AsyncWebServerRequest *request)
               { onSettingsRequest(request); });
 
-    server.on("/display", HTTP_GET, [this](AsyncWebServerRequest *request)
-              { onDisplayRequest(request); });
-
     server.on("/alarms", HTTP_GET, [this](AsyncWebServerRequest *request)
               { onAlarmsRequest(request); });
 
@@ -324,8 +321,8 @@ void ClockWebServer::begin()
       delay(100);
       ESP.restart(); });
 
-    server.on("/update", HTTP_GET, [this](AsyncWebServerRequest *request)
-              { request->send_P(200, "text/html", UPDATE_PAGE_HTML, [this](const String &var)
+    server.on("/system", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { request->send_P(200, "text/html", SYSTEM_PAGE_HTML, [this](const String &var)
                                 { return processor(var); }); });
 
     server.on(
@@ -365,10 +362,6 @@ void ClockWebServer::begin()
 
     if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
     {
-      server.on("/seriallog", HTTP_GET, [this](AsyncWebServerRequest *request)
-                { request->send_P(200, "text/html", SERIAL_LOG_PAGE_HTML,
-                                  [this](const String &var)
-                                  { return processor(var); }); });
       SerialLog::getInstance().begin(&server);
     }
   }
@@ -420,12 +413,6 @@ void ClockWebServer::onWifiRequest(AsyncWebServerRequest *request)
 void ClockWebServer::onSettingsRequest(AsyncWebServerRequest *request)
 {
   request->send_P(200, "text/html", SETTINGS_PAGE_HTML, [this](const String &var)
-                  { return processor(var); });
-}
-
-void ClockWebServer::onDisplayRequest(AsyncWebServerRequest *request)
-{
-  request->send_P(200, "text/html", DISPLAY_PAGE_HTML, [this](const String &var)
                   { return processor(var); });
 }
 
@@ -550,11 +537,27 @@ String ClockWebServer::processor(const String &var)
     return WiFi.localIP().toString();
   if (var == "HOSTNAME")
     return WiFiManager::getInstance().getHostname();
-  if (var == "SERIAL_LOG_BUTTON")
+  if (var == "SERIAL_LOG_TAB")
   {
     if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
     {
-      return "<a href=\"/seriallog\" class=\"btn btn-outline-light btn-lg\">Serial Log</a>";
+      return SERIAL_LOG_TAB_HTML;
+    }
+    return "";
+  }
+  if (var == "SERIAL_LOG_TAB_PANE")
+  {
+    if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
+    {
+      return SERIAL_LOG_TAB_PANE_HTML;
+    }
+    return "";
+  }
+  if (var == "SERIAL_LOG_SCRIPT")
+  {
+    if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
+    {
+      return SERIAL_LOG_SCRIPT_JS;
     }
     return "";
   }

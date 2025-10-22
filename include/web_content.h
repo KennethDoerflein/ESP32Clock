@@ -25,8 +25,88 @@ const char BOOTSTRAP_HEAD[] PROGMEM = R"rawliteral(
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
 <style>
-  .container { max-width: 500px; }
+  .container { max-width: 600px; }
 </style>
+)rawliteral";
+
+const char SERIAL_LOG_TAB_HTML[] PROGMEM = R"rawliteral(
+<li class="nav-item" role="presentation">
+  <button class="nav-link" id="serial-log-tab" data-bs-toggle="tab" data-bs-target="#serial-log" type="button" role="tab" aria-controls="serial-log" aria-selected="false">Serial Log</button>
+</li>
+)rawliteral";
+
+const char SERIAL_LOG_TAB_PANE_HTML[] PROGMEM = R"rawliteral(
+<div class="tab-pane fade" id="serial-log" role="tabpanel" aria-labelledby="serial-log-tab">
+  <div class="log-container">
+    <div class="log-header">
+      <h5>Live Log</h5>
+      <button id="download-btn" class="btn btn-sm btn-outline-secondary" title="Download the current log as a text file.">Download Log</button>
+    </div>
+    <div id="log">Waiting for logs...</div>
+  </div>
+</div>
+)rawliteral";
+
+const char SERIAL_LOG_SCRIPT_JS[] PROGMEM = R"rawliteral(
+<script>
+  const logDiv = document.getElementById('log');
+  const downloadBtn = document.getElementById('download-btn');
+  const serialLogTab = document.getElementById('serial-log-tab');
+  let socket;
+
+  function connect() {
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    socket = new WebSocket(`ws://${window.location.host}/ws`);
+    socket.onopen = () => {
+        logDiv.innerHTML = '<span class="log-connect">[SYSTEM] WebSocket connection established. Listening...</span><br>';
+    };
+    socket.onmessage = (event) => {
+        const shouldScroll = logDiv.scrollTop + logDiv.clientHeight >= logDiv.scrollHeight - 10;
+        const textNode = document.createTextNode(event.data);
+        logDiv.appendChild(textNode);
+        if (shouldScroll) {
+          logDiv.scrollTop = logDiv.scrollHeight;
+        }
+    };
+    socket.onclose = (event) => {
+        logDiv.innerHTML += `<span class="log-disconnect">[SYSTEM] WebSocket connection closed (Code: ${event.code}). Reconnecting...</span><br>`;
+        setTimeout(connect, 3000);
+    };
+    socket.onerror = (error) => {
+         logDiv.innerHTML += '<span class="log-error">[SYSTEM] WebSocket error occurred.</span><br>';
+    }
+  }
+
+  function disconnect() {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.close();
+    }
+  }
+
+  if (serialLogTab) {
+    serialLogTab.addEventListener('shown.bs.tab', function () {
+      connect();
+    });
+    serialLogTab.addEventListener('hidden.bs.tab', function () {
+      disconnect();
+    });
+  }
+  
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+        const logText = logDiv.textContent;
+        const blob = new Blob([logText], { type: 'text/plain;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "esp32clocklog.txt";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+  }
+</script>
 )rawliteral";
 
 /**
@@ -46,12 +126,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <div class="card-body text-center">
         <h1 class="card-title mb-4">Control Panel</h1>
         <div class="d-grid gap-3">
-          <a href="/wifi" class="btn btn-primary btn-lg" title="Configure WiFi network settings.">Configure WiFi</a>
-          <a href="/settings" class="btn btn-secondary btn-lg" title="Adjust general clock settings.">Clock Settings</a>
-          <a href="/display" class="btn btn-info btn-lg" title="Customize the display colors.">Display Settings</a>
-          <a href="/alarms" class="btn btn-warning btn-lg" title="Set and manage alarms.">Alarm Settings</a>
-          <a href="/update" class="btn btn-danger btn-lg" title="Update the device firmware.">Update Firmware</a>
-          %SERIAL_LOG_BUTTON%
+          <a href="/wifi" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center" title="Configure WiFi network settings."><i class="bi bi-wifi me-2"></i>Configure WiFi</a>
+          <a href="/alarms" class="btn btn-warning btn-lg d-flex align-items-center justify-content-center" title="Set and manage alarms."><i class="bi bi-alarm-fill me-2"></i>Alarms</a>
+          <a href="/settings" class="btn btn-info btn-lg d-flex align-items-center justify-content-center" title="Adjust clock and display settings."><i class="bi bi-gear-fill me-2"></i>Settings</a>
+          <a href="/system" class="btn btn-secondary btn-lg d-flex align-items-center justify-content-center" title="Update firmware and view logs."><i class="bi bi-hdd-fill me-2"></i>System</a>
         </div>
         <div class="mt-4 text-center text-muted">
           <small>Firmware Version: %FIRMWARE_VERSION%</small>
@@ -262,7 +340,6 @@ const char SIMPLE_WIFI_SETUP_HTML[] PROGMEM = R"rawliteral(
 /**
  * @brief The WiFi Configuration page.
  * Displays available networks and provides a form to enter credentials.
- * Contains a placeholder `%NETWORKS%` which is replaced by the list of scanned networks.
  */
 const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -325,7 +402,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
             name="hostname"
             value="%HOSTNAME%"
             title="Enter the desired hostname." />
-          <button class="btn btn-primary" type="submit" title="Save the new hostname and reboot the device.">
+          <button class="btn btn-warning" type="submit" title="Save the new hostname and reboot the device.">
             Save & Reboot
           </button>
         </div>
@@ -501,257 +578,14 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 /**
- * @brief The Clock Settings page.
- * Contains a form to adjust settings like brightness, time format, and temperature unit.
- * Fetches data from /api/settings and auto-saves on change.
+ * @brief The Settings page.
+ * Contains forms to adjust clock settings and display colors.
  */
 const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html data-bs-theme="dark">
 <head>
-  <title>Clock Settings</title>
-  %HEAD%
-  <style>
-      .status-indicator {
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        min-width: 95px;
-      }
-  </style>
-</head>
-  <body>
-    <div class="container mt-5">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="card-title m-0">Clock Settings</h1>
-            <div class="status-indicator"></div>
-          </div>
-          
-          <div class="alert alert-info d-flex align-items-center" role="alert">
-            <i class="bi bi-info-circle-fill me-2"></i>
-            <div>Heads up! All your changes are saved automatically.</div>
-          </div>
-
-          <form id="settings-form">
-            <div
-              class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-              <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
-              <input
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                id="auto-brightness"
-                name="autoBrightness" />
-            </div>
-
-            <div class="mb-3 p-3 border rounded">
-              <label for="brightness" class="form-label d-flex justify-content-between">
-                <span title="Set the display brightness manually.">Manual Brightness</span>
-                <span id="brightness-value">255</span>
-              </label>
-              <input
-                type="range"
-                class="form-range"
-                id="brightness"
-                name="brightness"
-                min="10"
-                max="255"
-                title="Adjust the manual brightness level." />
-            </div>
-
-            <div
-              class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-              <label class="form-check-label" for="24hour" title="Switch between 12-hour and 24-hour time formats.">24-Hour Format</label>
-              <input
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                id="24hour"
-                name="use24HourFormat" />
-            </div>
-
-            <div
-              class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-              <label class="form-check-label" for="celsius" title="Switch between Celsius and Fahrenheit temperature units.">Use Celsius (&deg;C)</label>
-              <input
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                id="celsius"
-                name="useCelsius" />
-            </div>
-
-            <div
-              class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-              <label class="form-check-label" for="screen-flipped" title="Flip the screen orientation 180 degrees.">Flip Screen</label>
-              <input
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                id="screen-flipped"
-                name="screenFlipped" />
-            </div>
-          </form>
-
-          <hr>
-
-          <div class="d-grid gap-2 mt-4">
-            <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
-              <button type="button" class="btn btn-danger w-100 mt-3" onclick="rebootDevice()" title="Reboot the device.">
-                Reboot Device
-              </button>
-              <button type="button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()" title="Reset all settings to factory defaults.">
-                Factory Reset
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <script>
-      const DEBOUNCE_DELAY_MS = 1500;
-      const ERROR_DISPLAY_MS = 3000;
-      let saveTimeout;
-
-      const statusEl = document.querySelector(".status-indicator");
-      const form = document.getElementById("settings-form");
-      const autoBrightnessEl = document.getElementById("auto-brightness");
-      const brightnessEl = document.getElementById("brightness");
-      const brightnessValueEl = document.getElementById("brightness-value");
-      const twentyFourHourEl = document.getElementById("24hour");
-      const celsiusEl = document.getElementById("celsius");
-      const screenFlippedEl = document.getElementById("screen-flipped");
-
-      const STATUS_INDICATORS = {
-        SAVED:
-          '<i class="bi bi-check-circle-fill text-success"></i> <span class="text-muted">Saved</span>',
-        UNSAVED:
-          '<i class="bi bi-pencil-fill text-warning"></i> <span class="text-warning">Unsaved</span>',
-        SAVING:
-          '<div class="spinner-border spinner-border-sm text-primary" role="status"></div> <span class="text-primary">Saving...</span>',
-        ERROR:
-          '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
-      };
-
-      function handleInputChange() {
-        clearTimeout(saveTimeout);
-        statusEl.innerHTML = STATUS_INDICATORS.UNSAVED;
-        saveTimeout = setTimeout(saveSettings, DEBOUNCE_DELAY_MS);
-      }
-      
-      function toggleBrightnessSlider() {
-          brightnessEl.disabled = autoBrightnessEl.checked;
-      }
-
-      async function loadSettings() {
-        statusEl.innerHTML = "";
-        try {
-          const response = await fetch('/api/settings');
-          const settings = await response.json();
-          autoBrightnessEl.checked = settings.autoBrightness;
-          
-          // Use 'actualBrightness' for the slider's value and text
-          brightnessEl.value = settings.actualBrightness;
-          brightnessValueEl.textContent = settings.actualBrightness;
-          
-          twentyFourHourEl.checked = settings.use24HourFormat;
-          celsiusEl.checked = settings.useCelsius;
-          screenFlippedEl.checked = settings.screenFlipped;
-          
-          // Update the slider's enabled/disabled state
-          toggleBrightnessSlider(); 
-          
-          statusEl.innerHTML = STATUS_INDICATORS.SAVED;
-        } catch (e) {
-          statusEl.innerHTML = STATUS_INDICATORS.ERROR;
-        }
-      }
-
-      async function saveSettings() {
-        statusEl.innerHTML = STATUS_INDICATORS.SAVING;
-        
-        const settings = {
-            autoBrightness: autoBrightnessEl.checked,
-            // When saving, send the slider's current value as the user's preference
-            brightness: parseInt(brightnessEl.value), 
-            use24HourFormat: twentyFourHourEl.checked,
-            useCelsius: celsiusEl.checked,
-            screenFlipped: screenFlippedEl.checked
-        };
-
-        try {
-          await fetch('/api/settings/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(settings)
-          });
-          statusEl.innerHTML = STATUS_INDICATORS.SAVED;
-          
-          // After a successful save, reload the settings to get the
-          // updated 'actualBrightness' from the device.
-          setTimeout(loadSettings, 500);
-
-        } catch (e) {
-          statusEl.innerHTML = STATUS_INDICATORS.ERROR;
-          setTimeout(() => {
-            statusEl.innerHTML = STATUS_INDICATORS.UNSAVED;
-          }, ERROR_DISPLAY_MS);
-        }
-      }
-
-      function rebootDevice() {
-        if (confirm("Are you sure you want to reboot the device?")) {
-          fetch("/reboot").then((response) => {
-            if (response.ok) {
-              alert("Device is rebooting...");
-            } else {
-              alert("Failed to send reboot command.");
-            }
-          });
-        }
-      }
-
-      function factoryReset() {
-        if (confirm("Are you sure you want to perform a factory reset? This will erase all settings.")) {
-          fetch("/factory-reset").then((response) => {
-            if (response.ok) {
-              alert("Factory reset successful. Device is rebooting...");
-            } else {
-              alert("Failed to send factory reset command.");
-            }
-          });
-        }
-      }
-      
-      // Update the text value as the slider moves
-      brightnessEl.addEventListener('input', () => {
-          brightnessValueEl.textContent = brightnessEl.value;
-      });
-
-      // Toggle the slider when the checkbox is clicked
-      autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
-      
-      form.addEventListener('input', handleInputChange);
-      document.addEventListener("DOMContentLoaded", loadSettings);
-    </script>
-  </body>
-</html>
-)rawliteral";
-
-/**
- * @brief The Display Settings page.
- * Contains color pickers to customize the clock's appearance.
- * Fetches data from /api/display and auto-saves on change.
- */
-const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>
-  <title>Display Settings</title>
+  <title>Settings</title>
   %HEAD%
   <style>
       .status-indicator {
@@ -788,7 +622,7 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
       <div class="card shadow-sm">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="card-title m-0">Display Settings</h1>
+            <h1 class="card-title m-0">Settings</h1>
             <div class="status-indicator"></div>
           </div>
           
@@ -797,61 +631,103 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
             <div>Heads up! All your changes are saved automatically.</div>
           </div>
 
-          <form id="display-settings-form">
-            <div class="row">
-              <div class="col-md-6">
-                <div class="color-picker-wrapper">
-                  <label for="background-color" title="Set the main background color.">Background Color</label>
-                  <input type="color" id="background-color" name="backgroundColor" title="Select a background color.">
+          <ul class="nav nav-tabs nav-fill" id="settingsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-controls="general" aria-selected="true">General</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="display-tab" data-bs-toggle="tab" data-bs-target="#display" type="button" role="tab" aria-controls="display" aria-selected="false">Display</button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="settingsTabsContent">
+            <div class="tab-pane fade show active p-3" id="general" role="tabpanel" aria-labelledby="general-tab">
+              <form id="settings-form">
+                <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
+                  <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
+                  <input class="form-check-input" type="checkbox" role="switch" id="auto-brightness" name="autoBrightness" />
                 </div>
-              </div>
-              <div class="col-md-6">
-                <div class="color-picker-wrapper">
-                  <label for="time-color" title="Set the color for the time display.">Time Color</label>
-                  <input type="color" id="time-color" name="timeColor" title="Select a color for the time.">
+                <div class="mb-3 p-3 border rounded">
+                  <label for="brightness" class="form-label d-flex justify-content-between">
+                    <span title="Set the display brightness manually.">Manual Brightness</span>
+                    <span id="brightness-value">255</span>
+                  </label>
+                  <input type="range" class="form-range" id="brightness" name="brightness" min="10" max="255" title="Adjust the manual brightness level." />
                 </div>
-              </div>
-              <div class="col-md-6">
-                <div class="color-picker-wrapper">
-                  <label for="tod-color" title="Set the color for the AM/PM indicator.">TOD Color</label>
-                  <input type="color" id="tod-color" name="todColor" title="Select a color for the AM/PM indicator.">
+                <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
+                  <label class="form-check-label" for="24hour" title="Switch between 12-hour and 24-hour time formats.">24-Hour Format</label>
+                  <input class="form-check-input" type="checkbox" role="switch" id="24hour" name="use24HourFormat" />
                 </div>
-              </div>
-              <div class="col-md-6">
-                <div class="color-picker-wrapper">
-                  <label for="seconds-color" title="Set the color for the seconds display.">Seconds Color</label>
-                  <input type="color" id="seconds-color" name="secondsColor" title="Select a color for the seconds.">
+                <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
+                  <label class="form-check-label" for="celsius" title="Switch between Celsius and Fahrenheit temperature units.">Use Celsius (&deg;C)</label>
+                  <input class="form-check-input" type="checkbox" role="switch" id="celsius" name="useCelsius" />
                 </div>
-              </div>
-              <div class="col-md-6">
-                <div class="color-picker-wrapper">
-                  <label for="day-of-week-color" title="Set the color for the day of the week.">Day of Week Color</label>
-                  <input type="color" id="day-of-week-color" name="dayOfWeekColor" title="Select a color for the day of the week.">
+                <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
+                  <label class="form-check-label" for="screen-flipped" title="Flip the screen orientation 180 degrees.">Flip Screen</label>
+                  <input class="form-check-input" type="checkbox" role="switch" id="screen-flipped" name="screenFlipped" />
                 </div>
-              </div>
-              <div class="col-md-6">
-                <div class="color-picker-wrapper">
-                  <label for="date-color" title="Set the color for the date display.">Date Color</label>
-                  <input type="color" id="date-color" name="dateColor" title="Select a color for the date.">
+              </form>
+            </div>
+            <div class="tab-pane fade p-3" id="display" role="tabpanel" aria-labelledby="display-tab">
+              <form id="display-settings-form">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="background-color" title="Set the main background color.">Background Color</label>
+                      <input type="color" id="background-color" name="backgroundColor" title="Select a background color.">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="time-color" title="Set the color for the time display.">Time Color</label>
+                      <input type="color" id="time-color" name="timeColor" title="Select a color for the time.">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="tod-color" title="Set the color for the AM/PM indicator.">TOD Color</label>
+                      <input type="color" id="tod-color" name="todColor" title="Select a color for the AM/PM indicator.">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="seconds-color" title="Set the color for the seconds display.">Seconds Color</label>
+                      <input type="color" id="seconds-color" name="secondsColor" title="Select a color for the seconds.">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="day-of-week-color" title="Set the color for the day of the week.">Day of Week Color</label>
+                      <input type="color" id="day-of-week-color" name="dayOfWeekColor" title="Select a color for the day of the week.">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="date-color" title="Set the color for the date display.">Date Color</label>
+                      <input type="color" id="date-color" name="dateColor" title="Select a color for the date.">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="temp-color" title="Set the color for the temperature display.">Temperature Color</label>
+                      <input type="color" id="temp-color" name="tempColor" title="Select a color for the temperature.">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="humidity-color" title="Set the color for the humidity display.">Humidity Color</label>
+                      <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity.">
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div class="col-md-6">
-                <div class="color-picker-wrapper">
-                  <label for="temp-color" title="Set the color for the temperature display.">Temperature Color</label>
-                  <input type="color" id="temp-color" name="tempColor" title="Select a color for the temperature.">
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="color-picker-wrapper">
-                  <label for="humidity-color" title="Set the color for the humidity display.">Humidity Color</label>
-                  <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity.">
-                </div>
+              </form>
+              <div class="d-grid gap-2 mt-4">
+                <button type="button" id="reset-colors-btn" class="btn btn-danger" title="Reset all colors to their default values.">Reset Colors</button>
               </div>
             </div>
-          </form>
+          </div>
 
-          <div class="d-grid gap-2 mt-4">
-            <button type="button" id="reset-colors-btn" class="btn btn-danger" title="Reset all colors to their default values.">Reset Colors</button>
+          <div class="d-grid gap-2 mt-0">
             <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
           </div>
         </div>
@@ -861,22 +737,24 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
       const DEBOUNCE_DELAY_MS = 1500;
       const ERROR_DISPLAY_MS = 3000;
       let saveTimeout;
-      let statusClearTimeout;
 
       const statusEl = document.querySelector(".status-indicator");
-      const form = document.getElementById("display-settings-form");
+      const settingsForm = document.getElementById("settings-form");
+      const displaySettingsForm = document.getElementById("display-settings-form");
       
-      const colorPickers = form.querySelectorAll('input[type="color"]');
+      const autoBrightnessEl = document.getElementById("auto-brightness");
+      const brightnessEl = document.getElementById("brightness");
+      const brightnessValueEl = document.getElementById("brightness-value");
+      const twentyFourHourEl = document.getElementById("24hour");
+      const celsiusEl = document.getElementById("celsius");
+      const screenFlippedEl = document.getElementById("screen-flipped");
+      const colorPickers = displaySettingsForm.querySelectorAll('input[type="color"]');
 
       const STATUS_INDICATORS = {
-        SAVED:
-          '<i class="bi bi-check-circle-fill text-success"></i> <span class="text-muted">Saved</span>',
-        UNSAVED:
-          '<i class="bi bi-pencil-fill text-warning"></i> <span class="text-warning">Unsaved</span>',
-        SAVING:
-          '<div class="spinner-border spinner-border-sm text-primary" role="status"></div> <span class="text-primary">Saving...</span>',
-        ERROR:
-          '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
+        SAVED: '<i class="bi bi-check-circle-fill text-success"></i> <span class="text-muted">Saved</span>',
+        UNSAVED: '<i class="bi bi-pencil-fill text-warning"></i> <span class="text-warning">Unsaved</span>',
+        SAVING: '<div class="spinner-border spinner-border-sm text-primary" role="status"></div> <span class="text-primary">Saving...</span>',
+        ERROR: '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
       };
 
       function setStatus(status) {
@@ -886,40 +764,75 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
       function handleInputChange() {
         clearTimeout(saveTimeout);
         setStatus(STATUS_INDICATORS.UNSAVED);
-        saveTimeout = setTimeout(saveSettings, DEBOUNCE_DELAY_MS);
+        saveTimeout = setTimeout(saveAllSettings, DEBOUNCE_DELAY_MS);
       }
 
-      async function loadSettings() {
+      function toggleBrightnessSlider() {
+        brightnessEl.disabled = autoBrightnessEl.checked;
+      }
+
+      async function loadAllSettings() {
+        setStatus("");
         try {
-          const response = await fetch('/api/display');
-          const settings = await response.json();
-          for (const key in settings) {
-              const el = document.querySelector(`[name="${key}"]`);
-              if (el) {
-                  el.value = settings[key];
-              }
+          const [settingsRes, displayRes] = await Promise.all([
+            fetch('/api/settings'),
+            fetch('/api/display')
+          ]);
+          const settings = await settingsRes.json();
+          const displaySettings = await displayRes.json();
+          
+          autoBrightnessEl.checked = settings.autoBrightness;
+          brightnessEl.value = settings.actualBrightness;
+          brightnessValueEl.textContent = settings.actualBrightness;
+          twentyFourHourEl.checked = settings.use24HourFormat;
+          celsiusEl.checked = settings.useCelsius;
+          screenFlippedEl.checked = settings.screenFlipped;
+          toggleBrightnessSlider();
+
+          for (const key in displaySettings) {
+            const el = document.querySelector(`[name="${key}"]`);
+            if (el) {
+              el.value = displaySettings[key];
+            }
           }
+          
           setStatus(STATUS_INDICATORS.SAVED);
         } catch (e) {
           setStatus(STATUS_INDICATORS.ERROR);
         }
       }
 
-      async function saveSettings() {
+      async function saveAllSettings() {
         setStatus(STATUS_INDICATORS.SAVING);
         
-        const settings = {};
+        const settings = {
+          autoBrightness: autoBrightnessEl.checked,
+          brightness: parseInt(brightnessEl.value),
+          use24HourFormat: twentyFourHourEl.checked,
+          useCelsius: celsiusEl.checked,
+          screenFlipped: screenFlippedEl.checked
+        };
+
+        const displaySettings = {};
         colorPickers.forEach(picker => {
-            settings[picker.name] = picker.value;
+          displaySettings[picker.name] = picker.value;
         });
 
         try {
-          await fetch('/api/display/save', {
+          await Promise.all([
+            fetch('/api/settings/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(settings)
-          });
+            }),
+            fetch('/api/display/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(displaySettings)
+            })
+          ]);
           setStatus(STATUS_INDICATORS.SAVED);
+          setTimeout(loadAllSettings, 500);
         } catch (e) {
           setStatus(STATUS_INDICATORS.ERROR);
           setTimeout(() => {
@@ -928,8 +841,15 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
         }
       }
       
-      form.addEventListener('input', handleInputChange);
-      document.addEventListener("DOMContentLoaded", loadSettings);
+      brightnessEl.addEventListener('input', () => {
+        brightnessValueEl.textContent = brightnessEl.value;
+      });
+
+      autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
+      
+      settingsForm.addEventListener('input', handleInputChange);
+      displaySettingsForm.addEventListener('input', handleInputChange);
+      document.addEventListener("DOMContentLoaded", loadAllSettings);
 
       document.getElementById('reset-colors-btn').addEventListener('click', async () => {
         if (confirm('Are you sure you want to reset all colors to their default values?')) {
@@ -937,7 +857,7 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
           try {
             const response = await fetch('/api/display/reset', { method: 'POST' });
             if (response.ok) {
-              await loadSettings(); // Reload settings to show the defaults
+              await loadAllSettings();
               setStatus(STATUS_INDICATORS.SAVED);
             } else {
               throw new Error('Failed to reset colors');
@@ -948,6 +868,7 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
         }
       });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
 )rawliteral";
@@ -959,7 +880,7 @@ const char DISPLAY_PAGE_HTML[] PROGMEM = R"rawliteral(
  */
 const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html data-bs-theme="dark">
   <head>
     <title>Alarm Settings</title>
     %HEAD%
@@ -1223,56 +1144,123 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 /**
- * @brief The OTA Update page
- * Provides forms for manual and GitHub updates with on-page status feedback.
+ * @brief The System page for updates and logs.
+ * Provides forms for manual and GitHub updates, and a real-time serial log.
  */
-const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
+const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html data-bs-theme="dark">
 <head>
-  <title>Firmware Update</title>
+  <title>System</title>
   %HEAD%
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+    
+    .log-container {
+      background-color: #000;
+      border-radius: 0.375rem;
+      overflow: hidden;
+    }
+    .log-header {
+      background-color: #000;
+      padding: 0.5rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .log-header h5 {
+      color: #00FF00;
+      text-shadow: 0 0 8px #00FF00;
+      margin: 0;
+    }
+    .log-header .btn {
+      background-color: transparent;
+      border: 1px solid #00FF00;
+      color: #00FF00;
+      text-shadow: 0 0 5px #00FF00;
+    }
+    .log-header .btn:hover {
+      background-color: #00FF00;
+      color: #000;
+      text-shadow: none;
+    }
+    #log {
+      background-color: #000;
+      height: 350px;
+      padding: 1rem;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+      color: #00FF00;
+      text-shadow: 0 0 2px #00FF00;
+    }
+    #log::-webkit-scrollbar {
+      width: 8px;
+    }
+    #log::-webkit-scrollbar-track {
+      background: #222;
+    }
+    #log::-webkit-scrollbar-thumb {
+      background: #00FF00;
+      border-radius: 4px;
+    }
+    .log-connect { color: #39FF14; }
+    .log-disconnect { color: #FFA500; }
+    .log-error { color: #FF3131; }
+  </style>
 </head>
 <body>
   <div class="container mt-5">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h1 class="card-title text-center mb-4">Firmware Update</h1>
-
-        <!-- Manual Update Section -->
-        <div class="card mb-4">
-          <div class="card-body">
-            <h5 class="card-title d-flex align-items-center"><i class="bi bi-upload me-2"></i>Manual Update</h5>
-            <p class="card-text text-muted small">Select a .bin file from your computer to upload and flash.</p>
-            <form id="upload-form">
-              <div class="input-group">
-                <input type="file" class="form-control" id="firmware" name="firmware" accept=".bin" required title="Select a .bin firmware file.">
-                <button class="btn btn-primary" type="submit" title="Upload the selected firmware file.">Upload</button>
+        <h1 class="card-title text-center mb-4">System</h1>
+        <ul class="nav nav-tabs nav-fill" id="systemTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="update-tab" data-bs-toggle="tab" data-bs-target="#update" type="button" role="tab" aria-controls="update" aria-selected="true">Firmware Update</button>
+          </li>
+          %SERIAL_LOG_TAB%
+        </ul>
+        <div class="tab-content p-3 border-top-0 border" id="systemTabsContent">
+          <div class="tab-pane fade show active" id="update" role="tabpanel" aria-labelledby="update-tab">
+            <div class="card mb-4">
+              <div class="card-body">
+                <h5 class="card-title d-flex align-items-center"><i class="bi bi-upload me-2"></i>Manual Update</h5>
+                <p class="card-text text-muted small">Select a .bin file from your computer to upload and flash.</p>
+                <form id="upload-form">
+                  <div class="input-group">
+                    <input type="file" class="form-control" id="firmware" name="firmware" accept=".bin" required title="Select a .bin firmware file.">
+                    <button class="btn btn-primary" type="submit" title="Upload the selected firmware file.">Upload</button>
+                  </div>
+                </form>
               </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- Online Update Section -->
-        <div class="card">
-          <div class="card-body">
-            <h5 class="card-title d-flex align-items-center"><i class="bi bi-cloud-download me-2"></i>Online Update (Untested)</h5>
-            <p class="card-text text-muted small">Check for the latest release and update automatically.</p>
-            <div class="d-grid">
-              <button id="online-button" class="btn btn-success" title="Check for and apply updates from the internet.">Check for Updates</button>
             </div>
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title d-flex align-items-center"><i class="bi bi-cloud-download me-2"></i>Online Update (Untested)</h5>
+                <p class="card-text text-muted small">Check for the latest release and update automatically.</p>
+                <div class="d-grid">
+                  <button id="online-button" class="btn btn-success" title="Check for and apply updates from the internet.">Check for Updates</button>
+                </div>
+              </div>
+            </div>
+            <div id="status" class="mt-4"></div>
           </div>
+          %SERIAL_LOG_TAB_PANE%
         </div>
-        
-        <!-- Status and Back Button -->
-        <div id="status" class="mt-4"></div>
-        <div class="d-grid mt-4">
+        <div class="d-grid gap-2 mt-4">
           <a href="/" id="back-button" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
+          <button type="button" class="btn btn-warning w-100 mt-3" onclick="rebootDevice()" title="Reboot the device.">
+            Reboot Device
+          </button>
+          <button type="button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()" title="Reset all settings to factory defaults.">
+            Factory Reset
+          </button>
         </div>
       </div>
     </div>
   </div>
-
   <script>
     const uploadForm = document.getElementById('upload-form');
     const onlineButton = document.getElementById('online-button');
@@ -1353,7 +1341,6 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
       })
       .then(text => {
         showStatus(text, 'success');
-        // Re-enable buttons after the check.
         setButtonsDisabled(false);
         isUpdating = false;
       })
@@ -1363,117 +1350,26 @@ const char UPDATE_PAGE_HTML[] PROGMEM = R"rawliteral(
         isUpdating = false;
       });
     });
+
+    function rebootDevice() {
+      if (confirm("Are you sure you want to reboot the device?")) {
+        fetch("/reboot").then(res => alert(res.ok ? "Device is rebooting..." : "Failed to reboot."));
+      }
+    }
+
+    function factoryReset() {
+      const confirmationText = "RESET";
+      const userInput = prompt(`To confirm, please type "${confirmationText}" in the box below.`);
+
+      if (userInput === confirmationText) {
+        fetch("/factory-reset").then(res => alert(res.ok ? "Factory reset successful. Device is rebooting..." : "Failed to reset."));
+      } else if (userInput !== null) {
+        alert("The text you entered did not match. Factory reset has been canceled.");
+      }
+    }
   </script>
-</body>
-</html>
-)rawliteral";
-
-/**
- * @brief The Serial Log page for development builds.
- * Displays real-time serial logs with a retro console theme and download functionality.
- */
-const char SERIAL_LOG_PAGE_HTML[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>
-    <title>Serial Log</title>
-    %HEAD%
-    <style>
-        /* Retro Console Theme */
-        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-
-        body {
-            background-color: #000;
-            color: #00FF00;
-            font-family: 'VT323', monospace; /* Authentic retro font with a fallback */
-        }
-        .container {
-            max-width: 95%;
-        }
-        .retro-header {
-            color: #00FF00;
-            text-shadow: 0 0 5px #00FF00;
-        }
-        .btn-retro {
-            background-color: #1a1a1a;
-            border: 1px solid #00FF00;
-            color: #00FF00;
-            text-shadow: 0 0 2px #00FF00;
-        }
-        .btn-retro:hover {
-            background-color: #00FF00;
-            color: #000;
-            text-shadow: none;
-        }
-        #log {
-            background-color: #0a0a0a;
-            border: 2px solid #00FF00;
-            border-radius: 5px;
-            height: 70vh;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            font-size: 1.2rem;
-            text-shadow: 0 0 2px #00FF00;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3) inset;
-        }
-        .log-connect { color: #39FF14; }
-        .log-disconnect { color: #FFA500; }
-        .log-error { color: #FF3131; }
-    </style>
-</head>
-<body>
-    <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1 class="h3 retro-header">Serial LOG</h1>
-            <div>
-                <button id="download-btn" class="btn btn-retro me-2" title="Download the current log as a text file.">Download Log</button>
-                <a href="/" class="btn btn-retro" title="Return to the main menu.">Back to Menu</a>
-            </div>
-        </div>
-        <div id="log" class="p-3"></div>
-    </div>
-    <script>
-        const logDiv = document.getElementById('log');
-        const downloadBtn = document.getElementById('download-btn');
-
-        function connect() {
-            const socket = new WebSocket(`ws://${window.location.host}/ws`);
-            socket.onopen = () => {
-                logDiv.innerHTML += '<span class="log-connect">[SYSTEM] WebSocket connection established. Listening...</span>\n';
-            };
-            socket.onmessage = (event) => {
-                const textNode = document.createTextNode(event.data);
-                logDiv.appendChild(textNode);
-                logDiv.scrollTop = logDiv.scrollHeight;
-            };
-            socket.onclose = (event) => {
-                logDiv.innerHTML += `<span class="log-disconnect">[SYSTEM] WebSocket connection closed (Code: ${event.code}). Reconnecting...</span>\n`;
-                setTimeout(connect, 3000);
-            };
-            socket.onerror = (error) => {
-                 logDiv.innerHTML += '<span class="log-error">[SYSTEM] WebSocket error occurred.</span>\n';
-            }
-        }
-
-        downloadBtn.addEventListener('click', () => {
-            // Get the text content, which preserves line breaks
-            const logText = logDiv.textContent;
-            // Create a blob, which is a file-like object
-            const blob = new Blob([logText], { type: 'text/plain;charset=utf-8;' });
-            // Create a temporary invisible link
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "esp32clocklog.txt";
-            // Programmatically click the link to trigger the download
-            document.body.appendChild(link);
-            link.click();
-            // Clean up by removing the temporary link
-            document.body.removeChild(link);
-        });
-
-        document.addEventListener('DOMContentLoaded', connect);
-    </script>
+  %SERIAL_LOG_SCRIPT%
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
 )rawliteral";
