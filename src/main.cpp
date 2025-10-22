@@ -87,9 +87,9 @@ void handleBootButton()
       bootButtonPressTime = millis();
       SerialLog::getInstance().print("Boot button pressed. Timer started for factory reset...\n");
     }
-    else if (millis() - bootButtonPressTime > 60000)
+    else if (millis() - bootButtonPressTime > 30000)
     {
-      // Button has been held for 60 seconds
+      // Button has been held for 30 seconds
       SerialLog::getInstance().print("Factory reset triggered by boot button.\n");
       ConfigManager::getInstance().factoryReset();
       ESP.restart();
