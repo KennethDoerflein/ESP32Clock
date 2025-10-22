@@ -762,7 +762,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
     <script>
-      const DEBOUNCE_DELAY_MS = 1500;
+      const DEBOUNCE_DELAY_MS = 3000;
       const ERROR_DISPLAY_MS = 3000;
       let saveTimeout;
 
@@ -1072,7 +1072,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const DAY_MAP = { 1: "Su", 2: "M", 4: "Tu", 8: "W", 16: "Th", 32: "F", 64: "Sa" };
       const alarmsContainer = document.getElementById("alarms-container");
 
-      const DEBOUNCE_DELAY_MS = 1500;
+      const DEBOUNCE_DELAY_MS = 3000;
       const ERROR_DISPLAY_MS = 3000;
       const saveTimeouts = {};
 
