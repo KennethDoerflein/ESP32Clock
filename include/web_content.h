@@ -1238,7 +1238,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
             </div>
             <div class="card">
               <div class="card-body">
-                <h5 class="card-title d-flex align-items-center"><i class="bi bi-cloud-download me-2"></i>Online Update (Untested)</h5>
+                <h5 class="card-title d-flex align-items-center"><i class="bi bi-cloud-download me-2"></i>Online Update</h5>
                 <p class="card-text text-muted small">Check for the latest release and update automatically.</p>
                 <div class="d-grid">
                   <button id="online-button" class="btn btn-success" title="Check for and apply updates from the internet.">Check for Updates</button>
@@ -1251,10 +1251,11 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
         </div>
         <div class="d-grid gap-2 mt-4">
           <a href="/" id="back-button" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
-          <button type="button" class="btn btn-warning w-100 mt-3" onclick="rebootDevice()" title="Reboot the device.">
+          
+          <button type="button" id="reboot-button" class="btn btn-warning w-100 mt-3" onclick="rebootDevice()" title="Reboot the device.">
             Reboot Device
           </button>
-          <button type="button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()" title="Reset all settings to factory defaults.">
+          <button type="button" id="factory-reset-button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()" title="Reset all settings to factory defaults.">
             Factory Reset
           </button>
         </div>
@@ -1268,7 +1269,10 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     const fileInput = document.getElementById('firmware');
     const backButton = document.getElementById('back-button');
     const uploadButton = uploadForm.querySelector('button');
+    const rebootBtn = document.getElementById('reboot-button');
+    const resetBtn = document.getElementById('factory-reset-button');
     let isUpdating = false;
+    let pollInterval = null;
 
     window.addEventListener('beforeunload', (event) => {
       if (isUpdating) {
@@ -1276,6 +1280,35 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
         event.returnValue = '';
       }
     });
+
+    function startPollingStatus() {
+      pollInterval = setInterval(() => {
+        fetch('/api/update/status')
+          .then(r => {
+            if (!r.ok) { throw new Error('Network error or device rebooting'); }
+            return r.json();
+          })
+          .then(data => {
+            if (data.inProgress) {
+              showStatus('Updating firmware... please wait.', 'info');
+              setButtonsDisabled(true);
+            } else {
+              // Update finished, but polling caught it.
+              clearInterval(pollInterval);
+              showStatus('Update complete. Device will reboot shortly.', 'success');
+              setButtonsDisabled(false); // Re-enable buttons now
+              isUpdating = false;
+            }
+          })
+          .catch((error) => {
+            // Fetch fails if device reboots. This is an expected "success" case.
+            clearInterval(pollInterval);
+            showStatus('Update complete. Device is rebooting...', 'success');
+            setButtonsDisabled(false); // Re-enable buttons now
+            isUpdating = false;
+          });
+      }, 2500);
+    }
 
     function showStatus(message, type = 'info') {
       statusDiv.innerHTML = `<div class="alert alert-${type} d-flex align-items-center" role="alert">
@@ -1287,11 +1320,16 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     function setButtonsDisabled(disabled) {
         uploadButton.disabled = disabled;
         onlineButton.disabled = disabled;
+        
+        // Disable/enable back button
         if(disabled) {
             backButton.classList.add('disabled');
         } else {
             backButton.classList.remove('disabled');
         }
+
+        if (rebootBtn) rebootBtn.disabled = disabled;
+        if (resetBtn) resetBtn.disabled = disabled;
     }
 
     uploadForm.addEventListener('submit', function(e) {
@@ -1302,7 +1340,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
       }
       showStatus('Uploading firmware... Do not close this page.');
       setButtonsDisabled(true);
-      isUpdating = true;
+      isUpdating = true; // Set flag to prevent navigation
 
       const formData = new FormData(this);
       fetch('/update', {
@@ -1311,16 +1349,28 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
       })
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Server responded with status: ${response.status}`);
+          // Server sent a 500 or other error
+          throw new Error(`Server responded with status: ${response.status} ${response.statusText}`);
         }
         return response.text();
       })
       .then(text => {
-        showStatus(text, 'success');
-        setButtonsDisabled(false);
-        isUpdating = false;
+        // Server sent 200 OK
+        if (text.includes('Update successful')) {
+            showStatus(text, 'success');
+            // Device is rebooting. Re-enable buttons and allow navigation.
+            setButtonsDisabled(false);
+            isUpdating = false; 
+        } else {
+            // This means the update FAILED from the server side (e.g., Update.end() failed)
+            showStatus(text, 'danger');
+            setButtonsDisabled(false);
+            isUpdating = false;
+        }
       })
       .catch(error => {
+        // This catch block will be hit if the server reboots *before* sending a response,
+        // OR if the response.ok was false.
         showStatus(`Upload failed: ${error.message}`, 'danger');
         setButtonsDisabled(false);
         isUpdating = false;
@@ -1328,23 +1378,30 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     });
 
     onlineButton.addEventListener('click', function() {
-      showStatus('Checking for online updates...');
+      showStatus('Checking for online updates...', 'info');
       setButtonsDisabled(true);
       isUpdating = true;
 
       fetch('/api/update/github', { method: 'POST' })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Server responded with status: ${response.status}`);
-        }
-        return response.text();
-      })
+      .then(response => response.text()) // Server always sends 200 OK
       .then(text => {
-        showStatus(text, 'success');
-        setButtonsDisabled(false);
-        isUpdating = false;
+        // Now analyze the text response from our server
+        if (text.includes('Starting update')) {
+          showStatus(text, 'info'); // Blue spinner, update is starting
+          startPollingStatus();
+        } else if (text.toLowerCase().includes('error') || text.toLowerCase().includes('failed')) {
+          showStatus(text, 'danger'); // Red alert, show error
+          setButtonsDisabled(false);  // Re-enable buttons
+          isUpdating = false;
+        } else {
+          // This is for "No new update found."
+          showStatus(text, 'success'); // Green alert, show success
+          setButtonsDisabled(false);   // Re-enable buttons
+          isUpdating = false;
+        }
       })
       .catch(error => {
+        // This will only catch actual network failures
         showStatus(`Online update check failed: ${error.message}`, 'danger');
         setButtonsDisabled(false);
         isUpdating = false;

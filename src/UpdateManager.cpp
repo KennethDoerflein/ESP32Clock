@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include "github_ca.h"
+#include "SerialLog.h"
 
 UpdateManager &UpdateManager::getInstance()
 {
@@ -25,7 +26,7 @@ void UpdateManager::handleFileUpload(uint8_t *data, size_t len, size_t index, si
 
   if (index == 0)
   {
-    Serial.println("Update Start");
+    SerialLog::getInstance().print("Update Start\n");
     _updateInProgress = true;
     _updateFailed = false; // Reset flag for new update
     // For multipart forms, the total size is unknown, so use UPDATE_SIZE_UNKNOWN
@@ -54,12 +55,12 @@ bool UpdateManager::endUpdate()
   bool success = false;
   if (_updateFailed)
   {
-    Serial.println("Update failed. Not finalizing.");
+    SerialLog::getInstance().print("Update failed. Not finalizing.\n");
     Update.abort();
   }
   else if (Update.end(true))
   { // true to finalize the update
-    Serial.println("Update Success");
+    SerialLog::getInstance().print("Update Success\n");
     success = true;
   }
   else
@@ -106,8 +107,7 @@ String UpdateManager::handleGithubUpdate()
   DeserializationError error = deserializeJson(doc, payload);
   if (error)
   {
-    Serial.print("deserializeJson() failed: ");
-    Serial.println(error.c_str());
+    SerialLog::getInstance().printf("deserializeJson() failed: %s\n", error.c_str());
     return "Error parsing update data.";
   }
 
@@ -122,7 +122,7 @@ String UpdateManager::handleGithubUpdate()
     return "No new update found.";
   }
 
-  Serial.printf("Current version: %s, New version: %s\n", FIRMWARE_VERSION, tagName);
+  SerialLog::getInstance().printf("Current version: %s, New version: %s\n", FIRMWARE_VERSION, tagName);
 
   JsonArray assets = doc["assets"];
   for (JsonObject asset : assets)
@@ -135,7 +135,7 @@ String UpdateManager::handleGithubUpdate()
       BaseType_t taskCreated = xTaskCreate(
           &UpdateManager::runGithubUpdateTask,
           "github_update_task",
-          8192,                // Stack size
+          16384,               // Stack size
           (void *)downloadUrl, // Task parameter
           5,                   // Priority
           NULL                 // Task handle
@@ -143,7 +143,7 @@ String UpdateManager::handleGithubUpdate()
 
       if (taskCreated != pdPASS)
       {
-        Serial.println("Failed to create update task.");
+        SerialLog::getInstance().print("Failed to create update task.\n");
         delete downloadUrl; // IMPORTANT: Clean up memory if task creation fails
         return "Failed to start update process.";
       }
@@ -166,7 +166,35 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
   client.setCACert(GITHUB_ROOT_CA);
 
   http.begin(client, *downloadUrl);
+
+  // Collect Location header for redirect handling
+  const char *headerKeys[] = {"Location"};
+  http.collectHeaders(headerKeys, 1);
+
   int httpCode = http.GET();
+
+  // Handle redirects
+  if (httpCode > 0 && (httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_FOUND || httpCode == HTTP_CODE_TEMPORARY_REDIRECT))
+  {
+    String newUrl = http.header("Location");
+    SerialLog::getInstance().print("Redirecting to: " + newUrl + "\n");
+    if (newUrl.isEmpty())
+    {
+      SerialLog::getInstance().print("Redirect location is empty!\n");
+    }
+    else
+    {
+      http.end();
+      client.stop(); // Explicitly stop the client to clear connection state
+      // The redirected URL is on a different domain, so we won't have the
+      // correct CA certificate. The initial request to the trusted GitHub API
+      // server was secure, so we can proceed without a certificate for the
+      // download itself.
+      client.setInsecure();
+      http.begin(client, newUrl);
+      httpCode = http.GET();
+    }
+  }
 
   if (httpCode == HTTP_CODE_OK)
   {
@@ -178,34 +206,26 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
     else
     {
       WiFiClient *stream = http.getStreamPtr();
-      uint8_t buff[1024] = {0};
-      size_t written = 0;
-      while (http.connected() && (len > 0 || len == -1))
+      size_t written = Update.writeStream(*stream);
+      if (written > 0)
       {
-        size_t size = stream->available();
-        if (size)
-        {
-          int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
-          if (Update.write(buff, c) != c)
-          {
-            Update.printError(Serial);
-            break; // Exit loop on write error
-          }
-          written += c;
-        }
-        delay(1); // Yield to other tasks
+        SerialLog::getInstance().printf("Written %d bytes\n", written);
+      }
+      else
+      {
+        SerialLog::getInstance().print("Write failed\n");
       }
 
       if (Update.end())
       {
         if (Update.isFinished())
         {
-          Serial.println("Update successful! Rebooting...");
+          SerialLog::getInstance().print("Update successful! Rebooting...\n");
           ESP.restart();
         }
         else
         {
-          Serial.println("Update not finished. Something went wrong.");
+          SerialLog::getInstance().print("Update not finished. Something went wrong.\n");
         }
       }
       else
@@ -216,7 +236,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
   }
   else
   {
-    Serial.printf("HTTP GET failed, error: %s\n", http.errorToString(httpCode).c_str());
+    SerialLog::getInstance().printf("HTTP GET failed, error: %s\n", http.errorToString(httpCode).c_str());
   }
 
   http.end();

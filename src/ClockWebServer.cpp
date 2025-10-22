@@ -360,6 +360,11 @@ void ClockWebServer::begin()
       String status = UpdateManager::getInstance().handleGithubUpdate();
       request->send(200, "text/plain", status); });
 
+    server.on("/api/update/status", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      bool inProgress = UpdateManager::getInstance().isUpdateInProgress();
+      request->send(200, "application/json", String("{\"inProgress\":") + (inProgress ? "true" : "false") + "}"); });
+
     if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
     {
       SerialLog::getInstance().begin(&server);
