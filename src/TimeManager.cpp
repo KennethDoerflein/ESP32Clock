@@ -275,7 +275,7 @@ DateTime TimeManager::getRTCTime() const
 
 bool TimeManager::isTimeSet() const
 {
-  // The DS3231 RTC defaults to a date in the year 2000 if it has lost
-  // power and hasn't been set. We can use this to check if the time is valid.
-  return RTC.now().year() > 2000;
+  // The DS3231 RTC has a Lost Power flag that is more reliable than checking
+  // the year.
+  return !RTC.lostPower();
 }
