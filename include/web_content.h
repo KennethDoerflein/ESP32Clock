@@ -161,7 +161,7 @@ const char SIMPLE_WIFI_SETUP_HTML[] PROGMEM = R"rawliteral(
         h1 { text-align: center; margin-bottom: 1.5rem; }
         form div { margin-bottom: 1rem; }
         label { display: block; margin-bottom: 0.5rem; }
-        input[type="text"], input[type="password"] { width: 100%; padding: 0.75rem; border: 1px solid #555; background-color: #444; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        input[type="text"], input[type="password"] { font-size: 1rem; width: 100%; padding: 0.75rem; border: 1px solid #555; background-color: #444; color: #fff; border-radius: 4px; box-sizing: border-box; }
         button { padding: 0.75rem; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 1rem; flex-grow: 1; }
         .button-group { display: flex; gap: 0.5rem; }
         #test-button { background-color: #6c757d; }
