@@ -1010,7 +1010,6 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
       }
 
       .card {
-        max-width: 500px;
         margin: auto;
       }
 
