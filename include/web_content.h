@@ -1198,7 +1198,10 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
     <div class="container mt-5">
       <div class="card shadow-sm">
         <div class="card-body">
-          <h1 class="card-title text-center mb-4">Alarm Settings</h1>
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="card-title m-0">Alarm Settings</h1>
+            <div class="status-indicator"></div>
+          </div>
 
           <div class="alert alert-info d-flex align-items-center" role="alert">
             <i class="bi bi-info-circle-fill me-2"></i>
@@ -1220,11 +1223,12 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
     <script>
       const DAY_MAP = { 1: "Su", 2: "M", 4: "Tu", 8: "W", 16: "Th", 32: "F", 64: "Sa" };
       const alarmsContainer = document.getElementById("alarms-container");
+      const statusEl = document.querySelector(".status-indicator");
 
       const DEBOUNCE_DELAY_MS = 3000;
       const ERROR_DISPLAY_MS = 3000;
-      const saveTimeouts = {};
-      const countdownIntervals = {};
+      let saveTimeout;
+      let countdownInterval;
 
       const STATUS_INDICATORS = {
         SAVED:
@@ -1237,18 +1241,13 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
           '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
       };
 
-      function stopSaveCountdown(alarmId) {
-        if (countdownIntervals[alarmId]) {
-          clearInterval(countdownIntervals[alarmId]);
-          delete countdownIntervals[alarmId];
-        }
+      function stopSaveCountdown() {
+        clearInterval(countdownInterval);
       }
 
-      function startSaveCountdown(cardElement) {
-        const alarmId = cardElement.dataset.id;
-        stopSaveCountdown(alarmId);
+      function startSaveCountdown() {
+        stopSaveCountdown();
         let countdown = Math.ceil(DEBOUNCE_DELAY_MS / 1000);
-        const statusEl = cardElement.querySelector(".status-indicator");
         const textSpan = statusEl.querySelector("span.text-warning");
 
         if (textSpan) {
@@ -1261,27 +1260,22 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
           updateCountdownText();
 
-          countdownIntervals[alarmId] = setInterval(() => {
+          countdownInterval = setInterval(() => {
             countdown--;
             if (countdown > 0) {
               updateCountdownText();
             } else {
-              stopSaveCountdown(alarmId);
+              stopSaveCountdown();
             }
           }, 1000);
         }
       }
 
-      function handleInputChange(cardElement) {
-        const alarmId = cardElement.dataset.id;
-        const statusEl = cardElement.querySelector(".status-indicator");
-        clearTimeout(saveTimeouts[alarmId]);
+      function handleInputChange() {
+        clearTimeout(saveTimeout);
         statusEl.innerHTML = STATUS_INDICATORS.UNSAVED;
-        startSaveCountdown(cardElement);
-        saveTimeouts[alarmId] = setTimeout(
-          () => saveAllAlarms(cardElement),
-          DEBOUNCE_DELAY_MS
-        );
+        startSaveCountdown();
+        saveTimeout = setTimeout(saveAllAlarms, DEBOUNCE_DELAY_MS);
       }
 
       function createAlarmCard(alarm) {
@@ -1303,10 +1297,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         card.innerHTML = `
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center alarm-header" data-bs-target="#${collapseId}" title="Expand or collapse alarm settings.">
-            <div class="d-flex align-items-center">
-                <h5 class="card-title mb-0 me-3">Alarm ${alarm.id + 1}</h5>
-                <span class="status-indicator"></span>
-            </div>
+            <h5 class="card-title mb-0">Alarm ${alarm.id + 1}</h5>
             <div class="d-flex align-items-center">
                  <i class="bi bi-chevron-down collapse-icon me-3"></i>
                  <div class="form-check form-switch">
@@ -1337,7 +1328,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
         const collapseElement = card.querySelector(`#${collapseId}`);
         const collapseInstance = new bootstrap.Collapse(collapseElement, {
-          toggle: false
+          toggle: false,
         });
 
         card.querySelector(".alarm-header").addEventListener("click", (event) => {
@@ -1359,16 +1350,16 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
           btn.addEventListener("click", () => {
             btn.classList.toggle("btn-primary");
             btn.classList.toggle("btn-outline-secondary");
-            handleInputChange(card);
+            handleInputChange();
           });
         });
 
         card
           .querySelector('input[type="time"]')
-          .addEventListener("change", () => handleInputChange(card));
+          .addEventListener("change", () => handleInputChange());
         card
           .querySelector('input[type="checkbox"]')
-          .addEventListener("change", () => handleInputChange(card));
+          .addEventListener("change", () => handleInputChange());
 
         return card;
       }
@@ -1377,7 +1368,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         alarmsContainer.innerHTML =
           '<p class="text-center">Loading alarms...</p>';
         try {
-          const response = await fetch('/api/alarms');
+          const response = await fetch("/api/alarms");
           const alarms = await response.json();
           renderAlarms(alarms);
         } catch (e) {
@@ -1400,13 +1391,11 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         alarms.forEach((alarm) => {
           const cardElement = createAlarmCard(alarm);
           alarmsContainer.appendChild(cardElement);
-          cardElement.querySelector(".status-indicator").innerHTML =
-            STATUS_INDICATORS.SAVED;
         });
+        statusEl.innerHTML = STATUS_INDICATORS.SAVED;
       }
 
-      async function saveAllAlarms(changedCardElement) {
-        const statusEl = changedCardElement.querySelector(".status-indicator");
+      async function saveAllAlarms() {
         statusEl.innerHTML = STATUS_INDICATORS.SAVING;
 
         const allAlarmsData = [];
@@ -1414,8 +1403,12 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
           const alarmData = {
             id: parseInt(card.dataset.id),
             enabled: card.querySelector(".form-check-input").checked,
-            hour: parseInt(card.querySelector('input[type="time"]').value.split(":")[0]),
-            minute: parseInt(card.querySelector('input[type="time"]').value.split(":")[1]),
+            hour: parseInt(
+              card.querySelector('input[type="time"]').value.split(":")[0]
+            ),
+            minute: parseInt(
+              card.querySelector('input[type="time"]').value.split(":")[1]
+            ),
             days: 0,
           };
           card.querySelectorAll(".day-btn.btn-primary").forEach((btn) => {
@@ -1425,10 +1418,10 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         });
 
         try {
-          await fetch('/api/alarms/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(allAlarmsData)
+          await fetch("/api/alarms/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(allAlarmsData),
           });
           statusEl.innerHTML = STATUS_INDICATORS.SAVED;
         } catch (e) {
