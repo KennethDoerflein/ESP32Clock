@@ -31,7 +31,7 @@ The components are connected using the I2C and SPI buses.
 
 | Component                  | Pin       | ESP32-S3 GPIO | Notes                 |
 | -------------------------- | --------- | ------------- | --------------------- |
-| **3.5" ILI9488 TFT (SPI)** | VCC       | VIN           | Connect to 5V input   |
+| **3.5" ILI9488 TFT (SPI)** | VCC       | 3.3V          | Connect to 3.3V pin   |
 |                            | GND       | GND           | Common ground         |
 |                            | CS        | GPIO 10       | Chip Select           |
 |                            | RST       | GPIO 11       | Reset                 |
