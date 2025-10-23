@@ -11,8 +11,7 @@
 #else
 // "version.h" was not found, so we'll include the backup.
 #include "version.h.default"
-#endif 
-
+#endif
 
 UpdateManager &UpdateManager::getInstance()
 {
