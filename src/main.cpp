@@ -81,6 +81,30 @@ void IRAM_ATTR handleButtonInterrupt()
 }
 
 /**
+ * @brief Triggers a factory reset, logs the source, and reboots the device.
+ * @param source A string indicating what triggered the reset (e.g., "snooze button").
+ * @param needsConfigInit A boolean indicating if the ConfigManager needs to be initialized.
+ *                        This is true for boot-time resets.
+ */
+void triggerFactoryReset(const char *source, bool needsConfigInit)
+{
+  auto &logger = SerialLog::getInstance();
+  logger.printf("Factory reset triggered by %s.\n", source);
+
+  // Attempt to show a message on the display.
+  Display::getInstance().drawStatusMessage("Resetting...");
+
+  // For boot-time resets, the ConfigManager must be initialized first.
+  if (needsConfigInit)
+  {
+    ConfigManager::getInstance().begin();
+  }
+
+  ConfigManager::getInstance().factoryReset();
+  ESP.restart(); // The device will restart into a clean state.
+}
+
+/**
  * @brief Handles the boot button check for factory reset during runtime.
  */
 void handleBootButton()
@@ -96,9 +120,7 @@ void handleBootButton()
     else if (millis() - bootButtonPressTime > 30000)
     {
       // Button has been held for 30 seconds
-      SerialLog::getInstance().print("Factory reset triggered by boot button.\n");
-      ConfigManager::getInstance().factoryReset();
-      ESP.restart();
+      triggerFactoryReset("boot button", false);
     }
   }
   else
@@ -118,7 +140,45 @@ void handleBootButton()
 void setup()
 {
   Serial.begin(115200);
+  pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP); // Use Snooze button for boot-time reset
   auto &logger = SerialLog::getInstance();
+  bool displayInitialized = false;
+
+  // Check for factory reset request at boot using the Snooze button.
+  // This avoids conflicts with the ESP32's hardware bootloader mode.
+  if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
+  {
+    auto &display = Display::getInstance();
+    display.begin(); // Initialize display only when needed.
+    displayInitialized = true;
+
+    logger.print("Snooze button held. Checking for factory reset...\n");
+    display.drawStatusMessage("Hold for factory reset");
+
+    unsigned long pressStartTime = millis();
+    while (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
+    {
+      // After 10 seconds, trigger the reset.
+      if (millis() - pressStartTime > 10000)
+      {
+        triggerFactoryReset("snooze button", true);
+      }
+      delay(50); // Small delay to prevent busy-waiting.
+    }
+
+    // If the button was released before the 10-second mark, cancel and proceed.
+    logger.print("Snooze button released. Factory reset cancelled.\n");
+    display.drawStatusMessage("Reset cancelled");
+    delay(2000);
+  }
+
+  // --- Proceed with the normal boot sequence ---
+  auto &display = Display::getInstance();
+  if (!displayInitialized)
+  {
+    display.begin();
+  }
+  pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP); // BOOT button is used for run-time reset
 
   // Disable logging if the version string does not contain "dev"
   if (String(FIRMWARE_VERSION).indexOf("dev") == -1)
@@ -132,19 +192,13 @@ void setup()
   logger.print("Initializing ConfigManager...\n");
   ConfigManager::getInstance().begin();
 
-  // Initialize the snooze button
+  // Initialize the snooze button interrupt
   logger.print("Initializing Snooze Button...\n");
-  pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP);
-  pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
 
   // Initialize the Alarm Manager
   logger.print("Initializing AlarmManager...\n");
   AlarmManager::getInstance().begin();
-
-  auto &display = Display::getInstance();
-  logger.print("Initializing Display...\n");
-  display.begin();
 
   auto &displayManager = DisplayManager::getInstance();
   logger.print("Initializing DisplayManager...\n");
@@ -155,7 +209,6 @@ void setup()
   setupSensors();
 
   // --- Critical Hardware Checks ---
-  // Check if the RTC was initialized. This is a critical failure.
   if (!isRtcFound())
   {
     logger.print("CRITICAL: RTC module not found. Halting execution.\n");
@@ -167,7 +220,6 @@ void setup()
   }
 
   // Initialize WiFi. This will connect or start an AP.
-  // The begin method returns true if it started the captive portal.
   logger.print("Initializing WiFiManager...\n");
   bool captivePortalStarted = WiFiManager::getInstance().begin();
 
@@ -178,14 +230,13 @@ void setup()
     ClockWebServer::getInstance().enableCaptivePortal();
   }
 
-  // Start the web server. It will now have the correct routes.
+  // Start the web server.
   logger.print("Starting Web Server...\n");
   ClockWebServer::getInstance().begin();
 
-  // Add a small delay for web server to stabilize before mDNS announcement.
-  delay(100);
+  delay(100); // Delay for web server stabilization.
 
-  // Add pages to the manager. Ownership is moved to the manager.
+  // Add pages to the manager.
   logger.print("Adding pages to DisplayManager...\n");
   displayManager.addPage(std::make_unique<ClockPage>(&display.getTft()));
   displayManager.addPage(std::make_unique<InfoPage>());
