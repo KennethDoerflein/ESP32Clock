@@ -68,6 +68,7 @@ private:
 
   // --- Template Processor and Helpers ---
   String processor(const String &var);
+  String settingsProcessor(const String &var);
 
   /// The actual server instance.
   AsyncWebServer server;

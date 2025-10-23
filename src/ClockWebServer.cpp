@@ -18,7 +18,7 @@
 #else
 // "version.h" was not found, so we'll include the backup.
 #include "version.h.default"
-#endif 
+#endif
 
 // --- Singleton Implementation ---
 ClockWebServer &ClockWebServer::getInstance()
@@ -242,6 +242,11 @@ void ClockWebServer::begin()
         Display::getInstance().updateRotation();
       }
       DisplayManager::getInstance().requestFullRefresh();
+      
+      // Give the main loop time to process the new default settings
+      // and update the Display singleton's actualBrightness.
+      delay(100); 
+
       request->send(200, "text/plain", "General settings reset!"); });
 
     // --- API Handlers for Display ---
@@ -322,6 +327,10 @@ void ClockWebServer::begin()
       config.resetDisplayToDefaults();
       config.save();
       DisplayManager::getInstance().requestFullRefresh();
+      
+      // Give the main loop time to process the new default settings.
+      delay(100); 
+
       request->send(200, "text/plain", "Display settings reset!"); });
 
     server.on("/api/wifi/hostname", HTTP_POST, [](AsyncWebServerRequest *request)
@@ -446,7 +455,7 @@ void ClockWebServer::onWifiRequest(AsyncWebServerRequest *request)
 void ClockWebServer::onSettingsRequest(AsyncWebServerRequest *request)
 {
   request->send_P(200, "text/html", SETTINGS_PAGE_HTML, [this](const String &var)
-                  { return processor(var); });
+                  { return settingsProcessor(var); });
 }
 
 void ClockWebServer::onAlarmsRequest(AsyncWebServerRequest *request)
@@ -541,6 +550,41 @@ void ClockWebServer::onCaptivePortalRedirect(AsyncWebServerRequest *request)
 
 // --- Template Processor ---
 
+// Helper function to convert a brightness value (0-255) to a percentage string
+String brightnessToPercent(int brightness)
+{
+  const int BRIGHTNESS_MIN = 10;
+  const int BRIGHTNESS_MAX = 255;
+  // Clamp the value to the allowed range
+  brightness = max(BRIGHTNESS_MIN, min(BRIGHTNESS_MAX, brightness));
+  // Map the value to a percentage
+  int percentage = map(brightness, BRIGHTNESS_MIN, BRIGHTNESS_MAX, 0, 100);
+  return String(percentage) + "&#37;";
+}
+
+// Helper function to format an hour value into a 12-hour AM/PM string
+String formatHour(int hour, bool is24Hour)
+{
+  if (is24Hour)
+  {
+    if (hour < 10)
+    {
+      return "0" + String(hour);
+    }
+    return String(hour);
+  }
+  else
+  {
+    if (hour == 0)
+      return "12 AM";
+    if (hour == 12)
+      return "12 PM";
+    if (hour < 12)
+      return String(hour) + " AM";
+    return String(hour - 12) + " PM";
+  }
+}
+
 void ClockWebServer::setupMDNS()
 {
   // Start the mDNS responder for ESP32Clock_XXXXXX.local
@@ -594,6 +638,65 @@ String ClockWebServer::processor(const String &var)
     }
     return "";
   }
+
+  return String();
+}
+
+String ClockWebServer::settingsProcessor(const String &var)
+{
+  auto &config = ConfigManager::getInstance();
+  String value = processor(var);
+  if (value != String())
+  {
+    return value;
+  }
+
+  if (var == "AUTO_BRIGHTNESS_CHECKED")
+    return config.isAutoBrightness() ? "checked" : "";
+  if (var == "AUTO_BRIGHTNESS_START_HOUR")
+    return String(config.getAutoBrightnessStartHour());
+  if (var == "AUTO_BRIGHTNESS_START_HOUR_VALUE")
+    return String(formatHour(config.getAutoBrightnessStartHour(), config.is24HourFormat()));
+  if (var == "AUTO_BRIGHTNESS_END_HOUR")
+    return String(config.getAutoBrightnessEndHour());
+  if (var == "AUTO_BRIGHTNESS_END_HOUR_VALUE")
+    return String(formatHour(config.getAutoBrightnessEndHour(), config.is24HourFormat()));
+  if (var == "DAY_BRIGHTNESS")
+    return String(config.getDayBrightness());
+  if (var == "DAY_BRIGHTNESS_VALUE")
+    return String(brightnessToPercent(config.getDayBrightness()));
+  if (var == "NIGHT_BRIGHTNESS")
+    return String(config.getNightBrightness());
+  if (var == "NIGHT_BRIGHTNESS_VALUE")
+    return String(brightnessToPercent(config.getNightBrightness()));
+  if (var == "BRIGHTNESS")
+    return String(Display::getInstance().getActualBrightness());
+  if (var == "BRIGHTNESS_VALUE")
+    return String(brightnessToPercent(Display::getInstance().getActualBrightness()));
+  if (var == "USE_24_HOUR_FORMAT_CHECKED")
+    return config.is24HourFormat() ? "checked" : "";
+  if (var == "USE_CELSIUS_CHECKED")
+    return config.isCelsius() ? "checked" : "";
+  if (var == "MANUAL_BRIGHTNESS_CLASS")
+    return config.isAutoBrightness() ? "d-none" : "";
+  if (var == "SCREEN_FLIPPED_CHECKED")
+    return config.isScreenFlipped() ? "checked" : "";
+  if (var == "BACKGROUND_COLOR")
+    return config.getBackgroundColor();
+  if (var == "TIME_COLOR")
+    return config.getTimeColor();
+  if (var == "TOD_COLOR")
+    return config.getTodColor();
+  if (var == "SECONDS_COLOR")
+    return config.getSecondsColor();
+  if (var == "DAY_OF_WEEK_COLOR")
+    return config.getDayOfWeekColor();
+  if (var == "DATE_COLOR")
+    return config.getDateColor();
+  if (var == "TEMP_COLOR")
+    return config.getTempColor();
+  if (var == "HUMIDITY_COLOR")
+    return config.getHumidityColor();
 
   return String();
 }

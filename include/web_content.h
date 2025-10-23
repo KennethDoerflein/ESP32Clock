@@ -646,54 +646,58 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 <div id="auto-brightness-section" class="mb-3 p-3 border rounded">
                   <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
                     <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
-                    <input class="form-check-input" type="checkbox" role="switch" id="auto-brightness" name="autoBrightness" />
+                    <input class="form-check-input" type="checkbox" role="switch" id="auto-brightness" name="autoBrightness" %AUTO_BRIGHTNESS_CHECKED% />
                   </div>
                   <div id="auto-brightness-controls" class="mt-3">
                     <hr>
                     <label for="auto-brightness-start-hour" class="form-label d-flex justify-content-between">
                       <span>Start Hour</span>
-                      <span id="auto-brightness-start-hour-value">7</span>
+                      <span id="auto-brightness-start-hour-value">%AUTO_BRIGHTNESS_START_HOUR_VALUE%</span>
                     </label>
-                    <input type="range" class="form-range" id="auto-brightness-start-hour" name="autoBrightnessStartHour" min="0" max="23" />
+                    <input type="range" class="form-range" id="auto-brightness-start-hour" name="autoBrightnessStartHour" min="0" max="23" value="%AUTO_BRIGHTNESS_START_HOUR%" />
                     <label for="auto-brightness-end-hour" class="form-label d-flex justify-content-between mt-2">
                       <span>End Hour</span>
-                      <span id="auto-brightness-end-hour-value">21</span>
+                      <span id="auto-brightness-end-hour-value">%AUTO_BRIGHTNESS_END_HOUR_VALUE%</span>
                     </label>
-                    <input type="range" class="form-range" id="auto-brightness-end-hour" name="autoBrightnessEndHour" min="0" max="23" />
+                    <input type="range" class="form-range" id="auto-brightness-end-hour" name="autoBrightnessEndHour" min="0" max="23" value="%AUTO_BRIGHTNESS_END_HOUR%" />
                     <label for="day-brightness" class="form-label d-flex justify-content-between mt-2">
                       <span>Day Brightness</span>
-                      <span id="day-brightness-value">255</span>
+                      <span id="day-brightness-value">%DAY_BRIGHTNESS_VALUE%</span>
                     </label>
-                    <input type="range" class="form-range" id="day-brightness" name="dayBrightness" min="10" max="255" />
+                    <input type="range" class="form-range" id="day-brightness" name="dayBrightness" min="10" max="255" value="%DAY_BRIGHTNESS%" />
                     <label for="night-brightness" class="form-label d-flex justify-content-between mt-2">
                       <span>Night Brightness</span>
-                      <span id="night-brightness-value">10</span>
+                      <span id="night-brightness-value">%NIGHT_BRIGHTNESS_VALUE%</span>
                     </label>
-                    <input type="range" class="form-range" id="night-brightness" name="nightBrightness" min="10" max="255" />
+                    <input type="range" class="form-range" id="night-brightness" name="nightBrightness" min="10" max="255" value="%NIGHT_BRIGHTNESS%" />
                   </div>
                 </div>
-                <div class="mb-3 p-3 border rounded">
+                <div id="manual-brightness-section" class="mb-3 p-3 border rounded %MANUAL_BRIGHTNESS_CLASS%">
                   <label for="brightness" class="form-label d-flex justify-content-between">
                     <span title="Set the display brightness manually.">Manual Brightness</span>
-                    <span id="brightness-value">255</span>
+                    <span id="brightness-value">%BRIGHTNESS_VALUE%</span>
                   </label>
-                  <input type="range" class="form-range" id="brightness" name="brightness" min="10" max="255" title="Adjust the manual brightness level." />
+                  <input type="range" class="form-range" id="brightness" name="brightness" min="10" max="255" title="Adjust the manual brightness level." value="%BRIGHTNESS%" />
                 </div>
-                <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-                  <label class="form-check-label" for="24hour" title="Switch between 12-hour and 24-hour time formats.">24-Hour Format</label>
-                  <input class="form-check-input" type="checkbox" role="switch" id="24hour" name="use24HourFormat" />
-                </div>
-                <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-                  <label class="form-check-label" for="celsius" title="Switch between Celsius and Fahrenheit temperature units.">Use Celsius (&deg;C)</label>
-                  <input class="form-check-input" type="checkbox" role="switch" id="celsius" name="useCelsius" />
-                </div>
-                <div class="form-check form-switch mb-3 p-3 border rounded d-flex justify-content-between align-items-center">
-                  <label class="form-check-label" for="screen-flipped" title="Flip the screen orientation 180 degrees.">Flip Screen</label>
-                  <input class="form-check-input" type="checkbox" role="switch" id="screen-flipped" name="screenFlipped" />
+                <div class="mb-3 p-3 border rounded">
+                  <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
+                    <label class="form-check-label" for="24hour" title="Switch between 12-hour and 24-hour time formats.">24-Hour Format</label>
+                    <input class="form-check-input" type="checkbox" role="switch" id="24hour" name="use24HourFormat" %USE_24_HOUR_FORMAT_CHECKED% />
+                  </div>
+                  <hr class="my-2">
+                  <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
+                    <label class="form-check-label" for="celsius" title="Switch between Celsius and Fahrenheit temperature units.">Use Celsius (&deg;C)</label>
+                    <input class="form-check-input" type="checkbox" role="switch" id="celsius" name="useCelsius" %USE_CELSIUS_CHECKED% />
+                  </div>
+                  <hr class="my-2">
+                  <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
+                    <label class="form-check-label" for="screen-flipped" title="Flip the screen orientation 180 degrees.">Flip Screen</label>
+                    <input class="form-check-input" type="checkbox" role="switch" id="screen-flipped" name="screenFlipped" %SCREEN_FLIPPED_CHECKED% />
+                  </div>
                 </div>
               </form>
               <div class="d-grid gap-2 mt-3">
-                <button type="button" id="reset-general-btn" class="btn btn-warning" title="Reset all general settings to their default values.">Reset General Settings</button>
+                <button type="button" id="reset-general-btn" class="btn btn-danger" title="Reset all general settings to their default values.">Reset General Settings</button>
               </div>
             </div>
             <div class="tab-pane fade" id="display" role="tabpanel" aria-labelledby="display-tab">
@@ -702,49 +706,49 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
                       <label for="background-color" title="Set the main background color.">Background Color</label>
-                      <input type="color" id="background-color" name="backgroundColor" title="Select a background color.">
+                      <input type="color" id="background-color" name="backgroundColor" title="Select a background color." value="%BACKGROUND_COLOR%">
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
                       <label for="time-color" title="Set the color for the time display.">Time Color</label>
-                      <input type="color" id="time-color" name="timeColor" title="Select a color for the time.">
+                      <input type="color" id="time-color" name="timeColor" title="Select a color for the time." value="%TIME_COLOR%">
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
                       <label for="tod-color" title="Set the color for the AM/PM indicator.">TOD Color</label>
-                      <input type="color" id="tod-color" name="todColor" title="Select a color for the AM/PM indicator.">
+                      <input type="color" id="tod-color" name="todColor" title="Select a color for the AM/PM indicator." value="%TOD_COLOR%">
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
                       <label for="seconds-color" title="Set the color for the seconds display.">Seconds Color</label>
-                      <input type="color" id="seconds-color" name="secondsColor" title="Select a color for the seconds.">
+                      <input type="color" id="seconds-color" name="secondsColor" title="Select a color for the seconds." value="%SECONDS_COLOR%">
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
                       <label for="day-of-week-color" title="Set the color for the day of the week.">Day of Week Color</label>
-                      <input type="color" id="day-of-week-color" name="dayOfWeekColor" title="Select a color for the day of the week.">
+                      <input type="color" id="day-of-week-color" name="dayOfWeekColor" title="Select a color for the day of the week." value="%DAY_OF_WEEK_COLOR%">
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
                       <label for="date-color" title="Set the color for the date display.">Date Color</label>
-                      <input type="color" id="date-color" name="dateColor" title="Select a color for the date.">
+                      <input type="color" id="date-color" name="dateColor" title="Select a color for the date." value="%DATE_COLOR%">
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
                       <label for="temp-color" title="Set the color for the temperature display.">Temperature Color</label>
-                      <input type="color" id="temp-color" name="tempColor" title="Select a color for the temperature.">
+                      <input type="color" id="temp-color" name="tempColor" title="Select a color for the temperature." value="%TEMP_COLOR%">
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="color-picker-wrapper">
                       <label for="humidity-color" title="Set the color for the humidity display.">Humidity Color</label>
-                      <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity.">
+                      <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity." value="%HUMIDITY_COLOR%">
                     </div>
                   </div>
                 </div>
@@ -764,7 +768,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
     <script>
       const DEBOUNCE_DELAY_MS = 3000;
       const ERROR_DISPLAY_MS = 3000;
-      let saveTimeout;
+      let saveGeneralTimeout;
+      let saveDisplayTimeout;
 
       const BRIGHTNESS_MIN = 10;
       const BRIGHTNESS_MAX = 255;
@@ -776,6 +781,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const autoBrightnessEl = document.getElementById("auto-brightness");
       const brightnessEl = document.getElementById("brightness");
       const brightnessValueEl = document.getElementById("brightness-value");
+      const manualBrightnessSectionEl = document.getElementById("manual-brightness-section");
       const autoBrightnessControlsEl = document.getElementById("auto-brightness-controls");
       const autoBrightnessStartHourEl = document.getElementById("auto-brightness-start-hour");
       const autoBrightnessStartHourValueEl = document.getElementById("auto-brightness-start-hour-value");
@@ -789,6 +795,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const celsiusEl = document.getElementById("celsius");
       const screenFlippedEl = document.getElementById("screen-flipped");
       const colorPickers = displaySettingsForm.querySelectorAll('input[type="color"]');
+      const resetGeneralBtn = document.getElementById('reset-general-btn');
+      const resetColorsBtn = document.getElementById('reset-colors-btn');
 
       const STATUS_INDICATORS = {
         SAVED: '<i class="bi bi-check-circle-fill text-success"></i> <span class="text-muted">Saved</span>',
@@ -796,6 +804,27 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         SAVING: '<div class="spinner-border spinner-border-sm text-primary" role="status"></div> <span class="text-primary">Saving...</span>',
         ERROR: '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
       };
+
+      /**
+       * Disables or enables all interactive elements on the page to prevent
+       * race conditions during save or reset operations.
+       * @param {boolean} isBusy - True to disable inputs, false to enable.
+       */
+      function setUIBusy(isBusy) {
+        // Disable/enable all inputs in the general settings form
+        settingsForm.querySelectorAll('input, button, select').forEach(el => {
+          el.disabled = isBusy;
+        });
+
+        // Disable/enable all inputs in the display settings form
+        displaySettingsForm.querySelectorAll('input, button, select').forEach(el => {
+          el.disabled = isBusy;
+        });
+
+        // Disable/enable the reset buttons
+        resetGeneralBtn.disabled = isBusy;
+        resetColorsBtn.disabled = isBusy;
+      }
 
       function setStatus(status) {
         statusEl.innerHTML = status;
@@ -814,7 +843,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       function formatHour(hour, is24Hour) {
         if (is24Hour) {
-          return hour;
+          const h = parseInt(hour);
+          return h < 10 ? '0' + h : h;
         }
         const h = parseInt(hour);
         if (h === 0) return '12 AM';
@@ -823,62 +853,106 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         return `${h - 12} PM`;
       }
 
-      function handleInputChange() {
-        clearTimeout(saveTimeout);
+      function handleGeneralInputChange() {
+        clearTimeout(saveGeneralTimeout);
         setStatus(STATUS_INDICATORS.UNSAVED);
-        saveTimeout = setTimeout(saveAllSettings, DEBOUNCE_DELAY_MS);
+        saveGeneralTimeout = setTimeout(saveGeneralSettings, DEBOUNCE_DELAY_MS);
+      }
+
+      function handleDisplayInputChange() {
+        clearTimeout(saveDisplayTimeout);
+        setStatus(STATUS_INDICATORS.UNSAVED);
+        saveDisplayTimeout = setTimeout(saveDisplaySettings, DEBOUNCE_DELAY_MS);
       }
 
       function toggleBrightnessSlider() {
-        brightnessEl.disabled = autoBrightnessEl.checked;
-        autoBrightnessControlsEl.style.display = autoBrightnessEl.checked ? 'block' : 'none';
+        const isAuto = autoBrightnessEl.checked;
+        brightnessEl.disabled = isAuto;
+        // We now toggle the class, but also set the style for instant feedback
+        if (isAuto) {
+          manualBrightnessSectionEl.classList.add('d-none');
+          manualBrightnessSectionEl.style.display = 'none';
+        } else {
+          manualBrightnessSectionEl.classList.remove('d-none');
+          manualBrightnessSectionEl.style.display = 'block';
+        }
+        autoBrightnessControlsEl.style.display = isAuto ? 'block' : 'none';
       }
 
-      async function loadAllSettings() {
-        setStatus("");
-        try {
-          const [settingsRes, displayRes] = await Promise.all([
-            fetch('/api/settings'),
-            fetch('/api/display')
-          ]);
-          const settings = await settingsRes.json();
-          const displaySettings = await displayRes.json();
-          
-          autoBrightnessEl.checked = settings.autoBrightness;
-          // raw values go into sliders; displayed values are percentages
-          brightnessEl.value = settings.actualBrightness;
-          brightnessValueEl.textContent = toPercent(settings.actualBrightness);
-          const is24Hour = settings.use24HourFormat;
-          twentyFourHourEl.checked = is24Hour;
-          autoBrightnessStartHourEl.value = settings.autoBrightnessStartHour;
-          autoBrightnessStartHourValueEl.textContent = formatHour(settings.autoBrightnessStartHour, is24Hour);
-          autoBrightnessEndHourEl.value = settings.autoBrightnessEndHour;
-          autoBrightnessEndHourValueEl.textContent = formatHour(settings.autoBrightnessEndHour, is24Hour);
-          dayBrightnessEl.value = settings.dayBrightness;
-          dayBrightnessValueEl.textContent = toPercent(settings.dayBrightness);
-          nightBrightnessEl.value = settings.nightBrightness;
-          nightBrightnessValueEl.textContent = toPercent(settings.nightBrightness);
-          celsiusEl.checked = settings.useCelsius;
-          screenFlippedEl.checked = settings.screenFlipped;
-          toggleBrightnessSlider();
+      function updateBrightnessUI(settings) {
+        brightnessEl.value = settings.actualBrightness ?? 128;
+        brightnessValueEl.textContent = toPercent(brightnessEl.value);
+        
+        dayBrightnessEl.value = settings.dayBrightness ?? 255;
+        dayBrightnessValueEl.textContent = toPercent(dayBrightnessEl.value);
+        
+        nightBrightnessEl.value = settings.nightBrightness ?? 10;
+        nightBrightnessValueEl.textContent = toPercent(nightBrightnessEl.value);
+      }
+      
+      function updateHourFormatUI(settings) {
+        const is24Hour = settings.use24HourFormat ?? false;
+        twentyFourHourEl.checked = is24Hour;
+        
+        autoBrightnessStartHourEl.value = settings.autoBrightnessStartHour ?? 7;
+        autoBrightnessStartHourValueEl.textContent = formatHour(autoBrightnessStartHourEl.value, is24Hour);
+        
+        autoBrightnessEndHourEl.value = settings.autoBrightnessEndHour ?? 21;
+        autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, is24Hour);
+      }
+      
+      function updateGeneralSettingsUI(settings) {
+        autoBrightnessEl.checked = settings.autoBrightness || false;
+        celsiusEl.checked = settings.useCelsius || false;
+        screenFlippedEl.checked = settings.screenFlipped || false;
 
-          for (const key in displaySettings) {
-            const el = document.querySelector(`[name="${key}"]`);
-            if (el) {
-              el.value = displaySettings[key];
-            }
-          }
-          
-          setStatus(STATUS_INDICATORS.SAVED);
+        // Manually trigger UI updates that depend on these values
+        updateBrightnessUI(settings);
+        updateHourFormatUI(settings);
+        toggleBrightnessSlider();
+      }
+      
+      function updateDisplaySettingsUI(settings) {
+        if (settings.backgroundColor) document.getElementById('background-color').value = settings.backgroundColor;
+        if (settings.timeColor) document.getElementById('time-color').value = settings.timeColor;
+        if (settings.todColor) document.getElementById('tod-color').value = settings.todColor;
+        if (settings.secondsColor) document.getElementById('seconds-color').value = settings.secondsColor;
+        if (settings.dayOfWeekColor) document.getElementById('day-of-week-color').value = settings.dayOfWeekColor;
+        if (settings.dateColor) document.getElementById('date-color').value = settings.dateColor;
+        if (settings.tempColor) document.getElementById('temp-color').value = settings.tempColor;
+        if (settings.humidityColor) document.getElementById('humidity-color').value = settings.humidityColor;
+      }
+      
+      async function fetchGeneralSettings() {
+        try {
+          const response = await fetch('/api/settings');
+          if (!response.ok) throw new Error('Failed to fetch general settings');
+          const settings = await response.json();
+          updateGeneralSettingsUI(settings);
         } catch (e) {
           console.error(e);
           setStatus(STATUS_INDICATORS.ERROR);
         }
       }
 
-      async function saveAllSettings() {
+      async function fetchDisplaySettings() {
+        try {
+          const response = await fetch('/api/display');
+          if (!response.ok) throw new Error('Failed to fetch display settings');
+          const settings = await response.json();
+          updateDisplaySettingsUI(settings);
+        } catch (e) {
+          console.error(e);
+          setStatus(STATUS_INDICATORS.ERROR);
+        }
+      }
+
+      async function saveGeneralSettings() {
+        clearTimeout(saveGeneralTimeout); // Clear pending saves
+        clearTimeout(saveDisplayTimeout);
         setStatus(STATUS_INDICATORS.SAVING);
-        
+        setUIBusy(true); // Disable UI
+
         const settings = {
           autoBrightness: autoBrightnessEl.checked,
           // send numeric raw values to the server
@@ -892,48 +966,62 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           screenFlipped: screenFlippedEl.checked
         };
 
+        try {
+          // Save general settings
+          const saveSettingsResponse = await fetch('/api/settings/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+          });
+          if (!saveSettingsResponse.ok) throw new Error('Failed to save general settings');
+
+          await fetchGeneralSettings(); // Re-fetch to get new state (like actualBrightness)
+          setStatus(STATUS_INDICATORS.SAVED);
+          
+        } catch (e) {
+          console.error(e);
+          setStatus(STATUS_INDICATORS.ERROR);
+          // Removed setTimeout that reverted to UNSAVED
+        } finally {
+          setUIBusy(false); // Re-enable UI
+        }
+      }
+
+      async function saveDisplaySettings() {
+        clearTimeout(saveGeneralTimeout); // Clear pending saves
+        clearTimeout(saveDisplayTimeout);
+        setStatus(STATUS_INDICATORS.SAVING);
+        setUIBusy(true); // Disable UI
+
         const displaySettings = {};
         colorPickers.forEach(picker => {
           displaySettings[picker.name] = picker.value;
         });
 
         try {
-          await Promise.all([
-            fetch('/api/settings/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(settings)
-            }),
-            fetch('/api/display/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(displaySettings)
-            })
-          ]);
+          // Save display settings
+          const saveDisplayResponse = await fetch('/api/display/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(displaySettings)
+          });
+          if (!saveDisplayResponse.ok) throw new Error('Failed to save display settings');
+
+          // After saving, fetch the new display state
+          await fetchDisplaySettings(); // Re-fetch new state
           setStatus(STATUS_INDICATORS.SAVED);
-          setTimeout(loadAllSettings, 500);
         } catch (e) {
           console.error(e);
           setStatus(STATUS_INDICATORS.ERROR);
-          setTimeout(() => {
-            setStatus(STATUS_INDICATORS.UNSAVED);
-          }, ERROR_DISPLAY_MS);
+          // Removed setTimeout that reverted to UNSAVED
+        } finally {
+          setUIBusy(false); // Re-enable UI
         }
       }
       
-      // update displayed percentages while sliding
+      // Update text labels in real-time as user slides
       brightnessEl.addEventListener('input', () => {
         brightnessValueEl.textContent = toPercent(brightnessEl.value);
-      });
-      autoBrightnessStartHourEl.addEventListener('input', () => {
-        autoBrightnessStartHourValueEl.textContent = formatHour(autoBrightnessStartHourEl.value, twentyFourHourEl.checked);
-      });
-      autoBrightnessEndHourEl.addEventListener('input', () => {
-        autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, twentyFourHourEl.checked);
-      });
-      twentyFourHourEl.addEventListener('change', () => {
-        autoBrightnessStartHourValueEl.textContent = formatHour(autoBrightnessStartHourEl.value, twentyFourHourEl.checked);
-        autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, twentyFourHourEl.checked);
       });
       dayBrightnessEl.addEventListener('input', () => {
         dayBrightnessValueEl.textContent = toPercent(dayBrightnessEl.value);
@@ -941,45 +1029,74 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       nightBrightnessEl.addEventListener('input', () => {
         nightBrightnessValueEl.textContent = toPercent(nightBrightnessEl.value);
       });
+      
+      // Update hour formats in real-time
+      autoBrightnessStartHourEl.addEventListener('input', () => {
+         autoBrightnessStartHourValueEl.textContent = formatHour(autoBrightnessStartHourEl.value, twentyFourHourEl.checked);
+      });
+      autoBrightnessEndHourEl.addEventListener('input', () => {
+         autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, twentyFourHourEl.checked);
+      });
+      twentyFourHourEl.addEventListener('change', () => {
+         autoBrightnessStartHourValueEl.textContent = formatHour(autoBrightnessStartHourEl.value, twentyFourHourEl.checked);
+         autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, twentyFourHourEl.checked);
+      });
 
       autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
       
-      settingsForm.addEventListener('input', handleInputChange);
-      displaySettingsForm.addEventListener('input', handleInputChange);
-      document.addEventListener("DOMContentLoaded", loadAllSettings);
+      // Trigger save only when user *finishes* making a change
+      settingsForm.addEventListener('change', handleGeneralInputChange);
+      displaySettingsForm.addEventListener('change', handleDisplayInputChange);
+      
+      document.addEventListener("DOMContentLoaded", () => {
+        setStatus(STATUS_INDICATORS.SAVED);
+        toggleBrightnessSlider(); // Set initial UI state for brightness sections
+      });
 
-      document.getElementById('reset-colors-btn').addEventListener('click', async () => {
+      resetColorsBtn.addEventListener('click', async () => {
         if (confirm('Are you sure you want to reset all colors to their default values?')) {
+          clearTimeout(saveGeneralTimeout); // Clear pending saves
+          clearTimeout(saveDisplayTimeout);
           setStatus(STATUS_INDICATORS.SAVING);
+          setUIBusy(true); // Disable UI
+
           try {
             const response = await fetch('/api/display/reset', { method: 'POST' });
             if (response.ok) {
-              await loadAllSettings();
               setStatus(STATUS_INDICATORS.SAVED);
+              await fetchDisplaySettings(); // Fetch and apply new default values
             } else {
               throw new Error('Failed to reset colors');
             }
           } catch (e) {
             console.error(e);
             setStatus(STATUS_INDICATORS.ERROR);
+          } finally {
+            setUIBusy(false); // Re-enable UI
           }
         }
       });
 
-      document.getElementById('reset-general-btn').addEventListener('click', async () => {
+      resetGeneralBtn.addEventListener('click', async () => {
         if (confirm('Are you sure you want to reset all general settings to their default values?')) {
+          clearTimeout(saveGeneralTimeout); // Clear pending saves
+          clearTimeout(saveDisplayTimeout);
           setStatus(STATUS_INDICATORS.SAVING);
+          setUIBusy(true); // Disable UI
+
           try {
             const response = await fetch('/api/settings/reset', { method: 'POST' });
             if (response.ok) {
-              await loadAllSettings();
               setStatus(STATUS_INDICATORS.SAVED);
+              await fetchGeneralSettings(); // Fetch and apply new default values
             } else {
               throw new Error('Failed to reset general settings');
             }
           } catch (e) {
             console.error(e);
             setStatus(STATUS_INDICATORS.ERROR);
+          } finally {
+            setUIBusy(false); // Re-enable UI
           }
         }
       });

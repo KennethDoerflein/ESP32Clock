@@ -122,17 +122,41 @@ void ConfigManager::load()
   screenFlipped = doc["screenFlipped"] | DEFAULT_SCREEN_FLIPPED;
 
   backgroundColor = doc["backgroundColor"] | DEFAULT_BACKGROUND_COLOR;
+  if (backgroundColor.startsWith("%"))
+    backgroundColor = DEFAULT_BACKGROUND_COLOR;
   timeColor = doc["timeColor"] | DEFAULT_TIME_COLOR;
+  if (timeColor.startsWith("%"))
+    timeColor = DEFAULT_TIME_COLOR;
   todColor = doc["todColor"] | DEFAULT_TOD_COLOR;
+  if (todColor.startsWith("%"))
+    todColor = DEFAULT_TOD_COLOR;
   secondsColor = doc["secondsColor"] | DEFAULT_SECONDS_COLOR;
+  if (secondsColor.startsWith("%"))
+    secondsColor = DEFAULT_SECONDS_COLOR;
   dayOfWeekColor = doc["dayOfWeekColor"] | DEFAULT_DAY_OF_WEEK_COLOR;
+  if (dayOfWeekColor.startsWith("%"))
+    dayOfWeekColor = DEFAULT_DAY_OF_WEEK_COLOR;
   dateColor = doc["dateColor"] | DEFAULT_DATE_COLOR;
+  if (dateColor.startsWith("%"))
+    dateColor = DEFAULT_DATE_COLOR;
   tempColor = doc["tempColor"] | DEFAULT_TEMP_COLOR;
+  if (tempColor.startsWith("%"))
+    tempColor = DEFAULT_TEMP_COLOR;
   humidityColor = doc["humidityColor"] | DEFAULT_HUMIDITY_COLOR;
+  if (humidityColor.startsWith("%"))
+    humidityColor = DEFAULT_HUMIDITY_COLOR;
   alarmIconColor = doc["alarmIconColor"] | DEFAULT_ALARM_ICON_COLOR;
+  if (alarmIconColor.startsWith("%"))
+    alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
   snoozeIconColor = doc["snoozeIconColor"] | DEFAULT_SNOOZE_ICON_COLOR;
+  if (snoozeIconColor.startsWith("%"))
+    snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
   alarmTextColor = doc["alarmTextColor"] | DEFAULT_ALARM_TEXT_COLOR;
+  if (alarmTextColor.startsWith("%"))
+    alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   errorTextColor = doc["errorTextColor"] | DEFAULT_ERROR_TEXT_COLOR;
+  if (errorTextColor.startsWith("%"))
+    errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
 
   // Deserialize the alarms array
   JsonArray alarmsArray = doc["alarms"];
