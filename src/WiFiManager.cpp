@@ -271,6 +271,8 @@ bool WiFiManager::isCaptivePortal() const
 
 void WiFiManager::startScan()
 {
+  // Clear previous scan results before starting a new one.
+  WiFi.scanDelete();
   // Start a non-blocking scan.
   // The results will be retrieved asynchronously by getScanResults().
   WiFi.scanNetworks(true);
@@ -336,9 +338,6 @@ String WiFiManager::getScanResults()
       }
     }
 
-    // After retrieving the results, clear them.
-    WiFi.scanDelete();
-
     String jsonOutput;
     serializeJson(doc, jsonOutput);
     return jsonOutput;
@@ -374,6 +373,7 @@ void WiFiManager::startCaptivePortal()
   // Show a message on the display while scanning
   logger.print("Starting background WiFi scan...\n");
   display.drawMultiLineStatusMessage("Please wait...", "Scanning for networks");
+  WiFi.scanDelete();       // Clear previous scan results
   WiFi.scanNetworks(true); // true = async (non-blocking)
   delay(5000);
 }
