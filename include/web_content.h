@@ -152,10 +152,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             <h6><i class="bi bi-thermometer-half me-1"></i> RTC Temp</h6>
             <p class="fs-4 mb-0" id="rtc-temp"></p>
           </div>
-          <div class="col">
-            <h6><i class="bi bi-cpu-fill me-1"></i> Core Temp</h6>
-            <p class="fs-4 mb-0" id="core-temp"></p>
-          </div>
         </div>
       </div>
       <div class="card-footer text-center text-muted small">
@@ -170,7 +166,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       const bmeTempEl = document.getElementById('bme-temp');
       const bmeHumidityEl = document.getElementById('bme-humidity');
       const rtcTempEl = document.getElementById('rtc-temp');
-      const coreTempEl = document.getElementById('core-temp');
 
       function updateSensorReadings() {
         fetch('/api/sensors')
@@ -191,20 +186,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             } else {
               rtcTempEl.textContent = 'N/A';
             }
-
-            if (data.coreTemp) {
-              coreTempEl.textContent = `${data.coreTemp}°${data.unit}`;
-            } else {
-              coreTempEl.textContent = 'N/A';
-            }
           })
           .catch(error => console.error('Error fetching sensor data:', error));
       }
 
       // Initial update
       updateSensorReadings();
-      // Update sensors every 10 seconds
-      setInterval(updateSensorReadings, 10000);
+      // Update sensors every 3 seconds
+      setInterval(updateSensorReadings, 3000);
     });
   </script>
 </body>
@@ -1611,6 +1600,33 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
           </div>
           %SERIAL_LOG_TAB_PANE%
         </div>
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title text-center mb-3">System Stats</h5>
+                <div id="system-stats-container" class="text-center">
+                    <div class="row mb-3">
+                        <div class="col">
+                            <h6><i class="bi bi-cpu-fill me-1"></i> Core Temp</h6>
+                            <p class="fs-4 mb-0" id="core-temp"></p>
+                        </div>
+                        <div class="col">
+                            <h6><i class="bi bi-memory me-1"></i> Free RAM</h6>
+                            <p class="fs-4 mb-0" id="free-ram"></p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <h6><i class="bi bi-clock-history me-1"></i> Uptime</h6>
+                            <p class="fs-4 mb-0" id="uptime"></p>
+                        </div>
+                        <div class="col">
+                            <h6><i class="bi bi-wifi me-1"></i> Wi-Fi RSSI</h6>
+                            <p class="fs-4 mb-0" id="wifi-rssi"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="d-grid gap-2 mt-4">
           <a href="/" id="back-button" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
           
@@ -1638,6 +1654,51 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     const resetBtn = document.getElementById('factory-reset-button');
     let isUpdating = false;
     let pollInterval = null;
+
+    const freeRamEl = document.getElementById('free-ram');
+    const uptimeEl = document.getElementById('uptime');
+    const wifiRssiEl = document.getElementById('wifi-rssi');
+    const coreTempEl = document.getElementById('core-temp');
+
+    function updateSystemStats() {
+        fetch('/api/system/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.freeHeap) {
+                    freeRamEl.textContent = `${(data.freeHeap / 1024).toFixed(2)} KB`;
+                } else {
+                    freeRamEl.textContent = 'N/A';
+                }
+
+                if (data.uptime) {
+                    const uptime = new Date(data.uptime);
+                    const days = Math.floor(data.uptime / (1000 * 60 * 60 * 24));
+                    const hours = uptime.getUTCHours();
+                    const minutes = uptime.getUTCMinutes();
+                    uptimeEl.textContent = `${days}d ${hours}h ${minutes}m`;
+                } else {
+                    uptimeEl.textContent = 'N/A';
+                }
+
+                if (data.rssi) {
+                    wifiRssiEl.textContent = `${data.rssi} dBm`;
+                } else {
+                    wifiRssiEl.textContent = 'N/A';
+                }
+
+                if (data.coreTemp) {
+                    coreTempEl.textContent = `${data.coreTemp}°${data.unit}`;
+                } else {
+                    coreTempEl.textContent = 'N/A';
+                }
+            })
+            .catch(error => console.error('Error fetching system stats:', error));
+    }
+
+    // Initial update
+    updateSystemStats();
+    // Update system stats every 5 seconds
+    setInterval(updateSystemStats, 5000);
 
     window.addEventListener('beforeunload', (event) => {
       if (isUpdating) {

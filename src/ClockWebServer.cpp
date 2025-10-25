@@ -279,6 +279,18 @@ void ClockWebServer::begin()
       if (isRtcFound()) {
         doc["rtcTemp"] = String(getRtcTemperature(), 1);
       }
+      doc["unit"] = ConfigManager::getInstance().isCelsius() ? "C" : "F";
+      
+      String response;
+      serializeJson(doc, response);
+      request->send(200, "application/json", response); });
+
+    server.on("/api/system/stats", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      JsonDocument doc;
+      doc["freeHeap"] = ESP.getFreeHeap();
+      doc["uptime"] = millis();
+      doc["rssi"] = WiFi.RSSI();
       doc["coreTemp"] = String(getCoreTemperature(), 1);
       doc["unit"] = ConfigManager::getInstance().isCelsius() ? "C" : "F";
       
