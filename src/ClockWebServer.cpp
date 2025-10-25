@@ -384,6 +384,11 @@ void ClockWebServer::begin()
 
     server.on("/factory-reset", HTTP_GET, [](AsyncWebServerRequest *request)
               {
+      if (UpdateManager::getInstance().isUpdateInProgress())
+      {
+        request->send(409, "text/plain", "Update in progress. Cannot perform factory reset.");
+        return;
+      }
       request->send(200, "text/plain", "Performing factory reset...");
       ConfigManager::getInstance().factoryReset();
       delay(100);
@@ -391,6 +396,11 @@ void ClockWebServer::begin()
 
     server.on("/factory-reset-except-wifi", HTTP_GET, [](AsyncWebServerRequest *request)
               {
+      if (UpdateManager::getInstance().isUpdateInProgress())
+      {
+        request->send(409, "text/plain", "Update in progress. Cannot perform factory reset.");
+        return;
+      }
       request->send(200, "text/plain", "Performing factory reset and keeping WiFi credentials...");
       ConfigManager::getInstance().factoryResetExceptWiFi();
       delay(100);

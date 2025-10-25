@@ -1633,7 +1633,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
           <button type="button" id="reboot-button" class="btn btn-warning w-100 mt-3" onclick="rebootDevice()" title="Reboot the device.">
             Reboot Device
           </button>
-          <button type="button" class="btn btn-outline-danger w-100 mt-4" onclick="factoryResetExceptWiFi()" title="Reset all settings to factory defaults, but keep WiFi credentials.">
+          <button type="button" id="factory-reset-keep-wifi-button" class="btn btn-outline-danger w-100 mt-4" onclick="factoryResetExceptWiFi()" title="Reset all settings to factory defaults, but keep WiFi credentials.">
           Factory Reset (keep WiFi)
           </button>
           <button type="button" id="factory-reset-button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()" title="Reset all settings to factory defaults. This will clear EVERYTHING including WiFi credentials.">
@@ -1652,6 +1652,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     const uploadButton = uploadForm.querySelector('button');
     const rebootBtn = document.getElementById('reboot-button');
     const resetBtn = document.getElementById('factory-reset-button');
+    const resetKeepWifiBtn = document.getElementById('factory-reset-keep-wifi-button');
     let isUpdating = false;
     let pollInterval = null;
 
@@ -1756,6 +1757,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
 
         if (rebootBtn) rebootBtn.disabled = disabled;
         if (resetBtn) resetBtn.disabled = disabled;
+        if (resetKeepWifiBtn) resetKeepWifiBtn.disabled = disabled;
     }
 
     uploadForm.addEventListener('submit', function(e) {
