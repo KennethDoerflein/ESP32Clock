@@ -8,6 +8,7 @@
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <WiFi.h>
+#include "sensors.h"
 #include "display.h"
 #include "UpdateManager.h"
 #include "SerialLog.h"
@@ -262,6 +263,23 @@ void ClockWebServer::begin()
       doc["dateColor"] = config.getDateColor();
       doc["tempColor"] = config.getTempColor();
       doc["humidityColor"] = config.getHumidityColor();
+      
+      String response;
+      serializeJson(doc, response);
+      request->send(200, "application/json", response); });
+
+    server.on("/api/sensors", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      JsonDocument doc;
+      doc["bmeFound"] = isBmeFound();
+      if (isBmeFound()) {
+        doc["bmeTemp"] = String(getBmeTemperature(), 1);
+        doc["bmeHumidity"] = String(getHumidity(), 1);
+      }
+      if (isRtcFound()) {
+        doc["rtcTemp"] = String(getRtcTemperature(), 1);
+      }
+      doc["unit"] = ConfigManager::getInstance().isCelsius() ? "C" : "F";
       
       String response;
       serializeJson(doc, response);

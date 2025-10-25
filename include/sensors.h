@@ -62,3 +62,21 @@ float getTemperature();
  * @return The cached relative humidity as a float.
  */
 float getHumidity();
+
+/**
+ * @brief Checks if the BME280 sensor was successfully initialized.
+ * @return True if the BME280 is available, false otherwise.
+ */
+bool isBmeFound();
+
+/**
+ * @brief Gets the last cached temperature reading from the BME280.
+ * @return The cached temperature, converted to the user's preferred unit.
+ */
+float getBmeTemperature();
+
+/**
+ * @brief Gets the last cached temperature reading from the RTC.
+ * @return The cached temperature, converted to the user's preferred unit.
+ */
+float getRtcTemperature();

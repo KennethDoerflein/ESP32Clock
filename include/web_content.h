@@ -135,11 +135,67 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           <small>Firmware Version: %FIRMWARE_VERSION%</small>
         </div>
       </div>
+    </div>
+    <div class="card mt-4">
+      <div class="card-body">
+        <h5 class="card-title text-center mb-3">Sensor Data</h5>
+        <div id="sensor-data-container" class="row text-center">
+          <div class="col" id="bme-temp-col" style="display: none;">
+            <h6><i class="bi bi-thermometer-sun me-1"></i> Temp</h6>
+            <p class="fs-4 mb-0" id="bme-temp"></p>
+          </div>
+          <div class="col" id="bme-humidity-col" style="display: none;">
+            <h6><i class="bi bi-droplet-half me-1"></i> Humidity</h6>
+            <p class="fs-4 mb-0" id="bme-humidity"></p>
+          </div>
+          <div class="col">
+            <h6><i class="bi bi-thermometer-half me-1"></i> RTC Temp</h6>
+            <p class="fs-4 mb-0" id="rtc-temp"></p>
+          </div>
+        </div>
+      </div>
       <div class="card-footer text-center text-muted small">
         IP: %IP_ADDRESS% &bull; Hostname: %HOSTNAME%
       </div>
     </div>
   </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const bmeTempCol = document.getElementById('bme-temp-col');
+      const bmeHumidityCol = document.getElementById('bme-humidity-col');
+      const bmeTempEl = document.getElementById('bme-temp');
+      const bmeHumidityEl = document.getElementById('bme-humidity');
+      const rtcTempEl = document.getElementById('rtc-temp');
+
+      function updateSensorReadings() {
+        fetch('/api/sensors')
+          .then(response => response.json())
+          .then(data => {
+            if (data.bmeFound) {
+              bmeTempEl.textContent = `${data.bmeTemp}°${data.unit}`;
+              bmeHumidityEl.textContent = `${data.bmeHumidity}%`;
+              bmeTempCol.style.display = 'block';
+              bmeHumidityCol.style.display = 'block';
+            } else {
+              bmeTempCol.style.display = 'none';
+              bmeHumidityCol.style.display = 'none';
+            }
+            
+            if (data.rtcTemp) {
+              rtcTempEl.textContent = `${data.rtcTemp}°${data.unit}`;
+            } else {
+              rtcTempEl.textContent = 'N/A';
+            }
+          })
+          .catch(error => console.error('Error fetching sensor data:', error));
+      }
+
+      // Initial update
+      updateSensorReadings();
+      // Update sensors every 3 seconds
+      setInterval(updateSensorReadings, 3000);
+    });
+  </script>
 </body>
 </html>
 )rawliteral";

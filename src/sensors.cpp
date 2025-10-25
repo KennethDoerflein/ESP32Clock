@@ -8,7 +8,8 @@ Adafruit_BME280 BME;
 RTC_Type RTC;
 
 // Static variables to cache the latest sensor readings.
-static float cached_temp_c = 0.0;
+static float cached_bme_temp_c = 0.0;
+static float cached_rtc_temp_c = 0.0;
 static float cached_humidity = 0.0;
 static bool bme280_found = false; // Track BME280 sensor status
 static bool rtc_found = false;    // Track RTC status
@@ -41,23 +42,53 @@ bool isRtcFound()
   return rtc_found;
 }
 
+bool isBmeFound()
+{
+  return bme280_found;
+}
+
 // Cached-value getter functions
 float getTemperature()
 {
-  bool useCelsius = ConfigManager::getInstance().isCelsius();
-  if (useCelsius)
+  if (bme280_found)
   {
-    return cached_temp_c;
+    return getBmeTemperature();
   }
   else
   {
-    return (cached_temp_c * 9.0 / 5.0) + 32.0;
+    return getRtcTemperature();
   }
 }
 
 float getHumidity()
 {
   return cached_humidity;
+}
+
+float getBmeTemperature()
+{
+  bool useCelsius = ConfigManager::getInstance().isCelsius();
+  if (useCelsius)
+  {
+    return cached_bme_temp_c;
+  }
+  else
+  {
+    return (cached_bme_temp_c * 9.0 / 5.0) + 32.0;
+  }
+}
+
+float getRtcTemperature()
+{
+  bool useCelsius = ConfigManager::getInstance().isCelsius();
+  if (useCelsius)
+  {
+    return cached_rtc_temp_c;
+  }
+  else
+  {
+    return (cached_rtc_temp_c * 9.0 / 5.0) + 32.0;
+  }
 }
 
 void handleSensorUpdates(bool force)
@@ -68,14 +99,17 @@ void handleSensorUpdates(bool force)
     prevSensorMillis = now;
     if (bme280_found)
     {
-      cached_temp_c = BME.readTemperature();
+      cached_bme_temp_c = BME.readTemperature();
       cached_humidity = BME.readHumidity();
     }
     else
     {
-      // Fallback to RTC temperature if BME280 is not available
-      cached_temp_c = RTC.getTemperature();
       cached_humidity = -1; // Indicate that humidity is not available
+    }
+
+    if (rtc_found)
+    {
+      cached_rtc_temp_c = RTC.getTemperature();
     }
   }
 }
