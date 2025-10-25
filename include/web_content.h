@@ -152,6 +152,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             <h6><i class="bi bi-thermometer-half me-1"></i> RTC Temp</h6>
             <p class="fs-4 mb-0" id="rtc-temp"></p>
           </div>
+          <div class="col">
+            <h6><i class="bi bi-cpu-fill me-1"></i> Core Temp</h6>
+            <p class="fs-4 mb-0" id="core-temp"></p>
+          </div>
         </div>
       </div>
       <div class="card-footer text-center text-muted small">
@@ -166,6 +170,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       const bmeTempEl = document.getElementById('bme-temp');
       const bmeHumidityEl = document.getElementById('bme-humidity');
       const rtcTempEl = document.getElementById('rtc-temp');
+      const coreTempEl = document.getElementById('core-temp');
 
       function updateSensorReadings() {
         fetch('/api/sensors')
@@ -186,14 +191,20 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             } else {
               rtcTempEl.textContent = 'N/A';
             }
+
+            if (data.coreTemp) {
+              coreTempEl.textContent = `${data.coreTemp}°${data.unit}`;
+            } else {
+              coreTempEl.textContent = 'N/A';
+            }
           })
           .catch(error => console.error('Error fetching sensor data:', error));
       }
 
       // Initial update
       updateSensorReadings();
-      // Update sensors every 3 seconds
-      setInterval(updateSensorReadings, 3000);
+      // Update sensors every 10 seconds
+      setInterval(updateSensorReadings, 10000);
     });
   </script>
 </body>

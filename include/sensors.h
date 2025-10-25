@@ -80,3 +80,9 @@ float getBmeTemperature();
  * @return The cached temperature, converted to the user's preferred unit.
  */
 float getRtcTemperature();
+
+/**
+ * @brief Gets the last cached temperature reading from the ESP32-S3's internal sensor.
+ * @return The cached temperature, converted to the user's preferred unit.
+ */
+float getCoreTemperature();

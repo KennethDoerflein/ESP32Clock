@@ -2,6 +2,7 @@
 
 #include "sensors.h"
 #include "ConfigManager.h"
+#include "driver/temp_sensor.h"
 
 // Instantiate the global sensor objects declared in the header.
 Adafruit_BME280 BME;
@@ -10,6 +11,7 @@ RTC_Type RTC;
 // Static variables to cache the latest sensor readings.
 static float cached_bme_temp_c = 0.0;
 static float cached_rtc_temp_c = 0.0;
+static float cached_core_temp_c = 0.0;
 static float cached_humidity = 0.0;
 static bool bme280_found = false; // Track BME280 sensor status
 static bool rtc_found = false;    // Track RTC status
@@ -33,6 +35,12 @@ void setupSensors()
     // The main loop will now handle the error message.
     return; // Exit early, no point in continuing
   }
+
+  // Initialize the internal temperature sensor
+  temp_sensor_config_t temp_sensor = TSENS_CONFIG_DEFAULT();
+  temp_sensor_set_config(temp_sensor);
+  temp_sensor_start();
+
   // Perform an initial sensor read to populate cached values.
   handleSensorUpdates(true);
 }
@@ -91,6 +99,19 @@ float getRtcTemperature()
   }
 }
 
+float getCoreTemperature()
+{
+  bool useCelsius = ConfigManager::getInstance().isCelsius();
+  if (useCelsius)
+  {
+    return cached_core_temp_c;
+  }
+  else
+  {
+    return (cached_core_temp_c * 9.0 / 5.0) + 32.0;
+  }
+}
+
 void handleSensorUpdates(bool force)
 {
   unsigned long now = millis();
@@ -111,5 +132,6 @@ void handleSensorUpdates(bool force)
     {
       cached_rtc_temp_c = RTC.getTemperature();
     }
+    temp_sensor_read_celsius(&cached_core_temp_c);
   }
 }

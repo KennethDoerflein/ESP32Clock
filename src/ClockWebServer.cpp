@@ -279,6 +279,7 @@ void ClockWebServer::begin()
       if (isRtcFound()) {
         doc["rtcTemp"] = String(getRtcTemperature(), 1);
       }
+      doc["coreTemp"] = String(getCoreTemperature(), 1);
       doc["unit"] = ConfigManager::getInstance().isCelsius() ? "C" : "F";
       
       String response;
