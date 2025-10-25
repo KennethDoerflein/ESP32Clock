@@ -1606,8 +1606,11 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
           <button type="button" id="reboot-button" class="btn btn-warning w-100 mt-3" onclick="rebootDevice()" title="Reboot the device.">
             Reboot Device
           </button>
-          <button type="button" id="factory-reset-button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()" title="Reset all settings to factory defaults.">
-            Factory Reset
+          <button type="button" class="btn btn-outline-danger w-100 mt-4" onclick="factoryResetExceptWiFi()" title="Reset all settings to factory defaults, but keep WiFi credentials.">
+          Factory Reset (keep WiFi)
+          </button>
+          <button type="button" id="factory-reset-button" class="btn btn-danger w-100 mt-3" onclick="factoryReset()" title="Reset all settings to factory defaults. This will clear EVERYTHING including WiFi credentials.">
+           Factory Reset (full wipe)
           </button>
         </div>
       </div>
@@ -1771,6 +1774,17 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       if (userInput === confirmationText) {
         fetch("/factory-reset").then(res => alert(res.ok ? "Factory reset successful. Device is rebooting..." : "Failed to reset."));
+      } else if (userInput !== null) {
+        alert("The text you entered did not match. Factory reset has been canceled.");
+      }
+    }
+
+    function factoryResetExceptWiFi() {
+      const confirmationText = "RESET";
+      const userInput = prompt(`To confirm, please type "${confirmationText}" in the box below.`);
+
+      if (userInput === confirmationText) {
+        fetch("/factory-reset-except-wifi").then(res => alert(res.ok ? "Factory reset successful. Device is rebooting..." : "Failed to reset."));
       } else if (userInput !== null) {
         alert("The text you entered did not match. Factory reset has been canceled.");
       }

@@ -321,6 +321,25 @@ void ConfigManager::factoryReset()
   save();
 }
 
+void ConfigManager::factoryResetExceptWiFi()
+{
+  SerialLog::getInstance().print("Performing factory reset, but keeping WiFi credentials...\n");
+
+  // Preserve WiFi credentials
+  String ssid = wifiSSID;
+  String password = wifiPassword;
+  bool credsValid = wifiCredsValid;
+
+  setDefaults();
+
+  // Restore WiFi credentials
+  wifiSSID = ssid;
+  wifiPassword = password;
+  wifiCredsValid = credsValid;
+
+  save();
+}
+
 void ConfigManager::resetDisplayToDefaults()
 {
   backgroundColor = DEFAULT_BACKGROUND_COLOR;

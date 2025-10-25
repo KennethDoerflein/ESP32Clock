@@ -477,6 +477,11 @@ public:
   void factoryReset();
 
   /**
+   * @brief Resets all settings to their default values, except for WiFi credentials.
+   */
+  void factoryResetExceptWiFi();
+
+  /**
    * @brief Resets all display settings to their default values.
    */
   void resetDisplayToDefaults();

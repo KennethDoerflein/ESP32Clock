@@ -376,6 +376,13 @@ void ClockWebServer::begin()
       delay(100);
       ESP.restart(); });
 
+    server.on("/factory-reset-except-wifi", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      request->send(200, "text/plain", "Performing factory reset and keeping WiFi credentials...");
+      ConfigManager::getInstance().factoryResetExceptWiFi();
+      delay(100);
+      ESP.restart(); });
+
     server.on("/system", HTTP_GET, [this](AsyncWebServerRequest *request)
               { request->send_P(200, "text/html", SYSTEM_PAGE_HTML, [this](const String &var)
                                 { return processor(var); }); });
