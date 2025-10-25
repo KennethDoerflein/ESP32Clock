@@ -1,5 +1,5 @@
 #include "pages/InfoPage.h"
-#include "fonts/DSEG14ModernBold24.h"
+#include "fonts/CenturyGothic28.h"
 #include <WiFi.h>
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -17,7 +17,7 @@ void InfoPage::onEnter(TFT_eSPI &tft)
 {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.loadFont(DSEG14ModernBold24);
+  tft.loadFont(CenturyGothic28);
 
   // --- Title ---
   tft.setTextDatum(MC_DATUM);
