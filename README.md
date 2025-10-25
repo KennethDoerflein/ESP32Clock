@@ -138,10 +138,8 @@ This project is broken down into phases to prioritize a functional base clock be
     - [ ] Let user set hold to dismiss alarm duration
   - [x] **Hardware Interaction:**
     - [x] Implement a factory reset via a long-press of the boot button.
-  - [ ] **Audio Feedback:**
-    - [ ] Add different sound options for the alarm.
   - [ ] **Display Feedback:**
-    - [ ] Show a "ringing" screen when an alarm is going off.
+    - [x] Show a "ringing" screen when an alarm is going off.
     - [ ] Show a snooze countdown.
     - [ ] Add a visual indicator for how long to hold the snooze button.
 - [x] **UI/UX Enhancements**
