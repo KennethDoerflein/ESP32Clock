@@ -1,7 +1,7 @@
 #include "display.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
-#include "fonts/DSEG14ModernBold24.h"
+#include "fonts/CenturyGothic28.h"
 #include <Arduino.h>
 
 // LEDC (LED Control) constants for managing the backlight PWM.
@@ -35,7 +35,7 @@ void Display::drawStatusMessage(const char *message)
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-  tft.loadFont(DSEG14ModernBold24);
+  tft.loadFont(CenturyGothic28);
   tft.drawString(message, tft.width() / 2, tft.height() / 2);
   tft.unloadFont(); // Unload font to free up memory
 }
@@ -45,7 +45,7 @@ void Display::drawMultiLineStatusMessage(const char *line1, const char *line2)
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-  tft.loadFont(DSEG14ModernBold24);
+  tft.loadFont(CenturyGothic28);
   tft.drawString(line1, tft.width() / 2, tft.height() / 2 - 15);
   tft.drawString(line2, tft.width() / 2, tft.height() / 2 + 15);
   tft.unloadFont(); // Unload font to free up memory
