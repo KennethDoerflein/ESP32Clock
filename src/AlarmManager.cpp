@@ -3,6 +3,11 @@
 #include "AlarmManager.h"
 #include "DisplayManager.h"
 #include "SerialLog.h"
+#include "ConfigManager.h"
+#include "display.h"
+
+// --- Constants ---
+constexpr unsigned long ALARM_RESUME_DELAY_MS = 5000;
 
 // --- Constants for the ramping alarm state machine ---
 const unsigned long STAGE1_DURATION_MS = 10000; // 10 seconds of slow beeping
@@ -19,25 +24,44 @@ void AlarmManager::begin()
 {
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
+
+  // --- Check for a ringing alarm at startup ---
+  int8_t ringingAlarmId = ConfigManager::getInstance().getRingingAlarmId();
+  if (ringingAlarmId != -1)
+  {
+    _resumeAlarmOnBoot = true;
+    _pendingResumeAlarmId = ringingAlarmId;
+    _pendingResumeTimestamp = ConfigManager::getInstance().getRingingAlarmStartTimestamp();
+    SerialLog::getInstance().print("AlarmManager: Pending resume for alarm.\n");
+  }
 }
 
 void AlarmManager::update()
 {
+  // --- Handle deferred resume first ---
+  // To ensure the system is fully stable, especially the display driver,
+  // the deferred resume operation is delayed for a few seconds after boot.
+  if (_resumeAlarmOnBoot && millis() > ALARM_RESUME_DELAY_MS)
+  {
+    resume(_pendingResumeAlarmId, _pendingResumeTimestamp);
+    _resumeAlarmOnBoot = false; // Clear the flag
+  }
+
   if (!_isRinging)
   {
     return;
   }
 
-  unsigned long currentTime = millis();
-  unsigned long alarmElapsedTime = currentTime - _alarmStartTime;
-
   // --- Stage Progression Logic ---
-  if (_rampStage == STAGE_SLOW_BEEP && alarmElapsedTime >= STAGE1_DURATION_MS)
+  uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();
+  uint32_t alarmElapsedSeconds = now - _alarmStartTimestamp;
+
+  if (_rampStage == STAGE_SLOW_BEEP && alarmElapsedSeconds >= (STAGE1_DURATION_MS / 1000))
   {
     SerialLog::getInstance().print("AlarmManager: Ramping to STAGE_FAST_BEEP\n");
     _rampStage = STAGE_FAST_BEEP;
   }
-  else if (_rampStage == STAGE_FAST_BEEP && alarmElapsedTime >= (STAGE1_DURATION_MS + STAGE2_DURATION_MS))
+  else if (_rampStage == STAGE_FAST_BEEP && alarmElapsedSeconds >= ((STAGE1_DURATION_MS + STAGE2_DURATION_MS) / 1000))
   {
     SerialLog::getInstance().print("AlarmManager: Ramping to STAGE_CONTINUOUS\n");
     _rampStage = STAGE_CONTINUOUS;
@@ -51,6 +75,7 @@ void AlarmManager::update()
   }
 
   // --- Beeping Logic ---
+  unsigned long currentTime = millis();
   unsigned long beepOnDuration = (_rampStage == STAGE_SLOW_BEEP) ? SLOW_BEEP_ON_MS : FAST_BEEP_ON_MS;
   unsigned long beepOffDuration = (_rampStage == STAGE_SLOW_BEEP) ? SLOW_BEEP_OFF_MS : FAST_BEEP_OFF_MS;
   unsigned long beepElapsedTime = currentTime - _lastBeepTime;
@@ -85,12 +110,17 @@ void AlarmManager::stop()
   _isRinging = false;
   _activeAlarmId = -1;
 
+  // --- Clear the persisted ringing state ---
+  auto &config = ConfigManager::getInstance();
+  config.setRingingAlarmId(-1);
+  config.setRingingAlarmStartTimestamp(0);
+  config.save(); // Persist the change immediately
+
   // --- Reset state machine ---
   _rampStage = STAGE_SLOW_BEEP;
   _buzzerState = BEEP_OFF;
 
-  // Force a redraw to clear the "RINGING!" message
-  DisplayManager::getInstance().setPage(DisplayManager::getInstance().getCurrentPageIndex(), true);
+  Display::getInstance().setBacklightFlashing(false);
 }
 
 bool AlarmManager::isRinging() const
@@ -109,16 +139,63 @@ void AlarmManager::trigger(uint8_t alarmId)
     return; // Don't trigger if another is already active
 
   SerialLog::getInstance().printf("Triggering alarm ID %d\n", alarmId);
-  _isRinging = true;
-  _activeAlarmId = alarmId;
 
   // --- Initialize the ramping alarm state ---
-  _alarmStartTime = millis();
-  _lastBeepTime = _alarmStartTime;
+  _alarmStartTimestamp = TimeManager::getInstance().getRTCTime().unixtime();
+  _lastBeepTime = millis();
   _rampStage = STAGE_SLOW_BEEP;
   _buzzerState = BEEP_ON;
   digitalWrite(BUZZER_PIN, HIGH); // Start with the buzzer on
+  _isRinging = true;
+  _activeAlarmId = alarmId;
 
-  // Show the ringing screen
+  // --- Persist the ringing state ---
+  auto &config = ConfigManager::getInstance();
+  config.setRingingAlarmId(alarmId);
+  config.setRingingAlarmStartTimestamp(_alarmStartTimestamp);
+  config.save(); // Persist the change immediately
+
+  // Switch to the clock page before showing the alarm overlay
+  DisplayManager::getInstance().setPage(0);
   DisplayManager::getInstance().showAlarmScreen();
+  Display::getInstance().setBacklightFlashing(true);
+}
+
+void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
+{
+  if (_isRinging)
+    return;
+
+  SerialLog::getInstance().printf("Resuming ringing alarm ID %d\n", alarmId);
+  _isRinging = true;
+  _activeAlarmId = alarmId;
+  _alarmStartTimestamp = startTimestamp;
+
+  // We don't know the buzzer state from before the reboot, so start it
+  _lastBeepTime = millis();
+  _buzzerState = BEEP_ON;
+  digitalWrite(BUZZER_PIN, HIGH);
+
+  // Re-evaluate the ramp stage based on how long it's been ringing.
+  uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();
+  uint32_t alarmElapsedSeconds = now - _alarmStartTimestamp;
+
+  if (alarmElapsedSeconds >= ((STAGE1_DURATION_MS + STAGE2_DURATION_MS) / 1000))
+  {
+    _rampStage = STAGE_CONTINUOUS;
+  }
+  else if (alarmElapsedSeconds >= (STAGE1_DURATION_MS / 1000))
+  {
+    _rampStage = STAGE_FAST_BEEP;
+  }
+  else
+  {
+    _rampStage = STAGE_SLOW_BEEP;
+  }
+  SerialLog::getInstance().printf("Resumed at ramp stage %d\n", _rampStage);
+
+  // Switch to the clock page before showing the alarm overlay
+  DisplayManager::getInstance().setPage(0);
+  DisplayManager::getInstance().showAlarmScreen();
+  Display::getInstance().setBacklightFlashing(true);
 }

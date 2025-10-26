@@ -43,11 +43,18 @@
 #define BOOT_BUTTON_PIN 0
 #define LOOP_INTERVAL 100 // Interval for the main loop in milliseconds
 
+// --- Constants for Button Logic ---
+constexpr unsigned long DISMISS_HOLD_DURATION_MS = 3000;
+
 // --- Global Variables for Timers & Button Handling ---
 unsigned long lastLoopTime = 0;
 volatile unsigned long pressDuration = 0;
 volatile bool newPress = false;
 unsigned long bootButtonPressTime = 0;
+
+// --- Button State for Alarm Handling ---
+static unsigned long alarmButtonPressTime = 0;
+static bool actionTaken = false;
 
 // --- Interrupt Service Routine (ISR) ---
 void IRAM_ATTR handleButtonInterrupt()
@@ -318,6 +325,7 @@ void loop()
   alarmManager.update();
   bool timeUpdated = timeManager.update(); // Updates time from the RTC
   timeManager.checkAlarms();
+  timeManager.updateSnoozeStates();
   display.updateBrightness();
   handleSensorUpdates();
 
@@ -335,50 +343,104 @@ void loop()
     SerialLog::getInstance().print("Settings changed, refreshing display.\n");
   }
 
-  // --- Button Handling Logic (Runs regardless of WiFi connection) ---
-  if (newPress)
+  // --- State-based Interrupt Management ---
+  // We use a state variable to detect the transition to/from ringing,
+  // allowing us to detach the interrupt only once when the alarm starts
+  // and re-attach it only once when it stops.
+  static bool alarmWasRinging = false;
+  bool alarmIsRinging = alarmManager.isRinging();
+
+  if (alarmIsRinging && !alarmWasRinging)
   {
+    // Alarm has just started: detach the page-cycling interrupt
+    // so it doesn't conflict with the polling logic for snooze/dismiss.
+    detachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN));
+    SerialLog::getInstance().print("Alarm started. Interrupt detached.\n");
+  }
+  else if (!alarmIsRinging && alarmWasRinging)
+  {
+    // Alarm has just stopped: re-attach the interrupt for normal operation.
+    attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
+    SerialLog::getInstance().print("Alarm stopped. Interrupt re-attached.\n");
+  }
+  alarmWasRinging = alarmIsRinging; // Update state for the next loop
+
+  // --- Button Handling Logic (Switches between polling and interrupts) ---
+  if (alarmIsRinging)
+  {
+    // --- Polling-based logic for when an alarm is active ---
+    if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
+    {
+      // Button is currently pressed
+      if (alarmButtonPressTime == 0)
+      {
+        // Button was just pressed
+        alarmButtonPressTime = currentMillis;
+        actionTaken = false;
+        SerialLog::getInstance().print("Alarm active: Button press detected.\n");
+      }
+      else if (!actionTaken)
+      {
+        // Update the progress bar while the button is held
+        float progress = (float)(currentMillis - alarmButtonPressTime) / DISMISS_HOLD_DURATION_MS;
+        displayManager.drawDismissProgressBar(progress);
+      }
+
+      if (!actionTaken && currentMillis - alarmButtonPressTime > DISMISS_HOLD_DURATION_MS)
+      {
+        // Button has been held long enough, dismiss the alarm
+        SerialLog::getInstance().print("Alarm active: Button held. Dismissing.\n");
+        int alarmId = alarmManager.getActiveAlarmId();
+        if (alarmId != -1)
+        {
+          Alarm alarm = config.getAlarm(alarmId);
+          alarm.dismiss(timeManager.getRTCTime());
+          config.setAlarm(alarmId, alarm);
+          config.save();
+          alarmManager.stop();
+          displayManager.clearAlarmOverlay();
+        }
+        actionTaken = true; // Ensure dismiss is only called once
+      }
+    }
+    else
+    {
+      // Button is not pressed (it's released)
+      if (alarmButtonPressTime > 0 && !actionTaken)
+      {
+        // Button was released before the 3-second dismiss
+        SerialLog::getInstance().print("Alarm active: Button released. Snoozing.\n");
+        int alarmId = alarmManager.getActiveAlarmId();
+        if (alarmId != -1)
+        {
+          Alarm alarm = config.getAlarm(alarmId);
+          alarm.snooze();
+          config.setAlarm(alarmId, alarm);
+          config.save();
+          alarmManager.stop();
+          displayManager.clearAlarmOverlay();
+        }
+      }
+      // Reset for the next press
+      alarmButtonPressTime = 0;
+    }
+  }
+  else if (newPress)
+  {
+    // --- Interrupt-based logic for normal operations (page cycling) ---
+    // This code only runs when the alarm is not ringing, because the
+    // interrupt that sets `newPress` is detached during an alarm.
     unsigned long duration;
-    // Atomically read and reset the flag
     noInterrupts();
     duration = pressDuration;
     newPress = false;
     interrupts();
 
     SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", duration);
-
-    if (alarmManager.isRinging())
-    {
-      int alarmId = alarmManager.getActiveAlarmId();
-      if (alarmId != -1)
-      {
-        Alarm alarm = config.getAlarm(alarmId); // Get a copy
-        bool isSnooze = duration <= 10000;
-
-        if (isSnooze)
-        {
-          alarm.snooze();
-          DateTime now = TimeManager::getInstance().getRTCTime();
-          DateTime snoozeUntil = now + TimeSpan(SNOOZE_DURATION_MS / 1000);
-          SerialLog::getInstance().printf("Snoozing until: %02d:%02d:%02d\n", snoozeUntil.hour(), snoozeUntil.minute(), snoozeUntil.second());
-        }
-        else // Long press (> 10 seconds) to dismiss
-        {
-          SerialLog::getInstance().print("Long press detected. Dismissing alarm.\n");
-          alarm.dismiss();
-        }
-        config.setAlarm(alarmId, alarm); // Save the updated state
-        config.save();                   // Persist the change
-        alarmManager.stop();             // Stop the ringing
-      }
-    }
-    else
-    {
-      // If not ringing, a short press cycles pages.
-      int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
-      SerialLog::getInstance().printf("Cycling to page index: %d\n", newIndex);
-      displayManager.setPage(newIndex);
-    }
+    // A short press cycles pages.
+    int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
+    SerialLog::getInstance().printf("Cycling to page index: %d\n", newIndex);
+    displayManager.setPage(newIndex);
   }
 
   // --- Update Alarm Icon (Runs regardless of WiFi connection) ---

@@ -51,6 +51,11 @@ public:
   void checkAlarms();
 
   /**
+   * @brief Checks all alarms to see if any snoozed alarms should be re-triggered.
+   */
+  void updateSnoozeStates();
+
+  /**
    * @brief Forces a time synchronization with the NTP server.
    *
    * This function attempts to connect to an NTP server to update the RTC.

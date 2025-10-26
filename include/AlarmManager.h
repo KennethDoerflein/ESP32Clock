@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 #include "Alarm.h"
+#include "TimeManager.h"
 
 // Define the GPIO pin for the active buzzer
 #define BUZZER_PIN 4
@@ -47,6 +48,13 @@ public:
   void trigger(uint8_t alarmId);
 
   /**
+   * @brief Resumes an alarm that was ringing before a reboot.
+   * @param alarmId The ID of the alarm to resume.
+   * @param startTimestamp The Unix timestamp when the alarm originally started.
+   */
+  void resume(uint8_t alarmId, uint32_t startTimestamp);
+
+  /**
    * @brief Stops the alarm from ringing.
    */
   void stop();
@@ -87,6 +95,11 @@ private:
   int _activeAlarmId;
   RampStage _rampStage;
   BuzzerState _buzzerState;
-  unsigned long _alarmStartTime;
+  uint32_t _alarmStartTimestamp; // Unix timestamp
   unsigned long _lastBeepTime;
+
+  // --- Deferred Resume Logic ---
+  bool _resumeAlarmOnBoot = false;
+  uint8_t _pendingResumeAlarmId;
+  uint32_t _pendingResumeTimestamp;
 };

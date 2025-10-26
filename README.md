@@ -132,8 +132,6 @@ This project is broken down into phases to prioritize a functional base clock be
 
 - [ ] **Alarms & User Interaction**
   - [ ] **Alarm Management:**
-    - [ ] UI for adding and deleting alarms.
-    - [ ] Significantly increase the 5-alarm limit.
     - [ ] Let user set snooze duration
     - [ ] Let user set hold to dismiss alarm duration
   - [x] **Hardware Interaction:**
@@ -141,7 +139,7 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] **Display Feedback:**
     - [x] Show a "ringing" screen when an alarm is going off.
     - [ ] Show a snooze countdown.
-    - [ ] Add a visual indicator for how long to hold the snooze button.
+    - [x] Add a visual indicator for how long to hold the snooze button.
 - [x] **UI/UX Enhancements**
   - [x] Add an option to reset to defaults in the web interface.
   - [x] Improve TOD and seconds centering.

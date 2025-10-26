@@ -63,9 +63,17 @@ public:
    */
   TFT_eSPI &getTft() { return tft; }
 
+  /**
+   * @brief Enables or disables the backlight flashing effect.
+   * @param enabled True to enable flashing, false to disable.
+   */
+  void setBacklightFlashing(bool enabled);
+
 private:
   Display() : actualBrightness(255) {} // Initialize to a default value
 
   TFT_eSPI tft;         ///< The main TFT_eSPI driver instance.
   int actualBrightness; ///< Stores the current brightness duty cycle.
+  bool _isFlashing = false;
+  unsigned long _lastFlashTime = 0;
 };

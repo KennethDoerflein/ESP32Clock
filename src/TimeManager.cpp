@@ -220,42 +220,23 @@ void TimeManager::checkAlarms()
       continue;
     }
 
-    // Snooze logic is always based on the real current time ("now").
-    // If the snooze period ends, updateSnooze will re-enable the alarm.
-    bool snoozeEnded = alarm.updateSnooze();
-    bool needsSave = false;
+    // Now, check every minute between the last check and the current time
+    // to see if this alarm should have rung.
+    // We start from the beginning of the *next* minute after the last check.
+    DateTime t = DateTime(lastCheckSeconds);
+    DateTime startTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute()) + TimeSpan(0, 0, 1, 0);
 
-    if (snoozeEnded)
+    for (DateTime checkMinute = startTime; checkMinute <= now; checkMinute = checkMinute + TimeSpan(0, 0, 1, 0))
     {
-      // If snooze just ended, re-trigger the alarm immediately.
-      AlarmManager::getInstance().trigger(alarm.getId());
-      alarmJustTriggered = true;
-    }
-    else
-    {
-      // Now, check every minute between the last check and the current time
-      // to see if this alarm should have rung.
-      // We start from the beginning of the *next* minute after the last check.
-      DateTime t = DateTime(lastCheckSeconds);
-      DateTime startTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute()) + TimeSpan(0, 0, 1, 0);
-
-      for (DateTime checkMinute = startTime; checkMinute <= now; checkMinute = checkMinute + TimeSpan(0, 0, 1, 0))
+      if (alarm.shouldRing(checkMinute))
       {
-        if (alarm.shouldRing(checkMinute))
-        {
-          AlarmManager::getInstance().trigger(alarm.getId());
-          alarmJustTriggered = true;
+        AlarmManager::getInstance().trigger(alarm.getId());
+        alarmJustTriggered = true;
 
-          // Note: One-time alarms are dismissed by the user (long press)
-          // in main.cpp, not automatically. This allows them to be snoozed.
-          break; // Stop checking minutes for this alarm
-        }
+        // Note: One-time alarms are dismissed by the user (long press)
+        // in main.cpp, not automatically. This allows them to be snoozed.
+        break; // Stop checking minutes for this alarm
       }
-    }
-
-    if (needsSave)
-    {
-      config.setAlarm(i, alarm);
     }
 
     if (alarmJustTriggered)
@@ -266,6 +247,31 @@ void TimeManager::checkAlarms()
 
   // Always update the last checked time to the current time.
   _lastTimeChecked = nowSeconds;
+}
+
+void TimeManager::updateSnoozeStates()
+{
+  if (AlarmManager::getInstance().isRinging())
+  {
+    return;
+  }
+  auto &config = ConfigManager::getInstance();
+  for (int i = 0; i < config.getNumAlarms(); ++i)
+  {
+    Alarm &alarm = config.getAlarm(i);
+    if (alarm.isEnabled() && alarm.isSnoozed())
+    {
+      if (alarm.updateSnooze())
+      {
+        // Snooze is over, re-trigger the alarm
+        AlarmManager::getInstance().trigger(alarm.getId());
+        // Persist the unsnoozed state
+        config.setAlarm(i, alarm);
+        config.save();
+        break; // Only trigger one alarm at a time
+      }
+    }
+  }
 }
 
 DateTime TimeManager::getRTCTime() const

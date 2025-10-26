@@ -39,6 +39,8 @@ public:
   static constexpr const char *DEFAULT_WIFI_PASSWORD = "";
   static constexpr const char *DEFAULT_HOSTNAME = "";
   static constexpr bool DEFAULT_WIFI_CREDS_VALID = false;
+  static constexpr int8_t DEFAULT_RINGING_ALARM_ID = -1;
+  static constexpr uint32_t DEFAULT_RINGING_ALARM_TIMESTAMP = 0;
   static constexpr bool DEFAULT_AUTO_BRIGHTNESS = true;
   static constexpr uint8_t DEFAULT_BRIGHTNESS = 128;
   static constexpr uint8_t DEFAULT_AUTO_BRIGHTNESS_START_HOUR = 7;
@@ -176,6 +178,18 @@ public:
   String getErrorTextColor() const { return errorTextColor; }
 
   /**
+   * @brief Gets the ID of the alarm that was ringing at shutdown.
+   * @return The ID of the alarm, or -1 if none.
+   */
+  int8_t getRingingAlarmId() const { return ringingAlarmId; }
+
+  /**
+   * @brief Gets the Unix timestamp of when the ringing alarm started.
+   * @return The start timestamp, or 0 if no alarm was ringing.
+   */
+  uint32_t getRingingAlarmStartTimestamp() const { return ringingAlarmStartTimestamp; }
+
+  /**
    * @brief Checks if the stored WiFi credentials have been validated.
    * @return True if the credentials are known to be good, false otherwise.
    */
@@ -223,6 +237,32 @@ public:
     if (wifiCredsValid != valid)
     {
       wifiCredsValid = valid;
+      _isDirty = true;
+    }
+  }
+
+  /**
+   * @brief Sets the ID of the currently ringing alarm.
+   * @param id The alarm ID, or -1 to clear.
+   */
+  void setRingingAlarmId(int8_t id)
+  {
+    if (ringingAlarmId != id)
+    {
+      ringingAlarmId = id;
+      _isDirty = true;
+    }
+  }
+
+  /**
+   * @brief Sets the start timestamp of the ringing alarm.
+   * @param timestamp The Unix timestamp.
+   */
+  void setRingingAlarmStartTimestamp(uint32_t timestamp)
+  {
+    if (ringingAlarmStartTimestamp != timestamp)
+    {
+      ringingAlarmStartTimestamp = timestamp;
       _isDirty = true;
     }
   }
@@ -502,6 +542,8 @@ private:
   String wifiPassword = DEFAULT_WIFI_PASSWORD;
   String hostname = DEFAULT_HOSTNAME;
   bool wifiCredsValid = DEFAULT_WIFI_CREDS_VALID;
+  int8_t ringingAlarmId = DEFAULT_RINGING_ALARM_ID;
+  uint32_t ringingAlarmStartTimestamp = DEFAULT_RINGING_ALARM_TIMESTAMP;
   bool autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
   uint8_t brightness = DEFAULT_BRIGHTNESS;
   uint8_t autoBrightnessStartHour = DEFAULT_AUTO_BRIGHTNESS_START_HOUR;

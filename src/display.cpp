@@ -51,8 +51,38 @@ void Display::drawMultiLineStatusMessage(const char *line1, const char *line2)
   tft.unloadFont(); // Unload font to free up memory
 }
 
+void Display::setBacklightFlashing(bool enabled)
+{
+  _isFlashing = enabled;
+  if (!_isFlashing)
+  {
+    // If flashing is disabled, immediately restore the correct brightness
+    updateBrightness();
+  }
+}
+
 void Display::updateBrightness()
 {
+  if (_isFlashing)
+  {
+    unsigned long currentTime = millis();
+    if (currentTime - _lastFlashTime > 500) // 500ms interval
+    {
+      _lastFlashTime = currentTime;
+      // Toggle between high and low brightness
+      if (actualBrightness > 10)
+      {
+        actualBrightness = 10;
+      }
+      else
+      {
+        actualBrightness = 255;
+      }
+      ledcWrite(BACKLIGHT_CHANNEL, actualBrightness);
+    }
+    return; // Skip normal brightness logic
+  }
+
   auto &config = ConfigManager::getInstance();
   int dutyCycle;
 

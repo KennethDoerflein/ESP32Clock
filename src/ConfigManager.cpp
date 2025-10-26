@@ -33,6 +33,8 @@ void ConfigManager::setDefaults()
   wifiPassword = DEFAULT_WIFI_PASSWORD;
   hostname = DEFAULT_HOSTNAME;
   wifiCredsValid = DEFAULT_WIFI_CREDS_VALID;
+  ringingAlarmId = DEFAULT_RINGING_ALARM_ID;
+  ringingAlarmStartTimestamp = DEFAULT_RINGING_ALARM_TIMESTAMP;
   autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
   brightness = DEFAULT_BRIGHTNESS;
   autoBrightnessStartHour = DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
@@ -111,6 +113,8 @@ void ConfigManager::load()
   wifiPassword = doc["wifiPassword"] | DEFAULT_WIFI_PASSWORD;
   hostname = doc["hostname"] | DEFAULT_HOSTNAME;
   wifiCredsValid = doc["wifiCredsValid"] | DEFAULT_WIFI_CREDS_VALID;
+  ringingAlarmId = doc["ringingAlarmId"] | DEFAULT_RINGING_ALARM_ID;
+  ringingAlarmStartTimestamp = doc["ringingAlarmStartTimestamp"] | DEFAULT_RINGING_ALARM_TIMESTAMP;
   autoBrightness = doc["autoBrightness"] | DEFAULT_AUTO_BRIGHTNESS;
   brightness = doc["brightness"] | DEFAULT_BRIGHTNESS;
   autoBrightnessStartHour = doc["autoBrightnessStartHour"] | DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
@@ -172,6 +176,8 @@ void ConfigManager::load()
       _alarms[i].setHour(alarmObj["hour"] | 6);
       _alarms[i].setMinute(alarmObj["minute"] | 0);
       _alarms[i].setDays(alarmObj["days"] | 0);
+      _alarms[i].setSnoozeState(alarmObj["snoozed"] | false, alarmObj["snoozeUntil"] | 0);
+      _alarms[i].setLastDismissedDay(alarmObj["lastDismissedDay"] | 8);
       i++;
     }
   }
@@ -199,6 +205,8 @@ bool ConfigManager::save()
   doc["wifiPassword"] = wifiPassword;
   doc["hostname"] = hostname;
   doc["wifiCredsValid"] = wifiCredsValid;
+  doc["ringingAlarmId"] = ringingAlarmId;
+  doc["ringingAlarmStartTimestamp"] = ringingAlarmStartTimestamp;
   doc["autoBrightness"] = autoBrightness;
   doc["brightness"] = brightness;
   doc["autoBrightnessStartHour"] = autoBrightnessStartHour;
@@ -232,6 +240,9 @@ bool ConfigManager::save()
     alarmObj["hour"] = _alarms[i].getHour();
     alarmObj["minute"] = _alarms[i].getMinute();
     alarmObj["days"] = _alarms[i].getDays();
+    alarmObj["snoozed"] = _alarms[i].isSnoozed();
+    alarmObj["snoozeUntil"] = _alarms[i].getSnoozeUntil();
+    alarmObj["lastDismissedDay"] = _alarms[i].getLastDismissedDay();
   }
 
   // Serialize the JSON document into the file.

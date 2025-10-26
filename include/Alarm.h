@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <RTClib.h>
+#include "TimeManager.h"
 
 // Bitmask for days of the week
 const uint8_t DAY_SUN = 1 << 0;
@@ -27,7 +28,8 @@ public:
   uint8_t getMinute() const { return _minute; }
   uint8_t getDays() const { return _days; }
   bool isSnoozed() const { return _snoozed; }
-  unsigned long getSnoozeUntil() const { return _snoozeUntil; }
+  uint32_t getSnoozeUntil() const { return _snoozeUntil; }
+  uint8_t getLastDismissedDay() const { return _lastDismissedDay; }
 
   // Public setters for properties
   void setId(uint8_t id) { _id = id; }
@@ -35,11 +37,12 @@ public:
   void setHour(uint8_t hour) { _hour = hour; }
   void setMinute(uint8_t minute) { _minute = minute; }
   void setDays(uint8_t days) { _days = days; }
-  void setSnoozeState(bool snoozed, unsigned long snoozeUntil)
+  void setSnoozeState(bool snoozed, uint32_t snoozeUntil)
   {
     _snoozed = snoozed;
     _snoozeUntil = snoozeUntil;
   }
+  void setLastDismissedDay(uint8_t day) { _lastDismissedDay = day; }
 
   /**
    * @brief Snoozes the alarm for a predefined duration.
@@ -47,20 +50,27 @@ public:
   void snooze()
   {
     _snoozed = true;
-    _snoozeUntil = millis() + SNOOZE_DURATION_MS;
+    // Use RTC unixtime for reboot resilience
+    _snoozeUntil = TimeManager::getInstance().getRTCTime().unixtime() + (SNOOZE_DURATION_MS / 1000);
   }
 
   /**
    * @brief Dismisses the alarm for the current day.
    * If it's a one-time alarm, it disables it permanently.
+   * @param now The current time, used to record the dismiss day.
    */
-  void dismiss()
+  void dismiss(const DateTime &now)
   {
     _snoozed = false;
     _snoozeUntil = 0;
     if (_days == 0)
     {
       _enabled = false; // Disable one-time alarms
+    }
+    else
+    {
+      // For repeating alarms, record the day it was dismissed
+      _lastDismissedDay = now.dayOfTheWeek();
     }
   }
 
@@ -71,7 +81,7 @@ public:
    */
   bool updateSnooze()
   {
-    if (_snoozed && millis() > _snoozeUntil)
+    if (_snoozed && TimeManager::getInstance().getRTCTime().unixtime() > _snoozeUntil)
     {
       _snoozed = false;
       _snoozeUntil = 0;
@@ -88,6 +98,12 @@ public:
   bool shouldRing(const DateTime &now) const
   {
     if (!_enabled || _snoozed)
+    {
+      return false;
+    }
+
+    // For repeating alarms, check if it has already been dismissed today.
+    if (_days != 0 && _lastDismissedDay == now.dayOfTheWeek())
     {
       return false;
     }
@@ -110,5 +126,6 @@ private:
   uint8_t _minute = 0;
   uint8_t _days = 0; // Bitmask for days of the week
   bool _snoozed = false;
-  unsigned long _snoozeUntil = 0;
+  uint32_t _snoozeUntil = 0;     // Unix timestamp for reboot resilience
+  uint8_t _lastDismissedDay = 8; // 8 is an invalid day to ensure it can ring on first boot
 };
