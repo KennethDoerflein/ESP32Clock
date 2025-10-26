@@ -384,7 +384,11 @@ void loop()
       {
         // Update the progress bar while the button is held
         float progress = (float)(currentMillis - alarmButtonPressTime) / DISMISS_HOLD_DURATION_MS;
-        displayManager.drawDismissProgressBar(progress);
+        if (displayManager.getCurrentPageIndex() == 0)
+        {
+          static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(progress);
+          displayManager.update();
+        }
       }
 
       if (!actionTaken && currentMillis - alarmButtonPressTime > DISMISS_HOLD_DURATION_MS)
@@ -399,7 +403,10 @@ void loop()
           config.setAlarm(alarmId, alarm);
           config.save();
           alarmManager.stop();
-          displayManager.clearAlarmOverlay();
+          if (displayManager.getCurrentPageIndex() == 0)
+          {
+            static_cast<ClockPage *>(displayManager.getCurrentPage())->clearAlarmSprite();
+          }
         }
         actionTaken = true; // Ensure dismiss is only called once
       }
@@ -419,7 +426,10 @@ void loop()
           config.setAlarm(alarmId, alarm);
           config.save();
           alarmManager.stop();
-          displayManager.clearAlarmOverlay();
+          if (displayManager.getCurrentPageIndex() == 0)
+          {
+            static_cast<ClockPage *>(displayManager.getCurrentPage())->clearAlarmSprite();
+          }
         }
       }
       // Reset for the next press

@@ -148,10 +148,10 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] **Alarm Management:**
     - [ ] Let user set snooze duration
     - [ ] Let user set hold to dismiss alarm duration
-  - [ ] **Display Feedback:**
-    - [ ] Show a snooze countdown.
+  - [x] **Display Feedback:**
+    - [x] Show a snooze countdown.
 - [ ] **Settings Management**
-  - [ ] Add a dropdown to select the timezone.
+  - [x] Add a dropdown to select the timezone.
   - [ ] Add an option to change the default page.
 
 ### Future Plans

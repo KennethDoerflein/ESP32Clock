@@ -5,18 +5,22 @@
 #include "utils.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
+#include "AlarmManager.h"
 #include "sensors.h"
 #include "fonts/DSEG7ModernBold104.h"
 #include "fonts/DSEG14ModernBold32.h"
 #include "fonts/DSEG14ModernBold48.h"
 #include "fonts/DSEG7ModernBold48.h"
+#include "fonts/CenturyGothicBold48.h"
 
 #include <Arduino.h>
 
 #define MARGIN 10
 
+
 ClockPage::ClockPage(TFT_eSPI *tft)
-    : sprClock(tft), sprDayOfWeek(tft), sprDate(tft), sprTemp(tft), sprHumidity(tft), sprTOD(tft), sprSeconds(tft)
+    : sprClock(tft), sprDayOfWeek(tft), sprDate(tft), sprTemp(tft), sprHumidity(tft), sprTOD(tft), sprSeconds(tft),
+      _alarmSprite(tft), _tft(tft)
 {
   // Sprites are initialized in the member initializer list
 }
@@ -34,6 +38,7 @@ void ClockPage::onEnter(TFT_eSPI &tft)
   if (!_spritesCreated)
   {
     setupSprites(tft);
+    initAlarmSprite(tft);
     _spritesCreated = true;
   }
   setupLayout(tft);
@@ -60,6 +65,7 @@ void ClockPage::update()
 
 void ClockPage::render(TFT_eSPI &tft)
 {
+  updateAlarmSprite();
   drawSeconds(tft);
   drawTemperature(tft);
   drawHumidity(tft);
@@ -114,6 +120,15 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   int fontHeight = tft.fontHeight();
   dateY = screenHeight - (fontHeight * 2 + MARGIN + 40);
   sensorY = screenHeight - (fontHeight + MARGIN + 10);
+
+  // --- Alarm Sprite Layout ---
+  _alarmSpriteX = (screenWidth - _alarmSprite.width()) / 2;
+  _alarmSpriteY = (screenHeight / 2) - (_alarmSprite.height() / 2);
+}
+
+void ClockPage::clearAlarmSprite()
+{
+  _tft->fillRect(_alarmSpriteX, _alarmSpriteY, _alarmSprite.width(), _alarmSprite.height(), _bgColor);
 }
 
 void ClockPage::setupSprites(TFT_eSPI &tft)
@@ -337,6 +352,11 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
   lastHumidity = humidity;
 }
 
+void ClockPage::setDismissProgress(float progress)
+{
+  _dismissProgress = progress;
+}
+
 void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
 {
   auto &config = ConfigManager::getInstance();
@@ -362,4 +382,72 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   lastHumidity = -999;
   lastTOD = "";
   lastSeconds = "";
+}
+
+void ClockPage::initAlarmSprite(TFT_eSPI &tft)
+{
+  tft.loadFont(CenturyGothicBold48);
+  int textWidth = tft.textWidth("ALARM");
+  _alarmSprite.createSprite(textWidth + 20, 50);
+  _alarmSprite.loadFont(CenturyGothicBold48);
+  _alarmSprite.setTextDatum(MC_DATUM);
+  _alarmSprite.setTextColor(hexToRGB565(ConfigManager::getInstance().getAlarmTextColor().c_str()));
+  tft.unloadFont();
+}
+
+void ClockPage::updateAlarmSprite()
+{
+  _alarmSprite.fillSprite(_bgColor);
+
+  auto &alarmManager = AlarmManager::getInstance();
+  auto &config = ConfigManager::getInstance();
+
+  bool anySnoozed = false;
+  for (int i = 0; i < config.getNumAlarms(); ++i)
+  {
+    if (config.getAlarm(i).isSnoozed())
+    {
+      anySnoozed = true;
+      break;
+    }
+  }
+
+  if (alarmManager.isRinging())
+  {
+    _alarmSprite.drawString("ALARM", _alarmSprite.width() / 2, _alarmSprite.height() / 2);
+    if (_dismissProgress > 0.0f)
+    {
+      int barWidth = _alarmSprite.width() * _dismissProgress;
+      _alarmSprite.fillRect(0, _alarmSprite.height() - 10, barWidth, 10, hexToRGB565(config.getAlarmTextColor().c_str()));
+    }
+  }
+  else if (anySnoozed)
+  {
+    _dismissProgress = 0.0f;
+    for (int i = 0; i < config.getNumAlarms(); ++i)
+    {
+      const auto &alarm = config.getAlarm(i);
+      if (alarm.isSnoozed())
+      {
+        time_t snoozeUntil = alarm.getSnoozeUntil();
+        time_t now = TimeManager::getInstance().getRTCTime().unixtime();
+        long remaining = snoozeUntil - now;
+        if (remaining < 0)
+        {
+          remaining = 0;
+        }
+
+        char buf[10];
+        snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
+        _alarmSprite.drawString(buf, _alarmSprite.width() / 2, _alarmSprite.height() / 2);
+        break;
+      }
+    }
+  }
+  else
+  {
+    _dismissProgress = 0.0f;
+  }
+
+  _alarmSprite.pushSprite(_alarmSpriteX, _alarmSpriteY);
 }

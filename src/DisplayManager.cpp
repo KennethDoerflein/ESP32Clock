@@ -2,9 +2,6 @@
 #include "utils.h"
 #include "ConfigManager.h"
 
-// A vertical offset to visually center the "ALARM" text.
-constexpr int ALARM_TEXT_VISUAL_CENTER_VOFFSET = -15;
-
 void DisplayManager::begin(TFT_eSPI &tft_instance)
 {
   this->tft = &tft_instance;
@@ -124,68 +121,6 @@ void DisplayManager::drawAlarmIcon(bool enabled, bool snoozing)
     // Erase the icon by drawing a black rectangle over its bounding box
     tft->fillRect(icon_x, icon_y, icon_w, icon_h, hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str()));
   }
-}
-
-void DisplayManager::showAlarmScreen()
-{
-  // This is a simple overlay, it doesn't create a new page.
-  // It draws a large "RINGING!" message in the center of the screen.
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getAlarmTextColor().c_str()));
-  tft->drawString("ALARM", tft->width() / 2, (tft->height() / 2) + ALARM_TEXT_VISUAL_CENTER_VOFFSET, 7);
-
-  // Reset text datum and color for other components
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getTimeColor().c_str()));
-}
-
-void DisplayManager::drawDismissProgressBar(float progress)
-{
-  // Define the bar's dimensions and position it relative to the "ALARM" text.
-  const int barHeight = 10;
-  // Font 7 is used for "ALARM", its height is 48 pixels.
-  // We'll place the bar a few pixels below the text's vertical center.
-  const int barY = (tft->height() / 2) + 30 + ALARM_TEXT_VISUAL_CENTER_VOFFSET; // 30 pixels below center
-
-  // The width of the bar will match the approximate width of the text.
-  const int barWidth = tft->textWidth("ALARM", 7);
-  const int barX = (tft->width() / 2) - (barWidth / 2);
-
-  // Calculate the width of the progress portion
-  int progressWidth = static_cast<int>(barWidth * progress);
-
-  // Draw the progress bar
-  uint16_t color = hexToRGB565(ConfigManager::getInstance().getAlarmTextColor().c_str());
-  tft->fillRect(barX, barY, progressWidth, barHeight, color);
-
-  // Clear the remainder of the bar to handle cases where progress decreases (though not expected here)
-  uint16_t bgColor = hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str());
-  tft->fillRect(barX + progressWidth, barY, barWidth - progressWidth, barHeight, bgColor);
-}
-
-void DisplayManager::clearAlarmOverlay()
-{
-  // This function needs to clear the area where "ALARM" and the progress bar are drawn.
-  // We can define a bounding box that covers both elements.
-
-  // The text is drawn with MC_DATUM (Middle Center)
-  const int textY = (tft->height() / 2) + ALARM_TEXT_VISUAL_CENTER_VOFFSET;
-  const int textHeight = 48; // Font 7 height
-
-  // The progress bar is 30 pixels below the text's vertical center.
-  const int barY = textY + 30;
-  const int barHeight = 10;
-
-  // Bounding box calculations
-  const int clearY = textY - (textHeight / 2);
-  const int clearHeight = (barY + barHeight) - clearY;
-
-  // We can reuse the text width calculation for the clearing width, with some padding.
-  const int clearWidth = tft->textWidth("ALARM", 7) + 20; // Add some padding
-  const int clearX = (tft->width() / 2) - (clearWidth / 2);
-
-  uint16_t bgColor = hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str());
-  tft->fillRect(clearX, clearY, clearWidth, clearHeight, bgColor);
 }
 
 void DisplayManager::showErrorScreen(const char *message)

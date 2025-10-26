@@ -157,7 +157,6 @@ void AlarmManager::trigger(uint8_t alarmId)
 
   // Switch to the clock page before showing the alarm overlay
   DisplayManager::getInstance().setPage(0);
-  DisplayManager::getInstance().showAlarmScreen();
   Display::getInstance().setBacklightFlashing(true);
 }
 
@@ -196,6 +195,5 @@ void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
 
   // Switch to the clock page before showing the alarm overlay
   DisplayManager::getInstance().setPage(0);
-  DisplayManager::getInstance().showAlarmScreen();
   Display::getInstance().setBacklightFlashing(true);
 }

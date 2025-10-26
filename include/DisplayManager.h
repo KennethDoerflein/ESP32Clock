@@ -58,6 +58,12 @@ public:
   int getCurrentPageIndex() const { return currentPageIndex; }
 
   /**
+   * @brief Gets the currently active page.
+   * @return A pointer to the current page.
+   */
+  Page *getCurrentPage() { return currentPage; }
+
+  /**
    * @brief Updates the currently active page.
    * This should be called in the main application loop.
    */

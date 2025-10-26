@@ -22,6 +22,8 @@ public:
   void update() override;
   void render(TFT_eSPI &tft) override;
   void refresh(TFT_eSPI &tft, bool fullRefresh) override;
+  void setDismissProgress(float progress);
+  void clearAlarmSprite();
 
 private:
   void setupSprites(TFT_eSPI &tft);
@@ -33,6 +35,8 @@ private:
   void drawHumidity(TFT_eSPI &tft);
   void drawSeconds(TFT_eSPI &tft);
   void updateSpriteColors();
+  void initAlarmSprite(TFT_eSPI &tft);
+  void updateAlarmSprite();
 
   // Flag to track sprite creation
   bool _spritesCreated = false;
@@ -45,6 +49,7 @@ private:
   TFT_eSprite sprHumidity;
   TFT_eSprite sprTOD;
   TFT_eSprite sprSeconds;
+  TFT_eSprite _alarmSprite;
 
   // Cached values to prevent unnecessary redraws
   String lastTime;
@@ -65,7 +70,11 @@ private:
   int secondsY;
   int dateY;
   int sensorY;
+  int _alarmSpriteX;
+  int _alarmSpriteY;
 
   // Cached background color
   uint16_t _bgColor;
+  float _dismissProgress = 0.0f;
+  TFT_eSPI *_tft;
 };
