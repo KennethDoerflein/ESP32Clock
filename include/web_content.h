@@ -1614,6 +1614,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
                 </form>
               </div>
             </div>
+            <div id="status" class="my-4"></div>
             <div class="card">
               <div class="card-body">
                 <h5 class="card-title d-flex align-items-center"><i class="bi bi-cloud-download me-2"></i>Online Update</h5>
@@ -1623,7 +1624,16 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
                 </div>
               </div>
             </div>
-            <div id="status" class="mt-4"></div>
+            <div class="card mt-4">
+              <div class="card-body">
+                <h5 class="card-title d-flex align-items-center"><i class="bi bi-clock me-2"></i>Time Synchronization</h5>
+                <p class="card-text text-muted small">Manually trigger a time sync with the NTP server.</p>
+                <div class="d-grid">
+                  <button id="ntp-sync-button" class="btn btn-info">Sync Now</button>
+                </div>
+                <div id="ntp-sync-status" class="mt-2 text-center"></div>
+              </div>
+            </div>
           </div>
           %SERIAL_LOG_TAB_PANE%
         </div>
@@ -1673,6 +1683,8 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
   <script>
     const uploadForm = document.getElementById('upload-form');
     const onlineButton = document.getElementById('online-button');
+    const ntpSyncButton = document.getElementById('ntp-sync-button');
+    const ntpSyncStatusDiv = document.getElementById('ntp-sync-status');
     const statusDiv = document.getElementById('status');
     const fileInput = document.getElementById('firmware');
     const backButton = document.getElementById('back-button');
@@ -1861,6 +1873,30 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
         setButtonsDisabled(false);
         isUpdating = false;
       });
+    });
+
+    ntpSyncButton.addEventListener('click', function() {
+      ntpSyncButton.disabled = true;
+
+      fetch('/api/system/ntp-sync', { method: 'POST' })
+        .then(response => {
+          if (response.ok) {
+            return response.text();
+          }
+          throw new Error('Sync request failed.');
+        })
+        .then(text => {
+          ntpSyncStatusDiv.innerHTML = `<span class="text-success">${text}</span>`;
+          setTimeout(() => {
+            ntpSyncStatusDiv.innerHTML = '';
+          }, 5000);
+        })
+        .catch(error => {
+          ntpSyncStatusDiv.innerHTML = `<span class="text-danger">${error.message}</span>`;
+        })
+        .finally(() => {
+          ntpSyncButton.disabled = false;
+        });
     });
 
     function rebootDevice() {

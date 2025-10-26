@@ -311,6 +311,11 @@ void ClockWebServer::begin()
       serializeJson(doc, response);
       request->send(200, "application/json", response); });
 
+    server.on("/api/system/ntp-sync", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+      startNtpSync();
+      request->send(200, "text/plain", "NTP sync started successfully."); });
+
     server.on(
         "/api/display/save", HTTP_POST, [](AsyncWebServerRequest *request) {},
         NULL,
