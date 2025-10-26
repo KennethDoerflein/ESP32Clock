@@ -355,6 +355,7 @@ void loop()
     // Alarm has just started: detach the page-cycling interrupt
     // so it doesn't conflict with the polling logic for snooze/dismiss.
     detachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN));
+    newPress = false; // Clear any pending button press from the interrupt
     SerialLog::getInstance().print("Alarm started. Interrupt detached.\n");
   }
   else if (!alarmIsRinging && alarmWasRinging)
