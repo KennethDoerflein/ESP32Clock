@@ -51,6 +51,8 @@ public:
   static constexpr bool DEFAULT_USE_CELSIUS = false;
   static constexpr bool DEFAULT_SCREEN_FLIPPED = false;
   static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0,M11.1.0";
+  static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
+  static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
 
   /**
    * @brief Gets the singleton instance of the ConfigManager.
@@ -170,6 +172,9 @@ public:
    */
   String getTimezone() const { return timezone; }
 
+  uint8_t getSnoozeDuration() const { return snoozeDuration; }
+  uint8_t getDismissDuration() const { return dismissDuration; }
+
   // Display Colors
   String getBackgroundColor() const { return backgroundColor; }
   String getTimeColor() const { return timeColor; }
@@ -244,6 +249,24 @@ public:
     if (wifiCredsValid != valid)
     {
       wifiCredsValid = valid;
+      _isDirty = true;
+    }
+  }
+
+  void setSnoozeDuration(uint8_t duration)
+  {
+    if (snoozeDuration != duration)
+    {
+      snoozeDuration = duration;
+      _isDirty = true;
+    }
+  }
+
+  void setDismissDuration(uint8_t duration)
+  {
+    if (dismissDuration != duration)
+    {
+      dismissDuration = duration;
       _isDirty = true;
     }
   }
@@ -574,6 +597,8 @@ private:
   bool useCelsius = DEFAULT_USE_CELSIUS;
   bool screenFlipped = DEFAULT_SCREEN_FLIPPED;
   String timezone = DEFAULT_TIMEZONE;
+  uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
+  uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;
 
   // Colors
   String backgroundColor = DEFAULT_BACKGROUND_COLOR;

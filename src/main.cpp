@@ -43,9 +43,6 @@
 #define BOOT_BUTTON_PIN 0
 #define LOOP_INTERVAL 100 // Interval for the main loop in milliseconds
 
-// --- Constants for Button Logic ---
-constexpr unsigned long DISMISS_HOLD_DURATION_MS = 3000;
-
 // --- Global Variables for Timers & Button Handling ---
 unsigned long lastLoopTime = 0;
 volatile unsigned long pressDuration = 0;
@@ -383,7 +380,8 @@ void loop()
       else if (!actionTaken)
       {
         // Update the progress bar while the button is held
-        float progress = (float)(currentMillis - alarmButtonPressTime) / DISMISS_HOLD_DURATION_MS;
+        unsigned long dismissDurationMs = config.getDismissDuration() * 1000;
+        float progress = (float)(currentMillis - alarmButtonPressTime) / dismissDurationMs;
         if (displayManager.getCurrentPageIndex() == 0)
         {
           static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(progress);
@@ -391,7 +389,7 @@ void loop()
         }
       }
 
-      if (!actionTaken && currentMillis - alarmButtonPressTime > DISMISS_HOLD_DURATION_MS)
+      if (!actionTaken && currentMillis - alarmButtonPressTime > (config.getDismissDuration() * 1000))
       {
         // Button has been held long enough, dismiss the alarm
         SerialLog::getInstance().print("Alarm active: Button held. Dismissing.\n");
@@ -422,7 +420,7 @@ void loop()
         if (alarmId != -1)
         {
           Alarm alarm = config.getAlarm(alarmId);
-          alarm.snooze();
+          alarm.snooze(config.getSnoozeDuration());
           config.setAlarm(alarmId, alarm);
           config.save();
           alarmManager.stop();

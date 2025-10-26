@@ -144,10 +144,10 @@ This project is broken down into phases to prioritize a functional base clock be
 
 - [ ] **General Problems**
   - [ ] wifi disconnects after a few hours
-- [ ] **Alarms & User Interaction**
-  - [ ] **Alarm Management:**
-    - [ ] Let user set snooze duration
-    - [ ] Let user set hold to dismiss alarm duration
+- [x] **Alarms & User Interaction**
+  - [x] **Alarm Management:**
+    - [x] Let user set snooze duration
+    - [x] Let user set hold to dismiss alarm duration
   - [x] **Display Feedback:**
     - [x] Show a snooze countdown.
 - [ ] **Settings Management**

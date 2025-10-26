@@ -178,6 +178,8 @@ void ClockWebServer::begin()
       doc["useCelsius"] = config.isCelsius();
       doc["screenFlipped"] = config.isScreenFlipped();
       doc["timezone"] = config.getTimezone();
+      doc["snoozeDuration"] = config.getSnoozeDuration();
+      doc["dismissDuration"] = config.getDismissDuration();
       
       String response;
       serializeJson(doc, response);
@@ -221,6 +223,8 @@ void ClockWebServer::begin()
               config.setCelsius(doc["useCelsius"]);
               config.setScreenFlipped(doc["screenFlipped"]);
               config.setTimezone(doc["timezone"]);
+              config.setSnoozeDuration(doc["snoozeDuration"]);
+              config.setDismissDuration(doc["dismissDuration"]);
               config.save();
 
               if (oldScreenFlipped != config.isScreenFlipped())
@@ -754,6 +758,10 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.getTempColor();
   if (var == "HUMIDITY_COLOR")
     return config.getHumidityColor();
+  if (var == "SNOOZE_DURATION")
+    return String(config.getSnoozeDuration());
+  if (var == "DISMISS_DURATION")
+    return String(config.getDismissDuration());
 
   return String();
 }

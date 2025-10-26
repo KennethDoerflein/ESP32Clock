@@ -763,6 +763,14 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                     <option value="HST10">Hawaii</option>
                   </select>
                 </div>
+                <div class="mb-3 p-3 border rounded">
+                  <label for="snooze-duration" class="form-label">Snooze Duration (minutes)</label>
+                  <input type="number" class="form-control" id="snooze-duration" name="snoozeDuration" min="1" max="60" value="%SNOOZE_DURATION%">
+                </div>
+                <div class="mb-3 p-3 border rounded">
+                  <label for="dismiss-duration" class="form-label">Hold to Dismiss (seconds)</label>
+                  <input type="number" class="form-control" id="dismiss-duration" name="dismissDuration" min="1" max="10" value="%DISMISS_DURATION%">
+                </div>
               </form>
               <div class="d-grid gap-2 mt-3">
                 <button type="button" id="reset-general-btn" class="btn btn-danger" title="Reset all general settings to their default values.">Reset General Settings</button>
@@ -1007,6 +1015,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         celsiusEl.checked = settings.useCelsius || false;
         screenFlippedEl.checked = settings.screenFlipped || false;
         timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0,M11.1.0";
+        document.getElementById('snooze-duration').value = settings.snoozeDuration || 9;
+        document.getElementById('dismiss-duration').value = settings.dismissDuration || 3;
 
         // Manually trigger UI updates that depend on these values
         updateBrightnessUI(settings);
@@ -1066,7 +1076,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           use24HourFormat: twentyFourHourEl.checked,
           useCelsius: celsiusEl.checked,
           screenFlipped: screenFlippedEl.checked,
-          timezone: timezoneEl.value
+          timezone: timezoneEl.value,
+          snoozeDuration: parseInt(document.getElementById('snooze-duration').value),
+          dismissDuration: parseInt(document.getElementById('dismiss-duration').value)
         };
 
         try {

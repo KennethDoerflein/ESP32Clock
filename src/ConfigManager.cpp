@@ -45,6 +45,8 @@ void ConfigManager::setDefaults()
   useCelsius = DEFAULT_USE_CELSIUS;
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
   timezone = DEFAULT_TIMEZONE;
+  snoozeDuration = DEFAULT_SNOOZE_DURATION;
+  dismissDuration = DEFAULT_DISMISS_DURATION;
 
   backgroundColor = DEFAULT_BACKGROUND_COLOR;
   timeColor = DEFAULT_TIME_COLOR;
@@ -126,6 +128,8 @@ void ConfigManager::load()
   useCelsius = doc["useCelsius"] | DEFAULT_USE_CELSIUS;
   screenFlipped = doc["screenFlipped"] | DEFAULT_SCREEN_FLIPPED;
   timezone = doc["timezone"] | DEFAULT_TIMEZONE;
+  snoozeDuration = doc["snoozeDuration"] | DEFAULT_SNOOZE_DURATION;
+  dismissDuration = doc["dismissDuration"] | DEFAULT_DISMISS_DURATION;
 
   backgroundColor = doc["backgroundColor"] | DEFAULT_BACKGROUND_COLOR;
   if (backgroundColor.startsWith("%"))
@@ -219,6 +223,8 @@ bool ConfigManager::save()
   doc["useCelsius"] = useCelsius;
   doc["screenFlipped"] = screenFlipped;
   doc["timezone"] = timezone;
+  doc["snoozeDuration"] = snoozeDuration;
+  doc["dismissDuration"] = dismissDuration;
 
   doc["backgroundColor"] = backgroundColor;
   doc["timeColor"] = timeColor;
@@ -383,5 +389,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   useCelsius = DEFAULT_USE_CELSIUS;
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
   timezone = DEFAULT_TIMEZONE;
+  snoozeDuration = DEFAULT_SNOOZE_DURATION;
+  dismissDuration = DEFAULT_DISMISS_DURATION;
   _isDirty = true;
 }

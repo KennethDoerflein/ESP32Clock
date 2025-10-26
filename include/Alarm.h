@@ -12,9 +12,6 @@ const uint8_t DAY_THU = 1 << 4;
 const uint8_t DAY_FRI = 1 << 5;
 const uint8_t DAY_SAT = 1 << 6;
 
-// Define the snooze duration in milliseconds (e.g., 5 minutes)
-#define SNOOZE_DURATION_MS (5 * 60 * 1000)
-
 class Alarm
 {
 public:
@@ -45,13 +42,14 @@ public:
   void setLastDismissedDay(uint8_t day) { _lastDismissedDay = day; }
 
   /**
-   * @brief Snoozes the alarm for a predefined duration.
+   * @brief Snoozes the alarm for a user-defined duration.
+   * @param snoozeMinutes The duration in minutes to snooze for.
    */
-  void snooze()
+  void snooze(uint8_t snoozeMinutes)
   {
     _snoozed = true;
     // Use RTC unixtime for reboot resilience
-    _snoozeUntil = TimeManager::getInstance().getRTCTime().unixtime() + (SNOOZE_DURATION_MS / 1000);
+    _snoozeUntil = TimeManager::getInstance().getRTCTime().unixtime() + (snoozeMinutes * 60);
   }
 
   /**
