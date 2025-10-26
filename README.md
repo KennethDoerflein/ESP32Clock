@@ -127,19 +127,9 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] **Hardware Interaction:** Physical button for snooze and dismiss functions.
   - [x] **Audio Feedback:** Progressive alarm volume.
   - [x] **Display Feedback:** On-screen alarm indicator.
-
-### Work in Progress
-
-- [ ] **Alarms & User Interaction**
-  - [ ] **Alarm Management:**
-    - [ ] Let user set snooze duration
-    - [ ] Let user set hold to dismiss alarm duration
-  - [x] **Hardware Interaction:**
-    - [x] Implement a factory reset via a long-press of the boot button.
-  - [ ] **Display Feedback:**
-    - [x] Show a "ringing" screen when an alarm is going off.
-    - [ ] Show a snooze countdown.
-    - [x] Add a visual indicator for how long to hold the snooze button.
+  - [x] **Hardware Interaction:** Implement a factory reset via a long-press of the boot button.
+  - [x] **Display Feedback:** Show a "ringing" screen when an alarm is going off.
+  - [x] **Display Feedback:** Add a visual indicator for how long to hold the snooze button.
 - [x] **UI/UX Enhancements**
   - [x] Add an option to reset to defaults in the web interface.
   - [x] Improve TOD and seconds centering.
@@ -149,21 +139,20 @@ This project is broken down into phases to prioritize a functional base clock be
 - [x] **Firmware Updates**
   - [x] Warn the user if they try to leave the page during an update.
   - [x] Improve version handling (don't update version.h).
+
+### Work in Progress
+
+- [ ] **General Problems**
+  - [ ] wifi disconnects after a few hours
+- [ ] **Alarms & User Interaction**
+  - [ ] **Alarm Management:**
+    - [ ] Let user set snooze duration
+    - [ ] Let user set hold to dismiss alarm duration
+  - [ ] **Display Feedback:**
+    - [ ] Show a snooze countdown.
 - [ ] **Settings Management**
   - [ ] Add a dropdown to select the timezone.
   - [ ] Add an option to change the default page.
-
-### Known Issues
-
-- [x] **Alarms & User Interaction**
-  - [x] Alarms stopping instead of being snoozed.
-  - [x] Web UI alarm settings opens and closes when enabling or disabling alarm
-- [x] **UI/UX Enhancements**
-  - [x] Lag when leaving the Wi-Fi page due to scanning.
-- [x] **Web UI**
-  - [x] Can't scroll up while log message are being added
-- [ ] **General Problems**
-  - [ ] wifi disconnects after a few hours
 
 ### Future Plans
 
