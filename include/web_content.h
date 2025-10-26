@@ -751,6 +751,18 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                     <input class="form-check-input" type="checkbox" role="switch" id="screen-flipped" name="screenFlipped" %SCREEN_FLIPPED_CHECKED% />
                   </div>
                 </div>
+                <div class="mb-3 p-3 border rounded">
+                  <label for="timezone-select" class="form-label">Timezone</label>
+                  <select class="form-select" id="timezone-select" name="timezone">
+                    <option value="EST5EDT,M3.2.0,M11.1.0">Eastern Time</option>
+                    <option value="CST6CDT,M3.2.0,M11.1.0">Central Time</option>
+                    <option value="MST7MDT,M3.2.0,M11.1.0">Mountain Time</option>
+                    <option value="PST8PDT,M3.2.0,M11.1.0">Pacific Time</option>
+                    <option value="MST7">Arizona</option>
+                    <option value="AKST9AKDT,M3.2.0,M11.1.0">Alaska</option>
+                    <option value="HST10">Hawaii</option>
+                  </select>
+                </div>
               </form>
               <div class="d-grid gap-2 mt-3">
                 <button type="button" id="reset-general-btn" class="btn btn-danger" title="Reset all general settings to their default values.">Reset General Settings</button>
@@ -851,6 +863,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const twentyFourHourEl = document.getElementById("24hour");
       const celsiusEl = document.getElementById("celsius");
       const screenFlippedEl = document.getElementById("screen-flipped");
+      const timezoneEl = document.getElementById("timezone-select");
       const colorPickers = displaySettingsForm.querySelectorAll('input[type="color"]');
       const resetGeneralBtn = document.getElementById('reset-general-btn');
       const resetColorsBtn = document.getElementById('reset-colors-btn');
@@ -993,6 +1006,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         autoBrightnessEl.checked = settings.autoBrightness || false;
         celsiusEl.checked = settings.useCelsius || false;
         screenFlippedEl.checked = settings.screenFlipped || false;
+        timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0,M11.1.0";
 
         // Manually trigger UI updates that depend on these values
         updateBrightnessUI(settings);
@@ -1051,7 +1065,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           nightBrightness: parseInt(nightBrightnessEl.value),
           use24HourFormat: twentyFourHourEl.checked,
           useCelsius: celsiusEl.checked,
-          screenFlipped: screenFlippedEl.checked
+          screenFlipped: screenFlippedEl.checked,
+          timezone: timezoneEl.value
         };
 
         try {

@@ -12,6 +12,7 @@
 #include "display.h"
 #include "UpdateManager.h"
 #include "SerialLog.h"
+#include "ntp.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -176,6 +177,7 @@ void ClockWebServer::begin()
       doc["use24HourFormat"] = config.is24HourFormat();
       doc["useCelsius"] = config.isCelsius();
       doc["screenFlipped"] = config.isScreenFlipped();
+      doc["timezone"] = config.getTimezone();
       
       String response;
       serializeJson(doc, response);
@@ -207,6 +209,7 @@ void ClockWebServer::begin()
             else
             {
               auto &config = ConfigManager::getInstance();
+              String oldTimezone = config.getTimezone();
               bool oldScreenFlipped = config.isScreenFlipped();
               config.setAutoBrightness(doc["autoBrightness"]);
               config.setBrightness(doc["brightness"]);
@@ -217,12 +220,18 @@ void ClockWebServer::begin()
               config.set24HourFormat(doc["use24HourFormat"]);
               config.setCelsius(doc["useCelsius"]);
               config.setScreenFlipped(doc["screenFlipped"]);
+              config.setTimezone(doc["timezone"]);
               config.save();
 
               if (oldScreenFlipped != config.isScreenFlipped())
               {
                 Display::getInstance().updateRotation();
                 DisplayManager::getInstance().requestFullRefresh();
+              }
+
+              if (oldTimezone != config.getTimezone())
+              {
+                startNtpSync();
               }
 
               request->send(200, "text/plain", "Settings saved!");

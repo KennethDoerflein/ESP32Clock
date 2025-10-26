@@ -9,6 +9,7 @@
 #include "ntp.h"
 #include "sensors.h"
 #include "SerialLog.h"
+#include "ConfigManager.h"
 #include <Arduino.h>
 
 // --- Common NTP Constants ---
@@ -18,8 +19,6 @@ const char *NTP_SERVER = "time.nist.gov";
 const char *BACKUP_NTP_SERVER = "time.cloudflare.com";
 /// @brief Second backup NTP server address.
 const char *BACKUP2_NTP_SERVER = "us.pool.ntp.org";
-/// @brief Timezone information string for US Eastern Time (EST/EDT).
-const char *TZ_INFO = "EST5EDT,M3.2.0,M11.1.0";
 
 /// @brief Maximum number of retry attempts for NTP synchronization.
 const int maxRetries = 25;
@@ -81,7 +80,7 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
 bool getNTPData(struct tm &timeinfo)
 {
   configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
-  setenv("TZ", TZ_INFO, 1);
+  setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
   tzset();
   // The getLocalTime function expects a pointer to the tm struct
   return getLocalTime(&timeinfo);

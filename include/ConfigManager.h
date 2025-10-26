@@ -50,6 +50,7 @@ public:
   static constexpr bool DEFAULT_USE_24_HOUR_FORMAT = false;
   static constexpr bool DEFAULT_USE_CELSIUS = false;
   static constexpr bool DEFAULT_SCREEN_FLIPPED = false;
+  static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0,M11.1.0";
 
   /**
    * @brief Gets the singleton instance of the ConfigManager.
@@ -162,6 +163,12 @@ public:
    * @return True if the screen is flipped, false otherwise.
    */
   bool isScreenFlipped() const { return screenFlipped; }
+
+  /**
+   * @brief Gets the timezone string.
+   * @return The timezone string.
+   */
+  String getTimezone() const { return timezone; }
 
   // Display Colors
   String getBackgroundColor() const { return backgroundColor; }
@@ -386,6 +393,19 @@ public:
   }
 
   /**
+   * @brief Sets the timezone string.
+   * @param tz The new timezone string.
+   */
+  void setTimezone(const String &tz)
+  {
+    if (timezone != tz)
+    {
+      timezone = tz;
+      _isDirty = true;
+    }
+  }
+
+  /**
    * @brief Updates an alarm at a specific index.
    * @param index The index of the alarm to update.
    * @param alarm The new alarm data.
@@ -553,6 +573,7 @@ private:
   bool use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
   bool useCelsius = DEFAULT_USE_CELSIUS;
   bool screenFlipped = DEFAULT_SCREEN_FLIPPED;
+  String timezone = DEFAULT_TIMEZONE;
 
   // Colors
   String backgroundColor = DEFAULT_BACKGROUND_COLOR;

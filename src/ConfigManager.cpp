@@ -44,6 +44,7 @@ void ConfigManager::setDefaults()
   use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
   useCelsius = DEFAULT_USE_CELSIUS;
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
+  timezone = DEFAULT_TIMEZONE;
 
   backgroundColor = DEFAULT_BACKGROUND_COLOR;
   timeColor = DEFAULT_TIME_COLOR;
@@ -124,6 +125,7 @@ void ConfigManager::load()
   use24HourFormat = doc["use24HourFormat"] | DEFAULT_USE_24_HOUR_FORMAT;
   useCelsius = doc["useCelsius"] | DEFAULT_USE_CELSIUS;
   screenFlipped = doc["screenFlipped"] | DEFAULT_SCREEN_FLIPPED;
+  timezone = doc["timezone"] | DEFAULT_TIMEZONE;
 
   backgroundColor = doc["backgroundColor"] | DEFAULT_BACKGROUND_COLOR;
   if (backgroundColor.startsWith("%"))
@@ -216,6 +218,7 @@ bool ConfigManager::save()
   doc["use24HourFormat"] = use24HourFormat;
   doc["useCelsius"] = useCelsius;
   doc["screenFlipped"] = screenFlipped;
+  doc["timezone"] = timezone;
 
   doc["backgroundColor"] = backgroundColor;
   doc["timeColor"] = timeColor;
@@ -379,5 +382,6 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
   useCelsius = DEFAULT_USE_CELSIUS;
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
+  timezone = DEFAULT_TIMEZONE;
   _isDirty = true;
 }
