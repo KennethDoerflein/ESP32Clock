@@ -60,7 +60,7 @@ The components are connected using the I2C and SPI buses.
 |                            | GND       | GND           | Shared ground         |
 |                            | SDA       | GPIO 8        | Shared data line      |
 |                            | SCL       | GPIO 9        | Shared clock line     |
-|           DS3231           | SQW       | GPIO 35       | Interrupt for alarms  |
+|           DS3231           | SQW       | GPIO 2        | Interrupt for alarms  |
 | **Active Buzzer**          | +         | GPIO 4        | Any free GPIO         |
 |                            | -         | GND           | Common ground         |
 | **Stop/Snooze Button**     | One leg   | GPIO 5        | Use INPUT_PULLUP mode |
