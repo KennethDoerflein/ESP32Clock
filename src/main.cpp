@@ -341,30 +341,40 @@ void loop()
   }
 
   // --- State-based Interrupt Management ---
-  // We use a state variable to detect the transition to/from ringing,
-  // allowing us to detach the interrupt only once when the alarm starts
-  // and re-attach it only once when it stops.
-  static bool alarmWasRinging = false;
-  bool alarmIsRinging = alarmManager.isRinging();
-
-  if (alarmIsRinging && !alarmWasRinging)
+  // We use a state variable to detect the transition to/from ringing or snoozing,
+  // allowing us to detach the interrupt only once when an alarm-related
+  // action is possible, and re-attach it when it's not.
+  static bool wasInAlarmOrSnoozeState = false;
+  bool isRinging = alarmManager.isRinging();
+  bool isSnoozed = false;
+  for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    // Alarm has just started: detach the page-cycling interrupt
+    if (config.getAlarm(i).isSnoozed())
+    {
+      isSnoozed = true;
+      break;
+    }
+  }
+  bool isInAlarmOrSnoozeState = isRinging || isSnoozed;
+
+  if (isInAlarmOrSnoozeState && !wasInAlarmOrSnoozeState)
+  {
+    // An alarm is ringing or snoozed: detach the page-cycling interrupt
     // so it doesn't conflict with the polling logic for snooze/dismiss.
     detachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN));
     newPress = false; // Clear any pending button press from the interrupt
-    SerialLog::getInstance().print("Alarm started. Interrupt detached.\n");
+    SerialLog::getInstance().print("Alarm/Snooze state entered. Interrupt detached.\n");
   }
-  else if (!alarmIsRinging && alarmWasRinging)
+  else if (!isInAlarmOrSnoozeState && wasInAlarmOrSnoozeState)
   {
-    // Alarm has just stopped: re-attach the interrupt for normal operation.
+    // Alarm has stopped and no alarm is snoozed: re-attach the interrupt for normal operation.
     attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
-    SerialLog::getInstance().print("Alarm stopped. Interrupt re-attached.\n");
+    SerialLog::getInstance().print("Alarm/Snooze state exited. Interrupt re-attached.\n");
   }
-  alarmWasRinging = alarmIsRinging; // Update state for the next loop
+  wasInAlarmOrSnoozeState = isInAlarmOrSnoozeState; // Update state for the next loop
 
   // --- Button Handling Logic (Switches between polling and interrupts) ---
-  if (alarmIsRinging)
+  if (isRinging)
   {
     // --- Polling-based logic for when an alarm is active ---
     if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
@@ -403,7 +413,10 @@ void loop()
           alarmManager.stop();
           if (displayManager.getCurrentPageIndex() == 0)
           {
-            static_cast<ClockPage *>(displayManager.getCurrentPage())->clearAlarmSprite();
+            // Reset the progress bar to 0 and then force a full render update
+            // to show the new snooze state and ensure the progress bar is cleared.
+            static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(0.0f);
+            displayManager.update();
           }
         }
         actionTaken = true; // Ensure dismiss is only called once
@@ -414,7 +427,7 @@ void loop()
       // Button is not pressed (it's released)
       if (alarmButtonPressTime > 0 && !actionTaken)
       {
-        // Button was released before the 3-second dismiss
+        // Button was released before the dismiss action, so snooze.
         SerialLog::getInstance().print("Alarm active: Button released. Snoozing.\n");
         int alarmId = alarmManager.getActiveAlarmId();
         if (alarmId != -1)
@@ -426,19 +439,84 @@ void loop()
           alarmManager.stop();
           if (displayManager.getCurrentPageIndex() == 0)
           {
-            static_cast<ClockPage *>(displayManager.getCurrentPage())->clearAlarmSprite();
+            // Reset the progress bar and then force a full render update
+            // to show the new snooze state and ensure the progress bar is cleared.
+            static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(0.0f);
+            displayManager.update();
           }
         }
       }
-      // Reset for the next press
+      // Always reset the button timer and action flag on release.
       alarmButtonPressTime = 0;
+      actionTaken = false;
+    }
+  }
+  else if (isSnoozed)
+  {
+    // --- Polling-based logic for when an alarm is snoozed ---
+    if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
+    {
+      // Button is currently pressed
+      if (alarmButtonPressTime == 0)
+      {
+        // Button was just pressed
+        alarmButtonPressTime = currentMillis;
+        actionTaken = false;
+        SerialLog::getInstance().print("Snooze active: Button press detected.\n");
+      }
+      else if (!actionTaken)
+      {
+        // Update the progress bar while the button is held
+        float progress = (float)(currentMillis - alarmButtonPressTime) / 3000.0f;
+        if (displayManager.getCurrentPageIndex() == 0)
+        {
+          static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(progress);
+          displayManager.update();
+        }
+      }
+
+      // If the button is held long enough, end the snooze for all snoozed alarms
+      if (!actionTaken && currentMillis - alarmButtonPressTime > 3000) // 3-second hold
+      {
+        SerialLog::getInstance().print("Snooze active: Button held. Ending snooze.\n");
+        for (int i = 0; i < config.getNumAlarms(); ++i)
+        {
+          Alarm alarm = config.getAlarm(i);
+          if (alarm.isSnoozed())
+          {
+            alarm.dismiss(timeManager.getRTCTime());
+            config.setAlarm(i, alarm);
+          }
+        }
+        config.save();
+        if (displayManager.getCurrentPageIndex() == 0)
+        {
+          // Force the alarm sprite to re-render, which will now be empty
+          static_cast<ClockPage *>(displayManager.getCurrentPage())->updateAlarmSprite();
+        }
+        actionTaken = true; // Ensure action is only called once
+      }
+    }
+    else
+    {
+      // Button is not pressed (it's released)
+      if (alarmButtonPressTime > 0)
+      {
+        // If the button was being held, reset the progress bar and timer.
+        if (displayManager.getCurrentPageIndex() == 0)
+        {
+          static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(0.0f);
+          displayManager.update();
+        }
+        alarmButtonPressTime = 0;
+      }
     }
   }
   else if (newPress)
   {
     // --- Interrupt-based logic for normal operations (page cycling) ---
-    // This code only runs when the alarm is not ringing, because the
-    // interrupt that sets `newPress` is detached during an alarm.
+    // This code only runs when no alarm is ringing or snoozed, because the
+    // interrupt that sets `newPress` is detached during those states.
     unsigned long duration;
     noInterrupts();
     duration = pressDuration;

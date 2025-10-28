@@ -120,6 +120,8 @@ The physical button (connected to GPIO 5) serves multiple purposes depending on 
 -   **Alarm Ringing**:
     -   A **short press** will **snooze** the alarm for the duration specified in the web interface.
     -   **Pressing and holding** the button will **dismiss** the alarm. The required hold time can be configured in the web interface.
+-   **Alarm Snoozed**:
+    -   **Pressing and holding** the button for 3 seconds will end the snooze and dismiss the alarm.
 
 ### Factory Reset
 

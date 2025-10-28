@@ -24,6 +24,7 @@ public:
   void refresh(TFT_eSPI &tft, bool fullRefresh) override;
   void setDismissProgress(float progress);
   void clearAlarmSprite();
+  void updateAlarmSprite();
 
 private:
   void setupSprites(TFT_eSPI &tft);
@@ -36,7 +37,6 @@ private:
   void drawSeconds(TFT_eSPI &tft);
   void updateSpriteColors();
   void initAlarmSprite(TFT_eSPI &tft);
-  void updateAlarmSprite();
 
   // Flag to track sprite creation
   bool _spritesCreated = false;

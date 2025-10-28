@@ -17,7 +17,6 @@
 
 #define MARGIN 10
 
-
 ClockPage::ClockPage(TFT_eSPI *tft)
     : sprClock(tft), sprDayOfWeek(tft), sprDate(tft), sprTemp(tft), sprHumidity(tft), sprTOD(tft), sprSeconds(tft),
       _alarmSprite(tft), _tft(tft)
@@ -423,7 +422,7 @@ void ClockPage::updateAlarmSprite()
   }
   else if (anySnoozed)
   {
-    _dismissProgress = 0.0f;
+    bool foundSnoozed = false;
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
       const auto &alarm = config.getAlarm(i);
@@ -440,8 +439,22 @@ void ClockPage::updateAlarmSprite()
         char buf[10];
         snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
         _alarmSprite.drawString(buf, _alarmSprite.width() / 2, _alarmSprite.height() / 2);
+        foundSnoozed = true;
         break;
       }
+    }
+    if (!foundSnoozed)
+    {
+      // This case is reached if the snooze was just cancelled.
+      // The sprite is explicitly cleared to ensure no stale countdown is shown.
+      _alarmSprite.fillSprite(_bgColor);
+    }
+
+    // Also draw the progress bar if the button is being held
+    if (_dismissProgress > 0.0f)
+    {
+      int barWidth = _alarmSprite.width() * _dismissProgress;
+      _alarmSprite.fillRect(0, _alarmSprite.height() - 10, barWidth, 10, hexToRGB565(config.getAlarmTextColor().c_str()));
     }
   }
   else
