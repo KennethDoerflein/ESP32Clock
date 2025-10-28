@@ -475,6 +475,7 @@ void loop()
     // Only attempt to sync time with the internet if connected.
     timeManager.updateNtp();
     timeManager.checkDailySync();
+    timeManager.checkDriftAndResync();
   }
 
   // --- Handle Boot Button for Factory Reset (Runs regardless of WiFi connection) ---

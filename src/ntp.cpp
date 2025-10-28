@@ -205,3 +205,22 @@ void resetNtpSync()
   ntpState = NTP_SYNC_IDLE;
   SerialLog::getInstance().print("NTP sync state reset to IDLE.");
 }
+
+DateTime getNtpTime()
+{
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo))
+  {
+    SerialLog::getInstance().print("Failed to obtain NTP time.\n");
+    return DateTime(); // Return an invalid DateTime
+  }
+
+  // Convert tm struct to DateTime object
+  return DateTime(
+      timeinfo.tm_year + 1900,
+      timeinfo.tm_mon + 1,
+      timeinfo.tm_mday,
+      timeinfo.tm_hour,
+      timeinfo.tm_min,
+      timeinfo.tm_sec);
+}

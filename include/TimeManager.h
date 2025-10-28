@@ -132,6 +132,15 @@ public:
    */
   void checkDailySync();
 
+  /**
+   * @brief Periodically checks RTC drift against NTP and resyncs if needed.
+   *
+   * This function is designed to be called in the main loop. It checks the
+   * time drift at a defined interval (e.g., every 4 hours) and triggers a
+   * non-blocking NTP sync if the drift exceeds a specified threshold.
+   */
+  void checkDriftAndResync();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
@@ -146,6 +155,9 @@ private:
 
   /// @brief The interval at which the `update` method runs its checks, in milliseconds.
   static constexpr unsigned long UPDATE_INTERVAL = 1000; // 1 second
+
+  /// @brief Timestamp of the last drift check.
+  unsigned long lastDriftCheck = 0;
 
   uint32_t _lastTimeChecked = 0; ///< Stores the Unix timestamp of the last alarm check.
 };

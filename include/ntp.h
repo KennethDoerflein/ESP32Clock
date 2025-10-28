@@ -83,3 +83,15 @@ NtpSyncState updateNtpSync();
  * the system from getting stuck in a SUCCESS or FAILED state.
  */
 void resetNtpSync();
+
+/**
+ * @brief Fetches the current time from an NTP server without setting the RTC.
+ *
+ * This function retrieves the time from an NTP server and returns it as a
+ * DateTime object. It is useful for checking the current time without
+ * modifying the system's RTC.
+ *
+ * @return A DateTime object representing the current NTP time. If the sync
+ *         fails, the returned object will be invalid (`!isValid()`).
+ */
+DateTime getNtpTime();

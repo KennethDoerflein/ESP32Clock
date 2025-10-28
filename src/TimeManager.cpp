@@ -249,6 +249,45 @@ void TimeManager::checkAlarms()
   _lastTimeChecked = nowSeconds;
 }
 
+void TimeManager::checkDriftAndResync()
+{
+  // How often to check for drift (e.g., every 4 hours).
+  const unsigned long DRIFT_CHECK_INTERVAL = 4 * 60 * 60 * 1000;
+  // The maximum acceptable drift in seconds before forcing a resync.
+  const int DRIFT_THRESHOLD_SECONDS = 2;
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastDriftCheck < DRIFT_CHECK_INTERVAL)
+  {
+    return; // Not time for a drift check yet.
+  }
+  lastDriftCheck = currentMillis;
+
+  SerialLog::getInstance().print("Performing periodic clock drift check...\n");
+
+  // Get the current time from the NTP server without adjusting the RTC.
+  DateTime ntpTime = getNtpTime();
+  if (!ntpTime.isValid())
+  {
+    SerialLog::getInstance().print("Drift check failed: Could not get NTP time.\n");
+    return;
+  }
+
+  // Get the current time from the local RTC.
+  DateTime rtcTime = RTC.now();
+  // Calculate the time difference.
+  TimeSpan drift = rtcTime - ntpTime;
+
+  SerialLog::getInstance().printf("RTC vs NTP drift is %ld seconds.\n", drift.totalseconds());
+
+  // If the absolute drift exceeds the threshold, start a non-blocking sync.
+  if (abs(drift.totalseconds()) > DRIFT_THRESHOLD_SECONDS)
+  {
+    SerialLog::getInstance().print("Drift exceeds threshold. Triggering NTP resync...\n");
+    startNtpSync();
+  }
+}
+
 void TimeManager::updateSnoozeStates()
 {
   if (AlarmManager::getInstance().isRinging())
