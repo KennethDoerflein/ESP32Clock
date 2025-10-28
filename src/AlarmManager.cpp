@@ -8,6 +8,7 @@
 
 // --- Constants ---
 constexpr unsigned long ALARM_RESUME_DELAY_MS = 5000;
+constexpr unsigned long ALARM_AUTO_OFF_SECONDS = 1800; // 30 minutes
 
 // --- Constants for the ramping alarm state machine ---
 const unsigned long STAGE1_DURATION_MS = 10000; // 10 seconds of slow beeping
@@ -55,6 +56,14 @@ void AlarmManager::update()
   // --- Stage Progression Logic ---
   uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();
   uint32_t alarmElapsedSeconds = now - _alarmStartTimestamp;
+
+  // --- Auto-off Logic ---
+  if (alarmElapsedSeconds >= ALARM_AUTO_OFF_SECONDS)
+  {
+    SerialLog::getInstance().print("AlarmManager: Auto-stopping alarm after 30 minutes.\n");
+    stop();
+    return;
+  }
 
   if (_rampStage == STAGE_SLOW_BEEP && alarmElapsedSeconds >= (STAGE1_DURATION_MS / 1000))
   {
