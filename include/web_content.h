@@ -671,6 +671,28 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         border: none;
         cursor: pointer;
       }
+      /* Make range inputs easier to use on touch devices */
+      .form-range {
+        padding: 0;
+      }
+      .form-range::-webkit-slider-thumb {
+        width: 2rem;
+        height: 2rem;
+        margin-top: -0.75rem; /* Vertically center thumb on track */
+      }
+      .form-range::-moz-range-thumb {
+        width: 2rem;
+        height: 2rem;
+      }
+      .form-range::-webkit-slider-runnable-track {
+        height: 0.5rem;
+      }
+      .form-range::-moz-range-track {
+        height: 0.5rem;
+      }
+      .form-range::-ms-track {
+        height: 0.5rem;
+      }
   </style>
 </head>
   <body>
