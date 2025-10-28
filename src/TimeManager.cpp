@@ -13,21 +13,9 @@ void TimeManager::begin()
 {
   // Note: RTC hardware initialization is handled externally in setupSensors()
   // to group all I2C device setups together.
-  SerialLog::getInstance().print("TimeManager: Initializing...\n");
-
-  // If the RTC is already set, start a non-blocking sync in the background.
-  // This prevents the UI from freezing on startup if the network is slow.
-  if (isTimeSet())
-  {
-    SerialLog::getInstance().print("RTC time is valid. Starting non-blocking NTP sync.\n");
-    startNtpSync();
-  }
-  else
-  {
-    // If the RTC is not set, perform a blocking sync to get the time immediately.
-    SerialLog::getInstance().print("RTC time not set. Performing blocking NTP sync...\n");
-    syncWithNTP();
-  }
+  // Perform an initial NTP sync attempt at startup.
+  SerialLog::getInstance().print("TimeManager: Performing initial NTP sync...\n");
+  syncWithNTP();
 }
 
 bool TimeManager::update()
