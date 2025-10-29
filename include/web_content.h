@@ -864,7 +864,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
     <script>
-      const DEBOUNCE_DELAY_MS = 3000;
+      const DEBOUNCE_DELAY_MS = 10000;
       const ERROR_DISPLAY_MS = 3000;
       let saveGeneralTimeout;
       let saveDisplayTimeout;
