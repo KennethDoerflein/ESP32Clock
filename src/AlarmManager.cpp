@@ -1,7 +1,7 @@
 // AlarmManager.cpp
 
 #include "AlarmManager.h"
-#include "display.h"
+#include "Display.h"
 #include "DisplayManager.h"
 #include "SerialLog.h"
 #include "ConfigManager.h"

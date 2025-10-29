@@ -1,10 +1,8 @@
-// web_content.h
-
 #ifndef WEB_CONTENT_H
 #define WEB_CONTENT_H
 
 /**
- * @file web_content.h
+ * @file WebContent.h
  * @brief Contains the HTML, CSS, and JavaScript for the web interface.
  *
  * All content is stored as C-style string literals in PROGMEM to conserve RAM.

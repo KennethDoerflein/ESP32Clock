@@ -4,7 +4,7 @@
 #include <WiFi.h>
 #include <DNSServer.h>
 #include "ConfigManager.h"
-#include "display.h"
+#include "Display.h"
 #include "ClockWebServer.h"
 #include <ArduinoJson.h>
 #include "SerialLog.h"

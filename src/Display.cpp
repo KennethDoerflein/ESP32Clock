@@ -1,4 +1,4 @@
-#include "display.h"
+#include "Display.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
 #include "fonts/CenturyGothic28.h"

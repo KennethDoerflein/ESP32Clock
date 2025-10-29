@@ -4,15 +4,15 @@
 #include "ConfigManager.h"
 #include "DisplayManager.h"
 #include "WiFiManager.h"
-#include "web_content.h"
+#include "WebContent.h"
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <WiFi.h>
-#include "sensors.h"
-#include "display.h"
+#include "SensorModule.h"
+#include "Display.h"
 #include "UpdateManager.h"
 #include "SerialLog.h"
-#include "ntp.h"
+#include "NtpSync.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.

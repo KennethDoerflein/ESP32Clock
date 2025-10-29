@@ -1,5 +1,3 @@
-// sensors.h
-
 #pragma once
 #include <Arduino.h>
 #include <Wire.h>
@@ -7,7 +5,7 @@
 #include <Adafruit_BME280.h>
 
 /**
- * @file sensors.h
+ * @file SensorModule.h
  * @brief Manages hardware sensors like the BME280 and the RTC.
  *
  * This file declares the global sensor objects and the functions used to

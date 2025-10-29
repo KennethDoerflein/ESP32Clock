@@ -6,8 +6,8 @@
  * methods to synchronize the device's RTC with an NTP server. It uses
  * a robust retry mechanism with exponential backoff and jitter.
  */
-#include "ntp.h"
-#include "sensors.h"
+#include "NtpSync.h"
+#include "SensorModule.h"
 #include "SerialLog.h"
 #include "ConfigManager.h"
 #include <Arduino.h>

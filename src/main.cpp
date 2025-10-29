@@ -17,8 +17,8 @@
 // Include all custom module headers.
 #include "ConfigManager.h"
 #include "AlarmManager.h"
-#include "sensors.h"
-#include "display.h"
+#include "SensorModule.h"
+#include "Display.h"
 #include "TimeManager.h"
 #include "WiFiManager.h"
 #include "DisplayManager.h"

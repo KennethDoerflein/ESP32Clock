@@ -1,6 +1,6 @@
 // sensors.cpp
 
-#include "sensors.h"
+#include "SensorModule.h"
 #include "ConfigManager.h"
 #include "driver/temp_sensor.h"
 

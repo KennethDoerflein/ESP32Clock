@@ -3,10 +3,10 @@
 
 #include "pages/ClockPage.h"
 #include "constants.h"
-#include "utils.h"
+#include "Utils.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
-#include "sensors.h"
+#include "SensorModule.h"
 #include "AlarmManager.h"
 #include "fonts/DSEG7ModernBold104.h"
 #include "fonts/DSEG14ModernBold32.h"

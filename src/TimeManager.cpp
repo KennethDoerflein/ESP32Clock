@@ -3,8 +3,8 @@
 // #define LOG_TICKS
 
 #include "TimeManager.h"
-#include "ntp.h"
-#include "sensors.h"
+#include "NtpSync.h"
+#include "SensorModule.h"
 #include "ConfigManager.h"
 #include "AlarmManager.h"
 #include "SerialLog.h"

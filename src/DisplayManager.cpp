@@ -1,6 +1,6 @@
 #include "DisplayManager.h"
 #include "constants.h"
-#include "utils.h"
+#include "Utils.h"
 #include "ConfigManager.h"
 
 void DisplayManager::begin(TFT_eSPI &tft_instance)
