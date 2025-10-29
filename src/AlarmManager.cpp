@@ -109,7 +109,7 @@ void AlarmManager::stop()
   auto &config = ConfigManager::getInstance();
   config.setRingingAlarmId(-1);
   config.setRingingAlarmStartTimestamp(0);
-  config.save(); // Persist the change immediately
+  config.saveRingingAlarmState(); // Persist the change immediately
 
   // --- Reset state machine ---
   _rampStage = STAGE_SLOW_BEEP;
@@ -148,7 +148,7 @@ void AlarmManager::trigger(uint8_t alarmId)
   auto &config = ConfigManager::getInstance();
   config.setRingingAlarmId(alarmId);
   config.setRingingAlarmStartTimestamp(_alarmStartTimestamp);
-  config.save(); // Persist the change immediately
+  config.saveRingingAlarmState(); // Persist the change immediately
 
   // Switch to the clock page before showing the alarm overlay
   DisplayManager::getInstance().setPage(0);

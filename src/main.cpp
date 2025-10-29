@@ -432,9 +432,6 @@ void loop()
           config.setAlarm(alarmId, alarm);
           config.save();
           alarmManager.stop();
-#ifdef USE_RTC_ALARMS
-          timeManager.setNextAlarms();
-#endif
           if (displayManager.getCurrentPageIndex() == 0)
           {
             // Reset the progress bar to 0 and then force a full render update
@@ -461,9 +458,6 @@ void loop()
           config.setAlarm(alarmId, alarm);
           config.save();
           alarmManager.stop();
-#ifdef USE_RTC_ALARMS
-          timeManager.setNextAlarms();
-#endif
           if (displayManager.getCurrentPageIndex() == 0)
           {
             // Reset the progress bar and then force a full render update

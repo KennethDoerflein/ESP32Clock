@@ -201,6 +201,12 @@ bool ConfigManager::save()
   return true;
 }
 
+void ConfigManager::saveRingingAlarmState()
+{
+  _preferences.putChar("ringAlarmId", ringingAlarmId);
+  _preferences.putUInt("ringAlarmTS", ringingAlarmStartTimestamp);
+}
+
 const Alarm &ConfigManager::getAlarm(int index) const
 {
   if (index < 0 || index >= MAX_ALARMS)

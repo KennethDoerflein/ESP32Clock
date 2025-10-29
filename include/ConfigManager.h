@@ -279,7 +279,6 @@ public:
     if (ringingAlarmId != id)
     {
       ringingAlarmId = id;
-      _isDirty = true;
     }
   }
 
@@ -292,7 +291,6 @@ public:
     if (ringingAlarmStartTimestamp != timestamp)
     {
       ringingAlarmStartTimestamp = timestamp;
-      _isDirty = true;
     }
   }
 
@@ -552,6 +550,7 @@ public:
    * @brief Clears the dirty flag, usually after handling the changes.
    */
   void clearDirtyFlag() { _isDirty = false; }
+  void saveRingingAlarmState();
 
   /**
    * @brief Resets all settings to their default values.
