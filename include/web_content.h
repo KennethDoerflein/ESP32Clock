@@ -121,7 +121,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   %HEAD%
 </head>
 <body>
-  <div class="container mt-5">
+  <div class="container my-5">
     <div class="card shadow-sm">
       <div class="card-body text-center">
         <h1 class="card-title mb-4">Control Panel</h1>
@@ -418,7 +418,7 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
-  <div class="container mt-5">
+  <div class="container my-5">
     <div class="card shadow-sm">
       <div class="card-body">
         <h1 class="card-title text-center mb-4">%WIFI_PAGE_TITLE%</h1>
@@ -1300,7 +1300,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
     </style>
   </head>
   <body>
-    <div class="container mt-5">
+    <div class="container my-5">
       <div class="card shadow-sm">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-4">
@@ -1612,7 +1612,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
-  <div class="container mt-5">
+  <div class="container my-5">
     <div class="card shadow-sm">
       <div class="card-body">
         <h1 class="card-title text-center mb-4">System</h1>
