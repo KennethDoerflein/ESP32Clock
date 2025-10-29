@@ -61,13 +61,13 @@ void ConfigManager::setDefaults()
 void ConfigManager::load()
 {
   // Check if this is the first boot
-  bool firstBoot = !_preferences.getBool("first_boot_done", false);
+  bool firstBoot = !_preferences.getBool("firstBootDone", false);
   if (firstBoot)
   {
     SerialLog::getInstance().print("First boot detected. Loading default configuration.");
     setDefaults();
     save(); // Save defaults to preferences
-    _preferences.putBool("first_boot_done", true);
+    _preferences.putBool("firstBootDone", true);
     return;
   }
 
@@ -75,36 +75,36 @@ void ConfigManager::load()
 
   // Load each setting from the Preferences
   wifiSSID = _preferences.getString("wifiSSID", DEFAULT_WIFI_SSID);
-  wifiPassword = _preferences.getString("wifiPassword", DEFAULT_WIFI_PASSWORD);
+  wifiPassword = _preferences.getString("wifiPass", DEFAULT_WIFI_PASSWORD);
   hostname = _preferences.getString("hostname", DEFAULT_HOSTNAME);
-  wifiCredsValid = _preferences.getBool("wifiCredsValid", DEFAULT_WIFI_CREDS_VALID);
-  ringingAlarmId = _preferences.getChar("ringingAlarmId", DEFAULT_RINGING_ALARM_ID);
-  ringingAlarmStartTimestamp = _preferences.getUInt("ringingAlarmStart", DEFAULT_RINGING_ALARM_TIMESTAMP);
-  autoBrightness = _preferences.getBool("autoBrightness", DEFAULT_AUTO_BRIGHTNESS);
+  wifiCredsValid = _preferences.getBool("wifiValid", DEFAULT_WIFI_CREDS_VALID);
+  ringingAlarmId = _preferences.getChar("ringAlarmId", DEFAULT_RINGING_ALARM_ID);
+  ringingAlarmStartTimestamp = _preferences.getUInt("ringAlarmTS", DEFAULT_RINGING_ALARM_TIMESTAMP);
+  autoBrightness = _preferences.getBool("autoBright", DEFAULT_AUTO_BRIGHTNESS);
   brightness = _preferences.getUChar("brightness", DEFAULT_BRIGHTNESS);
-  autoBrightnessStartHour = _preferences.getUChar("autoBrightStart", DEFAULT_AUTO_BRIGHTNESS_START_HOUR);
-  autoBrightnessEndHour = _preferences.getUChar("autoBrightEnd", DEFAULT_AUTO_BRIGHTNESS_END_HOUR);
-  dayBrightness = _preferences.getUChar("dayBrightness", DEFAULT_DAY_BRIGHTNESS);
-  nightBrightness = _preferences.getUChar("nightBrightness", DEFAULT_NIGHT_BRIGHTNESS);
-  use24HourFormat = _preferences.getBool("use24HourFormat", DEFAULT_USE_24_HOUR_FORMAT);
+  autoBrightnessStartHour = _preferences.getUChar("autoBrStartHr", DEFAULT_AUTO_BRIGHTNESS_START_HOUR);
+  autoBrightnessEndHour = _preferences.getUChar("autoBrEndHr", DEFAULT_AUTO_BRIGHTNESS_END_HOUR);
+  dayBrightness = _preferences.getUChar("dayBright", DEFAULT_DAY_BRIGHTNESS);
+  nightBrightness = _preferences.getUChar("nightBright", DEFAULT_NIGHT_BRIGHTNESS);
+  use24HourFormat = _preferences.getBool("is24Hour", DEFAULT_USE_24_HOUR_FORMAT);
   useCelsius = _preferences.getBool("useCelsius", DEFAULT_USE_CELSIUS);
-  screenFlipped = _preferences.getBool("screenFlipped", DEFAULT_SCREEN_FLIPPED);
+  screenFlipped = _preferences.getBool("screenFlip", DEFAULT_SCREEN_FLIPPED);
   timezone = _preferences.getString("timezone", DEFAULT_TIMEZONE);
-  snoozeDuration = _preferences.getUChar("snoozeDuration", DEFAULT_SNOOZE_DURATION);
-  dismissDuration = _preferences.getUChar("dismissDuration", DEFAULT_DISMISS_DURATION);
+  snoozeDuration = _preferences.getUChar("snoozeDur", DEFAULT_SNOOZE_DURATION);
+  dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
 
-  backgroundColor = _preferences.getString("backgroundColor", DEFAULT_BACKGROUND_COLOR);
-  timeColor = _preferences.getString("timeColor", DEFAULT_TIME_COLOR);
-  todColor = _preferences.getString("todColor", DEFAULT_TOD_COLOR);
-  secondsColor = _preferences.getString("secondsColor", DEFAULT_SECONDS_COLOR);
-  dayOfWeekColor = _preferences.getString("dayOfWeekColor", DEFAULT_DAY_OF_WEEK_COLOR);
-  dateColor = _preferences.getString("dateColor", DEFAULT_DATE_COLOR);
-  tempColor = _preferences.getString("tempColor", DEFAULT_TEMP_COLOR);
-  humidityColor = _preferences.getString("humidityColor", DEFAULT_HUMIDITY_COLOR);
-  alarmIconColor = _preferences.getString("alarmIconColor", DEFAULT_ALARM_ICON_COLOR);
-  snoozeIconColor = _preferences.getString("snoozeIconColor", DEFAULT_SNOOZE_ICON_COLOR);
-  alarmTextColor = _preferences.getString("alarmTextColor", DEFAULT_ALARM_TEXT_COLOR);
-  errorTextColor = _preferences.getString("errorTextColor", DEFAULT_ERROR_TEXT_COLOR);
+  backgroundColor = _preferences.getString("bgClr", DEFAULT_BACKGROUND_COLOR);
+  timeColor = _preferences.getString("timeClr", DEFAULT_TIME_COLOR);
+  todColor = _preferences.getString("todClr", DEFAULT_TOD_COLOR);
+  secondsColor = _preferences.getString("secondsClr", DEFAULT_SECONDS_COLOR);
+  dayOfWeekColor = _preferences.getString("dayOfWeekClr", DEFAULT_DAY_OF_WEEK_COLOR);
+  dateColor = _preferences.getString("dateClr", DEFAULT_DATE_COLOR);
+  tempColor = _preferences.getString("tempClr", DEFAULT_TEMP_COLOR);
+  humidityColor = _preferences.getString("humidityClr", DEFAULT_HUMIDITY_COLOR);
+  alarmIconColor = _preferences.getString("alarmIconClr", DEFAULT_ALARM_ICON_COLOR);
+  snoozeIconColor = _preferences.getString("snzIconClr", DEFAULT_SNOOZE_ICON_COLOR);
+  alarmTextColor = _preferences.getString("alarmTextClr", DEFAULT_ALARM_TEXT_COLOR);
+  errorTextColor = _preferences.getString("errorTextClr", DEFAULT_ERROR_TEXT_COLOR);
 
   // Validate colors to prevent issues with URL-encoded values
   if (backgroundColor.startsWith("%"))
@@ -135,16 +135,16 @@ void ConfigManager::load()
   // Load alarms
   for (int i = 0; i < MAX_ALARMS; ++i)
   {
-    String prefix = "alarm_" + String(i) + "_";
+    String prefix = "a_" + String(i) + "_";
     _alarms[i].setId(i);
-    _alarms[i].setEnabled(_preferences.getBool((prefix + "enabled").c_str(), false));
-    _alarms[i].setHour(_preferences.getUChar((prefix + "hour").c_str(), 6));
-    _alarms[i].setMinute(_preferences.getUChar((prefix + "minute").c_str(), 0));
+    _alarms[i].setEnabled(_preferences.getBool((prefix + "en").c_str(), false));
+    _alarms[i].setHour(_preferences.getUChar((prefix + "hr").c_str(), 6));
+    _alarms[i].setMinute(_preferences.getUChar((prefix + "min").c_str(), 0));
     _alarms[i].setDays(_preferences.getUChar((prefix + "days").c_str(), 0));
-    bool snoozed = _preferences.getBool((prefix + "snoozed").c_str(), false);
-    uint32_t snoozeUntil = _preferences.getUInt((prefix + "snoozeUntil").c_str(), 0);
+    bool snoozed = _preferences.getBool((prefix + "snz").c_str(), false);
+    uint32_t snoozeUntil = _preferences.getUInt((prefix + "snzUntil").c_str(), 0);
     _alarms[i].setSnoozeState(snoozed, snoozeUntil);
-    _alarms[i].setLastDismissedDay(_preferences.getUChar((prefix + "lastDismissed").c_str(), 8));
+    _alarms[i].setLastDismissedDay(_preferences.getUChar((prefix + "lastDis").c_str(), 8));
   }
 
   SerialLog::getInstance().print("Configuration loaded successfully.");
@@ -153,48 +153,48 @@ void ConfigManager::load()
 bool ConfigManager::save()
 {
   _preferences.putString("wifiSSID", wifiSSID);
-  _preferences.putString("wifiPassword", wifiPassword);
+  _preferences.putString("wifiPass", wifiPassword);
   _preferences.putString("hostname", hostname);
-  _preferences.putBool("wifiCredsValid", wifiCredsValid);
-  _preferences.putChar("ringingAlarmId", ringingAlarmId);
-  _preferences.putUInt("ringingAlarmStart", ringingAlarmStartTimestamp);
-  _preferences.putBool("autoBrightness", autoBrightness);
+  _preferences.putBool("wifiValid", wifiCredsValid);
+  _preferences.putChar("ringAlarmId", ringingAlarmId);
+  _preferences.putUInt("ringAlarmTS", ringingAlarmStartTimestamp);
+  _preferences.putBool("autoBright", autoBrightness);
   _preferences.putUChar("brightness", brightness);
-  _preferences.putUChar("autoBrightStart", autoBrightnessStartHour);
-  _preferences.putUChar("autoBrightEnd", autoBrightnessEndHour);
-  _preferences.putUChar("dayBrightness", dayBrightness);
-  _preferences.putUChar("nightBrightness", nightBrightness);
-  _preferences.putBool("use24HourFormat", use24HourFormat);
+  _preferences.putUChar("autoBrStartHr", autoBrightnessStartHour);
+  _preferences.putUChar("autoBrEndHr", autoBrightnessEndHour);
+  _preferences.putUChar("dayBright", dayBrightness);
+  _preferences.putUChar("nightBright", nightBrightness);
+  _preferences.putBool("is24Hour", use24HourFormat);
   _preferences.putBool("useCelsius", useCelsius);
-  _preferences.putBool("screenFlipped", screenFlipped);
+  _preferences.putBool("screenFlip", screenFlipped);
   _preferences.putString("timezone", timezone);
-  _preferences.putUChar("snoozeDuration", snoozeDuration);
-  _preferences.putUChar("dismissDuration", dismissDuration);
+  _preferences.putUChar("snoozeDur", snoozeDuration);
+  _preferences.putUChar("dismissDur", dismissDuration);
 
-  _preferences.putString("backgroundColor", backgroundColor);
-  _preferences.putString("timeColor", timeColor);
-  _preferences.putString("todColor", todColor);
-  _preferences.putString("secondsColor", secondsColor);
-  _preferences.putString("dayOfWeekColor", dayOfWeekColor);
-  _preferences.putString("dateColor", dateColor);
-  _preferences.putString("tempColor", tempColor);
-  _preferences.putString("humidityColor", humidityColor);
-  _preferences.putString("alarmIconColor", alarmIconColor);
-  _preferences.putString("snoozeIconColor", snoozeIconColor);
-  _preferences.putString("alarmTextColor", alarmTextColor);
-  _preferences.putString("errorTextColor", errorTextColor);
+  _preferences.putString("bgClr", backgroundColor);
+  _preferences.putString("timeClr", timeColor);
+  _preferences.putString("todClr", todColor);
+  _preferences.putString("secondsClr", secondsColor);
+  _preferences.putString("dayOfWeekClr", dayOfWeekColor);
+  _preferences.putString("dateClr", dateColor);
+  _preferences.putString("tempClr", tempColor);
+  _preferences.putString("humidityClr", humidityColor);
+  _preferences.putString("alarmIconClr", alarmIconColor);
+  _preferences.putString("snzIconClr", snoozeIconColor);
+  _preferences.putString("alarmTextClr", alarmTextColor);
+  _preferences.putString("errorTextClr", errorTextColor);
 
   // Save alarms
   for (int i = 0; i < MAX_ALARMS; ++i)
   {
-    String prefix = "alarm_" + String(i) + "_";
-    _preferences.putBool((prefix + "enabled").c_str(), _alarms[i].isEnabled());
-    _preferences.putUChar((prefix + "hour").c_str(), _alarms[i].getHour());
-    _preferences.putUChar((prefix + "minute").c_str(), _alarms[i].getMinute());
+    String prefix = "a_" + String(i) + "_";
+    _preferences.putBool((prefix + "en").c_str(), _alarms[i].isEnabled());
+    _preferences.putUChar((prefix + "hr").c_str(), _alarms[i].getHour());
+    _preferences.putUChar((prefix + "min").c_str(), _alarms[i].getMinute());
     _preferences.putUChar((prefix + "days").c_str(), _alarms[i].getDays());
-    _preferences.putBool((prefix + "snoozed").c_str(), _alarms[i].isSnoozed());
-    _preferences.putUInt((prefix + "snoozeUntil").c_str(), _alarms[i].getSnoozeUntil());
-    _preferences.putUChar((prefix + "lastDismissed").c_str(), _alarms[i].getLastDismissedDay());
+    _preferences.putBool((prefix + "snz").c_str(), _alarms[i].isSnoozed());
+    _preferences.putUInt((prefix + "snzUntil").c_str(), _alarms[i].getSnoozeUntil());
+    _preferences.putUChar((prefix + "lastDis").c_str(), _alarms[i].getLastDismissedDay());
   }
 
   SerialLog::getInstance().print("Configuration saved.");
