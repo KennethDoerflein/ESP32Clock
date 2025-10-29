@@ -331,11 +331,8 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
   timezone = DEFAULT_TIMEZONE;
 
-  if (!isAnyAlarmSnoozed())
-  {
-    snoozeDuration = DEFAULT_SNOOZE_DURATION;
-    dismissDuration = DEFAULT_DISMISS_DURATION;
-  }
+  snoozeDuration = DEFAULT_SNOOZE_DURATION;
+  dismissDuration = DEFAULT_DISMISS_DURATION;
   _isDirty = true;
 }
 

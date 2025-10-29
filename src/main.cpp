@@ -57,6 +57,60 @@ AlarmState g_alarmState = IDLE;
 
 ButtonManager snoozeButton(SNOOZE_BUTTON_PIN);
 
+/**
+ * @brief Updates the global alarm state based on the current system status.
+ *
+ * This function centralizes the logic for determining whether the system
+ * should be in the IDLE, RINGING, or SNOOZED state. It checks the
+ * AlarmManager and the configuration to make the decision.
+ */
+void updateAlarmState()
+{
+  auto &alarmManager = AlarmManager::getInstance();
+  auto &config = ConfigManager::getInstance();
+  AlarmState oldState = g_alarmState;
+
+  // Determine the new state based on current conditions.
+  // The order of checks is important: ringing takes precedence over snoozed.
+  AlarmState newState;
+  if (alarmManager.isRinging())
+  {
+    newState = RINGING;
+  }
+  else
+  {
+    bool anySnoozed = false;
+    for (int i = 0; i < config.getNumAlarms(); ++i)
+    {
+      if (config.getAlarm(i).isSnoozed())
+      {
+        anySnoozed = true;
+        break;
+      }
+    }
+    newState = anySnoozed ? SNOOZED : IDLE;
+  }
+
+  // --- Handle State Transitions ---
+  if (newState != oldState)
+  {
+    g_alarmState = newState; // Update the global state
+    SerialLog::getInstance().printf("Alarm state changed from %d to %d\n", oldState, newState);
+
+    // When moving to a state that requires polling, detach the interrupt.
+    // When returning to IDLE, re-attach it.
+    if (newState == IDLE)
+    {
+      snoozeButton.attach();
+    }
+    else
+    {
+      snoozeButton.detach();
+      snoozeButton.clearNewPress(); // Ensure no stale presses are carried over
+    }
+  }
+}
+
 #ifdef USE_RTC_ALARMS
 // --- RTC Alarm ISR ---
 void IRAM_ATTR onAlarm()
@@ -343,53 +397,7 @@ void loop()
   }
 
   // --- Alarm State Machine ---
-  bool isRinging = alarmManager.isRinging();
-  bool isSnoozed = false;
-  for (int i = 0; i < config.getNumAlarms(); ++i)
-  {
-    if (config.getAlarm(i).isSnoozed())
-    {
-      isSnoozed = true;
-      break;
-    }
-  }
-
-  // State transitions
-  if (g_alarmState == IDLE)
-  {
-    if (isRinging)
-    {
-      g_alarmState = RINGING;
-      snoozeButton.detach();
-      snoozeButton.clearNewPress();
-    }
-    else if (isSnoozed)
-    {
-      g_alarmState = SNOOZED;
-      snoozeButton.detach();
-      snoozeButton.clearNewPress();
-    }
-  }
-  else if (g_alarmState == RINGING && !isRinging)
-  {
-    g_alarmState = isSnoozed ? SNOOZED : IDLE;
-    if (g_alarmState == IDLE)
-    {
-      snoozeButton.attach();
-    }
-  }
-  else if (g_alarmState == SNOOZED && !isSnoozed)
-  {
-    if (isRinging)
-    {
-      g_alarmState = RINGING;
-    }
-    else
-    {
-      g_alarmState = IDLE;
-      snoozeButton.attach();
-    }
-  }
+  updateAlarmState();
 
   // State actions
   switch (g_alarmState)
