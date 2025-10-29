@@ -142,14 +142,14 @@ void ClockWebServer::begin()
           for (JsonObject alarmObj : alarmsArray) {
             int id = alarmObj["id"] | -1;
             if (id >= 0 && id < config.getNumAlarms()) {
-              Alarm newAlarm;
-              newAlarm.setId(id);
-              newAlarm.setEnabled(alarmObj["enabled"] | false);
-              newAlarm.setHour(alarmObj["hour"] | 6);
-              newAlarm.setMinute(alarmObj["minute"] | 0);
-              newAlarm.setDays(alarmObj["days"] | 0);
+              // Get the existing alarm to preserve its snooze state
+              Alarm alarm = config.getAlarm(id);
+              alarm.setEnabled(alarmObj["enabled"] | false);
+              alarm.setHour(alarmObj["hour"] | 6);
+              alarm.setMinute(alarmObj["minute"] | 0);
+              alarm.setDays(alarmObj["days"] | 0);
 
-              config.setAlarm(id, newAlarm);
+              config.setAlarm(id, alarm);
             }
           }
           config.save();
