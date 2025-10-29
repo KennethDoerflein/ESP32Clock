@@ -20,8 +20,9 @@ private:
   int _pin;
   volatile unsigned long _pressDuration;
   volatile bool _newPress;
-  static unsigned long s_lastInterruptTime;
-  static unsigned long s_buttonPressTime;
+  unsigned long _lastInterruptTime;
+  unsigned long _buttonPressTime;
+  portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
 };
 
 #endif // BUTTON_MANAGER_H
