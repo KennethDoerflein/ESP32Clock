@@ -141,6 +141,18 @@ public:
    */
   void checkDriftAndResync();
 
+#ifdef USE_RTC_ALARMS
+  /**
+   * @brief Processes the alarm event outside of the ISR.
+   */
+  void handleAlarm();
+
+  /**
+   * @brief Sets the RTC's hardware alarms for the next two upcoming alarms.
+   */
+  void setNextAlarms();
+#endif
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
@@ -160,4 +172,15 @@ private:
   unsigned long lastDriftCheck = 0;
 
   uint32_t _lastTimeChecked = 0; ///< Stores the Unix timestamp of the last alarm check.
+
+#ifdef USE_RTC_ALARMS
+  bool _rtc_alarms_initialized = false;
+  int8_t _rtcAlarm1Id = -1; ///< The ID of the alarm associated with RTC alarm 1.
+  int8_t _rtcAlarm2Id = -1; ///< The ID of the alarm associated with RTC alarm 2.
+
+  /**
+   * @brief Clears both hardware alarms on the RTC.
+   */
+  void clearRtcAlarms();
+#endif
 };

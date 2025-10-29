@@ -9,6 +9,59 @@
 #include "AlarmManager.h"
 #include "SerialLog.h"
 
+#ifdef USE_RTC_ALARMS
+#include <vector>
+#include <algorithm>
+
+// Structure to hold an alarm's next occurrence time and its ID
+struct NextAlarmTime
+{
+  DateTime time;
+  uint8_t id;
+
+  bool operator<(const NextAlarmTime &other) const
+  {
+    return time < other.time;
+  }
+};
+
+DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
+{
+  if (!alarm.isEnabled())
+  {
+    return DateTime(); // Return invalid DateTime
+  }
+
+  // If the alarm is snoozed, the next ring time is the snooze end time.
+  if (alarm.isSnoozed())
+  {
+    return DateTime(alarm.getSnoozeUntil());
+  }
+
+  // Check today
+  if (alarm.getHour() > now.hour() || (alarm.getHour() == now.hour() && alarm.getMinute() > now.minute()))
+  {
+    if (alarm.getDays() == 0 || (alarm.getDays() & (1 << now.dayOfTheWeek())))
+    {
+      return DateTime(now.year(), now.month(), now.day(), alarm.getHour(), alarm.getMinute(), 0);
+    }
+  }
+
+  // Check for the next 7 days
+  for (int i = 1; i <= 7; ++i)
+  {
+    uint8_t dayOfWeek = (now.dayOfTheWeek() + i) % 7;
+    if (alarm.getDays() == 0 || (alarm.getDays() & (1 << dayOfWeek)))
+    {
+      DateTime next = now + TimeSpan(i, 0, 0, 0);
+      return DateTime(next.year(), next.month(), next.day(), alarm.getHour(), alarm.getMinute(), 0);
+    }
+  }
+
+  return DateTime(); // No valid ring time found
+}
+#endif
+
 void TimeManager::begin()
 {
   // Note: RTC hardware initialization is handled externally in setupSensors()
@@ -32,6 +85,13 @@ bool TimeManager::update()
   SerialLog::getInstance().print("TimeManager: Tick\n");
 #endif
   // Perform routine checks, like the daily time sync.
+#ifdef USE_RTC_ALARMS
+  if (!_rtc_alarms_initialized)
+  {
+    setNextAlarms();
+    _rtc_alarms_initialized = true;
+  }
+#endif
   return true; // An update occurred.
 }
 
@@ -167,6 +227,7 @@ void TimeManager::checkDailySync()
   }
 }
 
+#ifndef USE_RTC_ALARMS
 void TimeManager::checkAlarms()
 {
   // If an alarm is already ringing, there's no need to check for others.
@@ -248,6 +309,7 @@ void TimeManager::checkAlarms()
   // Always update the last checked time to the current time.
   _lastTimeChecked = nowSeconds;
 }
+#endif
 
 void TimeManager::checkDriftAndResync()
 {
@@ -324,3 +386,85 @@ bool TimeManager::isTimeSet() const
   // the year.
   return !RTC.lostPower();
 }
+
+#ifdef USE_RTC_ALARMS
+void TimeManager::handleAlarm()
+{
+  if (RTC.alarmFired(1))
+  {
+    RTC.clearAlarm(1);
+    SerialLog::getInstance().printf("RTC alarm 1 fired for alarm ID %d\n", _rtcAlarm1Id);
+    if (_rtcAlarm1Id != -1)
+    {
+      AlarmManager::getInstance().trigger(_rtcAlarm1Id);
+    }
+  }
+
+  if (RTC.alarmFired(2))
+  {
+    RTC.clearAlarm(2);
+    SerialLog::getInstance().printf("RTC alarm 2 fired for alarm ID %d\n", _rtcAlarm2Id);
+    if (_rtcAlarm2Id != -1)
+    {
+      AlarmManager::getInstance().trigger(_rtcAlarm2Id);
+    }
+  }
+
+  setNextAlarms();
+}
+
+void TimeManager::clearRtcAlarms()
+{
+  RTC.clearAlarm(1);
+  RTC.clearAlarm(2);
+  RTC.disableAlarm(1);
+  RTC.disableAlarm(2);
+  RTC.writeSqwPinMode(DS3231_OFF);
+}
+
+void TimeManager::setNextAlarms()
+{
+  clearRtcAlarms();
+
+  auto &config = ConfigManager::getInstance();
+  std::vector<NextAlarmTime> nextAlarms;
+  DateTime now = RTC.now();
+
+  for (int i = 0; i < config.getNumAlarms(); ++i)
+  {
+    Alarm &alarm = config.getAlarm(i);
+    if (alarm.isEnabled())
+    {
+      DateTime next = calculateNextRingTime(alarm, now);
+      if (next.isValid())
+      {
+        nextAlarms.push_back({next, alarm.getId()});
+      }
+    }
+  }
+
+  std::sort(nextAlarms.begin(), nextAlarms.end());
+
+  if (!nextAlarms.empty())
+  {
+    _rtcAlarm1Id = nextAlarms[0].id;
+    RTC.setAlarm1(nextAlarms[0].time, DS3231_A1_Date);
+    char buf[40];
+    snprintf(buf, sizeof(buf), "Set RTC alarm 1 for %04d-%02d-%02d %02d:%02d:%02d\n",
+             nextAlarms[0].time.year(), nextAlarms[0].time.month(), nextAlarms[0].time.day(),
+             nextAlarms[0].time.hour(), nextAlarms[0].time.minute(), nextAlarms[0].time.second());
+    SerialLog::getInstance().print(buf);
+  }
+
+  if (nextAlarms.size() > 1)
+  {
+    _rtcAlarm2Id = nextAlarms[1].id;
+    RTC.setAlarm2(nextAlarms[1].time, DS3231_A2_Date);
+    char buf[40];
+    snprintf(buf, sizeof(buf), "Set RTC alarm 2 for %04d-%02d-%02d %02d:%02d\n",
+             nextAlarms[1].time.year(), nextAlarms[1].time.month(), nextAlarms[1].time.day(),
+             nextAlarms[1].time.hour(), nextAlarms[1].time.minute());
+    SerialLog::getInstance().print(buf);
+  }
+}
+#endif

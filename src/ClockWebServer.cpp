@@ -149,12 +149,6 @@ void ClockWebServer::begin()
               newAlarm.setMinute(alarmObj["minute"] | 0);
               newAlarm.setDays(alarmObj["days"] | 0);
 
-              // Preserve snooze state
-              const Alarm& oldAlarm = config.getAlarm(id);
-              if (oldAlarm.isSnoozed()) {
-                newAlarm.setSnoozeState(true, oldAlarm.getSnoozeUntil());
-              }
-
               config.setAlarm(id, newAlarm);
             }
           }

@@ -30,7 +30,15 @@ public:
 
   // Public setters for properties
   void setId(uint8_t id) { _id = id; }
-  void setEnabled(bool enabled) { _enabled = enabled; }
+  void setEnabled(bool enabled)
+  {
+    _enabled = enabled;
+    if (!_enabled)
+    {
+      _snoozed = false;
+      _snoozeUntil = 0;
+    }
+  }
   void setHour(uint8_t hour) { _hour = hour; }
   void setMinute(uint8_t minute) { _minute = minute; }
   void setDays(uint8_t days) { _days = days; }

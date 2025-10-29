@@ -41,6 +41,10 @@
 // --- Pin Definitions ---
 #define SNOOZE_BUTTON_PIN 5
 #define BOOT_BUTTON_PIN 0
+#ifdef USE_RTC_ALARMS
+#define RTC_INT_PIN 2 // SQW pin from DS3231
+volatile bool g_alarm_triggered = false;
+#endif
 #define LOOP_INTERVAL 100 // Interval for the main loop in milliseconds
 
 // --- Global Variables for Timers & Button Handling ---
@@ -83,6 +87,14 @@ void IRAM_ATTR handleButtonInterrupt()
     }
   }
 }
+
+#ifdef USE_RTC_ALARMS
+// --- RTC Alarm ISR ---
+void IRAM_ATTR onAlarm()
+{
+  g_alarm_triggered = true;
+}
+#endif
 
 /**
  * @brief Triggers a factory reset, logs the source, and reboots the device.
@@ -199,6 +211,13 @@ void setup()
   // Initialize the snooze button interrupt
   logger.print("Initializing Snooze Button...\n");
   attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
+
+#ifdef USE_RTC_ALARMS
+  // Initialize the RTC alarm interrupt
+  logger.print("Initializing RTC Interrupt...\n");
+  pinMode(RTC_INT_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(RTC_INT_PIN), onAlarm, FALLING);
+#endif
 
   // Initialize the Alarm Manager
   logger.print("Initializing AlarmManager...\n");
@@ -321,7 +340,15 @@ void loop()
   // Perform periodic tasks that don't require WiFi.
   alarmManager.update();
   bool timeUpdated = timeManager.update(); // Updates time from the RTC
+#ifdef USE_RTC_ALARMS
+  if (g_alarm_triggered)
+  {
+    g_alarm_triggered = false;
+    timeManager.handleAlarm();
+  }
+#else
   timeManager.checkAlarms();
+#endif
   timeManager.updateSnoozeStates();
   display.updateBrightness();
   handleSensorUpdates();
@@ -336,6 +363,9 @@ void loop()
   if (config.isDirty())
   {
     displayManager.refresh();
+#ifdef USE_RTC_ALARMS
+    timeManager.setNextAlarms();
+#endif
     config.clearDirtyFlag();
     SerialLog::getInstance().print("Settings changed, refreshing display.\n");
   }
@@ -411,6 +441,9 @@ void loop()
           config.setAlarm(alarmId, alarm);
           config.save();
           alarmManager.stop();
+#ifdef USE_RTC_ALARMS
+          timeManager.setNextAlarms();
+#endif
           if (displayManager.getCurrentPageIndex() == 0)
           {
             // Reset the progress bar to 0 and then force a full render update
@@ -437,6 +470,9 @@ void loop()
           config.setAlarm(alarmId, alarm);
           config.save();
           alarmManager.stop();
+#ifdef USE_RTC_ALARMS
+          timeManager.setNextAlarms();
+#endif
           if (displayManager.getCurrentPageIndex() == 0)
           {
             // Reset the progress bar and then force a full render update
