@@ -1,25 +1,11 @@
 // AlarmManager.cpp
 
 #include "AlarmManager.h"
+#include "display.h"
 #include "DisplayManager.h"
 #include "SerialLog.h"
 #include "ConfigManager.h"
-#include "display.h"
-
-// --- Constants ---
-constexpr unsigned long ALARM_RESUME_DELAY_MS = 5000;
-constexpr unsigned long ALARM_AUTO_OFF_SECONDS = 1800; // 30 minutes
-
-// --- Constants for the ramping alarm state machine ---
-const unsigned long STAGE1_DURATION_MS = 10000; // 10 seconds of slow beeping
-const unsigned long STAGE2_DURATION_MS = 20000; // 20 seconds of fast beeping
-// After STAGE2, the alarm will be continuous.
-
-// Beep timings for each stage
-const unsigned long SLOW_BEEP_ON_MS = 200;
-const unsigned long SLOW_BEEP_OFF_MS = 800;
-const unsigned long FAST_BEEP_ON_MS = 150;
-const unsigned long FAST_BEEP_OFF_MS = 150;
+#include "constants.h"
 
 void AlarmManager::begin()
 {

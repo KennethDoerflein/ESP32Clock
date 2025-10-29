@@ -10,25 +10,21 @@
  */
 
 #include <Arduino.h>
-#include <SPI.h>
-#include <TFT_eSPI.h>
-#include <WiFi.h>
 #include <memory> // For std::unique_ptr
 #include <ESPmDNS.h>
 
+#include "constants.h"
 // Include all custom module headers.
 #include "ConfigManager.h"
 #include "AlarmManager.h"
 #include "sensors.h"
 #include "display.h"
 #include "TimeManager.h"
-#include "ntp.h"
 #include "WiFiManager.h"
 #include "DisplayManager.h"
 #include "pages/ClockPage.h"
 #include "pages/InfoPage.h"
 #include "ClockWebServer.h"
-#include "UpdateManager.h"
 #include "SerialLog.h"
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -38,52 +34,47 @@
 #include "version.h.default"
 #endif
 
-// --- Pin Definitions ---
-#define SNOOZE_BUTTON_PIN 5
-#define BOOT_BUTTON_PIN 0
 #ifdef USE_RTC_ALARMS
-#define RTC_INT_PIN 2 // SQW pin from DS3231
 volatile bool g_alarm_triggered = false;
 #endif
-#define LOOP_INTERVAL 100 // Interval for the main loop in milliseconds
 
 // --- Global Variables for Timers & Button Handling ---
-unsigned long lastLoopTime = 0;
-volatile unsigned long pressDuration = 0;
-volatile bool newPress = false;
-unsigned long bootButtonPressTime = 0;
+unsigned long g_lastLoopTime = 0;
+volatile unsigned long g_pressDuration = 0;
+volatile bool g_newPress = false;
+unsigned long g_bootButtonPressTime = 0;
 
 // --- Button State for Alarm Handling ---
-static unsigned long alarmButtonPressTime = 0;
-static bool actionTaken = false;
+static unsigned long s_alarmButtonPressTime = 0;
+static bool s_actionTaken = false;
 
 // --- Interrupt Service Routine (ISR) ---
 void IRAM_ATTR handleButtonInterrupt()
 {
-  static unsigned long lastInterruptTime = 0;
-  static unsigned long buttonPressTime = 0;
+  static unsigned long s_lastInterruptTime = 0;
+  static unsigned long s_buttonPressTime = 0;
   unsigned long interruptTime = millis();
 
   // Basic debouncing
-  if (interruptTime - lastInterruptTime < 50)
+  if (interruptTime - s_lastInterruptTime < DEBOUNCE_DELAY)
   {
     return;
   }
-  lastInterruptTime = interruptTime;
+  s_lastInterruptTime = interruptTime;
 
   if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
   {
     // Button was just pressed
-    buttonPressTime = interruptTime;
+    s_buttonPressTime = interruptTime;
   }
   else
   {
     // Button was just released
-    if (buttonPressTime > 0)
+    if (s_buttonPressTime > 0)
     { // Ensure we have a valid press time
-      pressDuration = interruptTime - buttonPressTime;
-      newPress = true;
-      buttonPressTime = 0; // Reset for next press
+      g_pressDuration = interruptTime - s_buttonPressTime;
+      g_newPress = true;
+      s_buttonPressTime = 0; // Reset for next press
     }
   }
 }
@@ -127,13 +118,13 @@ void handleBootButton()
 {
   if (digitalRead(BOOT_BUTTON_PIN) == LOW)
   {
-    if (bootButtonPressTime == 0)
+    if (g_bootButtonPressTime == 0)
     {
       // Button was just pressed
-      bootButtonPressTime = millis();
+      g_bootButtonPressTime = millis();
       SerialLog::getInstance().print("Boot button pressed. Timer started for factory reset...\n");
     }
-    else if (millis() - bootButtonPressTime > 30000)
+    else if (millis() - g_bootButtonPressTime > FACTORY_RESET_HOLD_TIME)
     {
       // Button has been held for 30 seconds
       triggerFactoryReset("boot button", false);
@@ -141,11 +132,11 @@ void handleBootButton()
   }
   else
   {
-    if (bootButtonPressTime > 0)
+    if (g_bootButtonPressTime > 0)
     {
       // Button was released before the 60-second mark
       SerialLog::getInstance().print("Boot button released. Factory reset cancelled.\n");
-      bootButtonPressTime = 0;
+      g_bootButtonPressTime = 0;
     }
   }
 }
@@ -175,17 +166,17 @@ void setup()
     while (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
     {
       // After 10 seconds, trigger the reset.
-      if (millis() - pressStartTime > 10000)
+      if (millis() - pressStartTime > BOOT_FACTORY_RESET_HOLD_TIME)
       {
         triggerFactoryReset("snooze button", true);
       }
-      delay(50); // Small delay to prevent busy-waiting.
+      delay(DEBOUNCE_DELAY); // Small delay to prevent busy-waiting.
     }
 
     // If the button was released before the 10-second mark, cancel and proceed.
     logger.print("Snooze button released. Factory reset cancelled.\n");
     display.drawStatusMessage("Reset cancelled");
-    delay(2000);
+    delay(SETUP_CANCEL_DELAY);
   }
 
   // --- Proceed with the normal boot sequence ---
@@ -257,7 +248,7 @@ void setup()
   logger.print("Starting Web Server...\n");
   ClockWebServer::getInstance().begin();
 
-  delay(100); // Delay for web server stabilization.
+  delay(WEB_SERVER_STABILIZATION_DELAY); // Delay for web server stabilization.
 
   // Add pages to the manager.
   logger.print("Adding pages to DisplayManager...\n");
@@ -297,7 +288,7 @@ void setup()
   {
     logger.print("WiFi connection failed. RTC time is valid. Starting in offline mode.\n");
     display.drawMultiLineStatusMessage("Offline Mode", "AP: Clock-Setup");
-    delay(5000); // Show the message for 5 seconds.
+    delay(OFFLINE_MODE_MESSAGE_DELAY); // Show the message for 5 seconds.
     displayManager.setPage(0);
   }
   // This case should rarely be hit, but as a fallback, show setup.
@@ -323,12 +314,12 @@ void loop()
 
   // Implement a non-blocking delay to prevent watchdog timeouts.
   unsigned long currentMillis = millis();
-  if (currentMillis - lastLoopTime < LOOP_INTERVAL)
+  if (currentMillis - g_lastLoopTime < LOOP_INTERVAL)
   {
     delay(1); // Yield to other tasks.
     return;
   }
-  lastLoopTime = currentMillis;
+  g_lastLoopTime = currentMillis;
 
   // --- Core Clock Logic (Runs regardless of WiFi connection) ---
   auto &timeManager = TimeManager::getInstance();
@@ -374,7 +365,7 @@ void loop()
   // We use a state variable to detect the transition to/from ringing or snoozing,
   // allowing us to detach the interrupt only once when an alarm-related
   // action is possible, and re-attach it when it's not.
-  static bool wasInAlarmOrSnoozeState = false;
+  static bool s_wasInAlarmOrSnoozeState = false;
   bool isRinging = alarmManager.isRinging();
   bool isSnoozed = false;
   for (int i = 0; i < config.getNumAlarms(); ++i)
@@ -387,21 +378,21 @@ void loop()
   }
   bool isInAlarmOrSnoozeState = isRinging || isSnoozed;
 
-  if (isInAlarmOrSnoozeState && !wasInAlarmOrSnoozeState)
+  if (isInAlarmOrSnoozeState && !s_wasInAlarmOrSnoozeState)
   {
     // An alarm is ringing or snoozed: detach the page-cycling interrupt
     // so it doesn't conflict with the polling logic for snooze/dismiss.
     detachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN));
-    newPress = false; // Clear any pending button press from the interrupt
+    g_newPress = false; // Clear any pending button press from the interrupt
     SerialLog::getInstance().print("Alarm/Snooze state entered. Interrupt detached.\n");
   }
-  else if (!isInAlarmOrSnoozeState && wasInAlarmOrSnoozeState)
+  else if (!isInAlarmOrSnoozeState && s_wasInAlarmOrSnoozeState)
   {
     // Alarm has stopped and no alarm is snoozed: re-attach the interrupt for normal operation.
     attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
     SerialLog::getInstance().print("Alarm/Snooze state exited. Interrupt re-attached.\n");
   }
-  wasInAlarmOrSnoozeState = isInAlarmOrSnoozeState; // Update state for the next loop
+  s_wasInAlarmOrSnoozeState = isInAlarmOrSnoozeState; // Update state for the next loop
 
   // --- Button Handling Logic (Switches between polling and interrupts) ---
   if (isRinging)
@@ -410,18 +401,18 @@ void loop()
     if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
     {
       // Button is currently pressed
-      if (alarmButtonPressTime == 0)
+      if (s_alarmButtonPressTime == 0)
       {
         // Button was just pressed
-        alarmButtonPressTime = currentMillis;
-        actionTaken = false;
+        s_alarmButtonPressTime = currentMillis;
+        s_actionTaken = false;
         SerialLog::getInstance().print("Alarm active: Button press detected.\n");
       }
-      else if (!actionTaken)
+      else if (!s_actionTaken)
       {
         // Update the progress bar while the button is held
         unsigned long dismissDurationMs = config.getDismissDuration() * 1000;
-        float progress = (float)(currentMillis - alarmButtonPressTime) / dismissDurationMs;
+        float progress = (float)(currentMillis - s_alarmButtonPressTime) / dismissDurationMs;
         if (displayManager.getCurrentPageIndex() == 0)
         {
           static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(progress);
@@ -429,7 +420,7 @@ void loop()
         }
       }
 
-      if (!actionTaken && currentMillis - alarmButtonPressTime > (config.getDismissDuration() * 1000))
+      if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > (config.getDismissDuration() * 1000))
       {
         // Button has been held long enough, dismiss the alarm
         SerialLog::getInstance().print("Alarm active: Button held. Dismissing.\n");
@@ -452,13 +443,13 @@ void loop()
             displayManager.update();
           }
         }
-        actionTaken = true; // Ensure dismiss is only called once
+        s_actionTaken = true; // Ensure dismiss is only called once
       }
     }
     else
     {
       // Button is not pressed (it's released)
-      if (alarmButtonPressTime > 0 && !actionTaken)
+      if (s_alarmButtonPressTime > 0 && !s_actionTaken)
       {
         // Button was released before the dismiss action, so snooze.
         SerialLog::getInstance().print("Alarm active: Button released. Snoozing.\n");
@@ -483,8 +474,8 @@ void loop()
         }
       }
       // Always reset the button timer and action flag on release.
-      alarmButtonPressTime = 0;
-      actionTaken = false;
+      s_alarmButtonPressTime = 0;
+      s_actionTaken = false;
     }
   }
   else if (isSnoozed)
@@ -493,17 +484,17 @@ void loop()
     if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
     {
       // Button is currently pressed
-      if (alarmButtonPressTime == 0)
+      if (s_alarmButtonPressTime == 0)
       {
         // Button was just pressed
-        alarmButtonPressTime = currentMillis;
-        actionTaken = false;
+        s_alarmButtonPressTime = currentMillis;
+        s_actionTaken = false;
         SerialLog::getInstance().print("Snooze active: Button press detected.\n");
       }
-      else if (!actionTaken)
+      else if (!s_actionTaken)
       {
         // Update the progress bar while the button is held
-        float progress = (float)(currentMillis - alarmButtonPressTime) / 3000.0f;
+        float progress = (float)(currentMillis - s_alarmButtonPressTime) / 3000.0f;
         if (displayManager.getCurrentPageIndex() == 0)
         {
           static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(progress);
@@ -512,7 +503,7 @@ void loop()
       }
 
       // If the button is held long enough, end the snooze for all snoozed alarms
-      if (!actionTaken && currentMillis - alarmButtonPressTime > 3000) // 3-second hold
+      if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > SNOOZE_DISMISS_HOLD_TIME) // 3-second hold
       {
         SerialLog::getInstance().print("Snooze active: Button held. Ending snooze.\n");
         for (int i = 0; i < config.getNumAlarms(); ++i)
@@ -530,13 +521,13 @@ void loop()
           // Force the alarm sprite to re-render, which will now be empty
           static_cast<ClockPage *>(displayManager.getCurrentPage())->updateAlarmSprite();
         }
-        actionTaken = true; // Ensure action is only called once
+        s_actionTaken = true; // Ensure action is only called once
       }
     }
     else
     {
       // Button is not pressed (it's released)
-      if (alarmButtonPressTime > 0)
+      if (s_alarmButtonPressTime > 0)
       {
         // If the button was being held, reset the progress bar and timer.
         if (displayManager.getCurrentPageIndex() == 0)
@@ -544,19 +535,19 @@ void loop()
           static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(0.0f);
           displayManager.update();
         }
-        alarmButtonPressTime = 0;
+        s_alarmButtonPressTime = 0;
       }
     }
   }
-  else if (newPress)
+  else if (g_newPress)
   {
     // --- Interrupt-based logic for normal operations (page cycling) ---
     // This code only runs when no alarm is ringing or snoozed, because the
-    // interrupt that sets `newPress` is detached during those states.
+    // interrupt that sets `g_newPress` is detached during those states.
     unsigned long duration;
     noInterrupts();
-    duration = pressDuration;
-    newPress = false;
+    duration = g_pressDuration;
+    g_newPress = false;
     interrupts();
 
     SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", duration);

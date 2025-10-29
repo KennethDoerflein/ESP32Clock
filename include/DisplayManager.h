@@ -55,13 +55,13 @@ public:
    * @brief Gets the index of the currently active page.
    * @return The index of the current page.
    */
-  int getCurrentPageIndex() const { return currentPageIndex; }
+  int getCurrentPageIndex() const { return _currentPageIndex; }
 
   /**
    * @brief Gets the currently active page.
    * @return A pointer to the current page.
    */
-  Page *getCurrentPage() { return currentPage; }
+  Page *getCurrentPage() { return _currentPage; }
 
   /**
    * @brief Updates the currently active page.
@@ -115,14 +115,14 @@ public:
   void showErrorScreen(const char *message);
 
 private:
-  DisplayManager() : tft(nullptr), currentPage(nullptr) {}
+  DisplayManager() : _tft(nullptr), _currentPage(nullptr) {}
 
-  TFT_eSPI *tft;                            ///< Pointer to the main TFT object.
-  std::vector<std::unique_ptr<Page>> pages; ///< A list of all available pages.
-  Page *currentPage;                        ///< Pointer to the currently active page.
-  int currentPageIndex = -1;                ///< Index of the current page.
-  bool _alarmIconVisible = false;           ///< Tracks the current state of the alarm icon.
-  bool _isSnoozing = false;                 ///< Tracks the snooze state of the icon.
+  TFT_eSPI *_tft;                            ///< Pointer to the main TFT object.
+  std::vector<std::unique_ptr<Page>> _pages; ///< A list of all available pages.
+  Page *_currentPage;                        ///< Pointer to the currently active page.
+  int _currentPageIndex = -1;                ///< Index of the current page.
+  bool _alarmIconVisible = false;            ///< Tracks the current state of the alarm icon.
+  bool _isSnoozing = false;                  ///< Tracks the snooze state of the icon.
   bool _partialRefresh = false;
   bool _fullRefresh = false;
 };

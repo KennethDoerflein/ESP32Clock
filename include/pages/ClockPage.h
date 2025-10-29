@@ -42,34 +42,34 @@ private:
   bool _spritesCreated = false;
 
   // Sprites for this page, initialized in the constructor
-  TFT_eSprite sprClock;
-  TFT_eSprite sprDayOfWeek;
-  TFT_eSprite sprDate;
-  TFT_eSprite sprTemp;
-  TFT_eSprite sprHumidity;
-  TFT_eSprite sprTOD;
-  TFT_eSprite sprSeconds;
+  TFT_eSprite _sprClock;
+  TFT_eSprite _sprDayOfWeek;
+  TFT_eSprite _sprDate;
+  TFT_eSprite _sprTemp;
+  TFT_eSprite _sprHumidity;
+  TFT_eSprite _sprTOD;
+  TFT_eSprite _sprSeconds;
   TFT_eSprite _alarmSprite;
 
   // Cached values to prevent unnecessary redraws
-  String lastTime;
-  String lastDate;
-  String lastDayOfWeek;
-  String lastTOD;
-  String lastSeconds;
-  float lastTemp = -999;
-  float lastHumidity = -999;
+  String _lastTime;
+  String _lastDate;
+  String _lastDayOfWeek;
+  String _lastTOD;
+  String _lastSeconds;
+  float _lastTemp = -999;
+  float _lastHumidity = -999;
 
   // Layout position variables
-  int clockX;
-  int clockY;
-  int sideX;
-  int todX;
-  int todY;
-  int secondsX;
-  int secondsY;
-  int dateY;
-  int sensorY;
+  int _clockX;
+  int _clockY;
+  int _sideX;
+  int _todX;
+  int _todY;
+  int _secondsX;
+  int _secondsY;
+  int _dateY;
+  int _sensorY;
   int _alarmSpriteX;
   int _alarmSpriteY;
 

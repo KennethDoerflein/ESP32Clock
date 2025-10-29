@@ -2,11 +2,12 @@
 // #define DEBUG_BORDERS
 
 #include "pages/ClockPage.h"
+#include "constants.h"
 #include "utils.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
-#include "AlarmManager.h"
 #include "sensors.h"
+#include "AlarmManager.h"
 #include "fonts/DSEG7ModernBold104.h"
 #include "fonts/DSEG14ModernBold32.h"
 #include "fonts/DSEG14ModernBold48.h"
@@ -15,10 +16,8 @@
 
 #include <Arduino.h>
 
-#define MARGIN 10
-
 ClockPage::ClockPage(TFT_eSPI *tft)
-    : sprClock(tft), sprDayOfWeek(tft), sprDate(tft), sprTemp(tft), sprHumidity(tft), sprTOD(tft), sprSeconds(tft),
+    : _sprClock(tft), _sprDayOfWeek(tft), _sprDate(tft), _sprTemp(tft), _sprHumidity(tft), _sprTOD(tft), _sprSeconds(tft),
       _alarmSprite(tft), _tft(tft)
 {
   // Sprites are initialized in the member initializer list
@@ -43,13 +42,13 @@ void ClockPage::onEnter(TFT_eSPI &tft)
   setupLayout(tft);
 
   // Force a redraw of all elements
-  lastTime = "";
-  lastDate = "";
-  lastDayOfWeek = "";
-  lastTemp = -999;
-  lastHumidity = -999;
-  lastTOD = "";
-  lastSeconds = "";
+  _lastTime = "";
+  _lastDate = "";
+  _lastDayOfWeek = "";
+  _lastTemp = -999;
+  _lastHumidity = -999;
+  _lastTOD = "";
+  _lastSeconds = "";
 }
 
 void ClockPage::onExit()
@@ -79,14 +78,14 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   int screenHeight = tft.height();
 
   // --- Clock Block Layout ---
-  clockY = MARGIN;
+  _clockY = MARGIN;
 
   // Calculate the width of the side elements column (AM/PM and seconds)
-  int sideWidth = max(sprTOD.width(), sprSeconds.width());
+  int sideWidth = max(_sprTOD.width(), _sprSeconds.width());
   int timeSideGap = 15; // Gap between HH:MM and the side elements
 
   // Calculate the total width of the entire clock display
-  int totalWidth = sprClock.width() + timeSideGap + sideWidth;
+  int totalWidth = CLOCK_SPRITE_WIDTH + timeSideGap + sideWidth;
 
   // Calculate the starting X position to center the clock display
   int startX = (screenWidth - totalWidth) / 2;
@@ -94,31 +93,31 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
     startX = 0;
 
   // Set the position for the main clock sprite
-  clockX = startX - 15;
+  _clockX = startX - 15;
 
   // Calculate the starting X for the side elements
-  sideX = clockX + sprClock.width() + timeSideGap;
+  _sideX = _clockX + CLOCK_SPRITE_WIDTH + timeSideGap;
 
   // Calculate the total height of the side elements stack
   int sideElementsVGap = 15;
-  int sideElementsHeight = sprTOD.height() + sideElementsVGap + sprSeconds.height();
+  int sideElementsHeight = TOD_SPRITE_HEIGHT + sideElementsVGap + SECONDS_SPRITE_HEIGHT;
 
   // Calculate the starting Y to vertically center the side elements against the main clock
-  int sideStartY = clockY + (sprClock.height() - sideElementsHeight) / 2;
-  if (sideStartY < clockY)
-    sideStartY = clockY;
+  int sideStartY = _clockY + (CLOCK_SPRITE_HEIGHT - sideElementsHeight) / 2;
+  if (sideStartY < _clockY)
+    sideStartY = _clockY;
 
   // Set positions for AM/PM and Seconds sprites
-  todX = sideX + sideElementsVGap;
-  todY = sideStartY;
-  secondsX = todX + (sprTOD.width() - sprSeconds.width()) / 2;
-  secondsY = todY + sprTOD.height() + sideElementsVGap + 3;
+  _todX = _sideX + sideElementsVGap;
+  _todY = sideStartY;
+  _secondsX = _todX + (TOD_SPRITE_WIDTH - SECONDS_SPRITE_WIDTH) / 2;
+  _secondsY = _todY + TOD_SPRITE_HEIGHT + sideElementsVGap + 3;
 
   // --- Bottom Rows Layout (Date and Sensors) ---
   tft.loadFont(DSEG14ModernBold32);
   int fontHeight = tft.fontHeight();
-  dateY = screenHeight - (fontHeight * 2 + MARGIN + 40);
-  sensorY = screenHeight - (fontHeight + MARGIN + 10);
+  _dateY = screenHeight - (fontHeight * 2 + MARGIN + 40);
+  _sensorY = screenHeight - (fontHeight + MARGIN + 10);
 
   // --- Alarm Sprite Layout ---
   _alarmSpriteX = (screenWidth - _alarmSprite.width()) / 2;
@@ -133,33 +132,33 @@ void ClockPage::clearAlarmSprite()
 void ClockPage::setupSprites(TFT_eSPI &tft)
 {
   // Create the sprites and configure them
-  sprClock.createSprite(343, 106);
-  sprClock.loadFont(DSEG7ModernBold104);
-  sprClock.setTextDatum(MR_DATUM);
+  _sprClock.createSprite(CLOCK_SPRITE_WIDTH, CLOCK_SPRITE_HEIGHT);
+  _sprClock.loadFont(DSEG7ModernBold104);
+  _sprClock.setTextDatum(MR_DATUM);
 
-  sprTOD.createSprite(45, 34);
-  sprTOD.loadFont(DSEG14ModernBold32);
-  sprTOD.setTextDatum(TR_DATUM);
+  _sprTOD.createSprite(TOD_SPRITE_WIDTH, TOD_SPRITE_HEIGHT);
+  _sprTOD.loadFont(DSEG14ModernBold32);
+  _sprTOD.setTextDatum(TR_DATUM);
 
-  sprSeconds.createSprite(70, 50);
-  sprSeconds.loadFont(DSEG7ModernBold48);
-  sprSeconds.setTextDatum(TR_DATUM);
+  _sprSeconds.createSprite(SECONDS_SPRITE_WIDTH, SECONDS_SPRITE_HEIGHT);
+  _sprSeconds.loadFont(DSEG7ModernBold48);
+  _sprSeconds.setTextDatum(TR_DATUM);
 
-  sprDayOfWeek.createSprite(tft.width() / 2 - MARGIN, 50);
-  sprDayOfWeek.loadFont(DSEG14ModernBold48);
-  sprDayOfWeek.setTextDatum(ML_DATUM);
+  _sprDayOfWeek.createSprite(tft.width() / 2 - MARGIN, DAY_OF_WEEK_SPRITE_HEIGHT);
+  _sprDayOfWeek.loadFont(DSEG14ModernBold48);
+  _sprDayOfWeek.setTextDatum(ML_DATUM);
 
-  sprDate.createSprite(tft.width() / 2 - MARGIN, 50);
-  sprDate.loadFont(DSEG14ModernBold48);
-  sprDate.setTextDatum(MR_DATUM);
+  _sprDate.createSprite(tft.width() / 2 - MARGIN, DATE_SPRITE_HEIGHT);
+  _sprDate.loadFont(DSEG14ModernBold48);
+  _sprDate.setTextDatum(MR_DATUM);
 
-  sprTemp.createSprite(tft.width() / 2 - MARGIN, 50);
-  sprTemp.loadFont(DSEG14ModernBold48);
-  sprTemp.setTextDatum(ML_DATUM);
+  _sprTemp.createSprite(tft.width() / 2 - MARGIN, TEMP_SPRITE_HEIGHT);
+  _sprTemp.loadFont(DSEG14ModernBold48);
+  _sprTemp.setTextDatum(ML_DATUM);
 
-  sprHumidity.createSprite(tft.width() / 2 - MARGIN, 50);
-  sprHumidity.loadFont(DSEG14ModernBold48);
-  sprHumidity.setTextDatum(MR_DATUM);
+  _sprHumidity.createSprite(tft.width() / 2 - MARGIN, HUMIDITY_SPRITE_HEIGHT);
+  _sprHumidity.loadFont(DSEG14ModernBold48);
+  _sprHumidity.setTextDatum(MR_DATUM);
 
   updateSpriteColors();
 }
@@ -176,13 +175,13 @@ void ClockPage::updateSpriteColors()
   uint16_t tempColor = hexToRGB565(config.getTempColor());
   uint16_t humidityColor = hexToRGB565(config.getHumidityColor());
 
-  sprClock.setTextColor(timeColor, _bgColor);
-  sprTOD.setTextColor(todColor, _bgColor);
-  sprSeconds.setTextColor(secondsColor, _bgColor);
-  sprDayOfWeek.setTextColor(dayOfWeekColor, _bgColor);
-  sprDate.setTextColor(dateColor, _bgColor);
-  sprTemp.setTextColor(tempColor, _bgColor);
-  sprHumidity.setTextColor(humidityColor, _bgColor);
+  _sprClock.setTextColor(timeColor, _bgColor);
+  _sprTOD.setTextColor(todColor, _bgColor);
+  _sprSeconds.setTextColor(secondsColor, _bgColor);
+  _sprDayOfWeek.setTextColor(dayOfWeekColor, _bgColor);
+  _sprDate.setTextColor(dateColor, _bgColor);
+  _sprTemp.setTextColor(tempColor, _bgColor);
+  _sprHumidity.setTextColor(humidityColor, _bgColor);
 }
 
 void ClockPage::drawClock(TFT_eSPI &tft)
@@ -193,30 +192,30 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   String todStr = timeManager.getTOD();
 
   // Draw the main time (HH:MM) if it has changed
-  if (timeStr != lastTime)
+  if (timeStr != _lastTime)
   {
-    sprClock.fillSprite(_bgColor);
-    sprClock.drawString(timeStr.c_str(), sprClock.width(), sprClock.height() / 2);
+    _sprClock.fillSprite(_bgColor);
+    _sprClock.drawString(timeStr.c_str(), _sprClock.width(), _sprClock.height() / 2);
 #ifdef DEBUG_BORDERS
-    sprClock.drawRect(0, 0, sprClock.width(), sprClock.height(), TFT_RED);
+    _sprClock.drawRect(0, 0, _sprClock.width(), _sprClock.height(), TFT_RED);
 #endif
-    sprClock.pushSprite(clockX, clockY);
-    lastTime = timeStr;
+    _sprClock.pushSprite(_clockX, _clockY);
+    _lastTime = timeStr;
   }
 
   // Handle drawing or clearing the AM/PM sprite
   if (!is24Hour)
   {
     // In 12-hour mode, draw the TOD if it has changed
-    if (todStr != lastTOD)
+    if (todStr != _lastTOD)
     {
-      sprTOD.fillSprite(_bgColor);
-      sprTOD.drawString(todStr.c_str(), sprTOD.width(), 0);
+      _sprTOD.fillSprite(_bgColor);
+      _sprTOD.drawString(todStr.c_str(), _sprTOD.width(), 0);
 #ifdef DEBUG_BORDERS
-      sprTOD.drawRect(0, 0, sprTOD.width(), sprTOD.height(), TFT_GREEN);
+      _sprTOD.drawRect(0, 0, _sprTOD.width(), _sprTOD.height(), TFT_GREEN);
 #endif
-      sprTOD.pushSprite(todX, todY);
-      lastTOD = todStr;
+      _sprTOD.pushSprite(_todX, _todY);
+      _lastTOD = todStr;
     }
   }
 }
@@ -224,110 +223,110 @@ void ClockPage::drawClock(TFT_eSPI &tft)
 void ClockPage::drawSeconds(TFT_eSPI &tft)
 {
   String secondsStr = TimeManager::getInstance().getFormattedSeconds();
-  if (secondsStr == lastSeconds)
+  if (secondsStr == _lastSeconds)
   {
     return; // No change
   }
 
-  sprSeconds.fillSprite(_bgColor);
-  sprSeconds.drawString(secondsStr.c_str(), sprSeconds.width(), 0);
+  _sprSeconds.fillSprite(_bgColor);
+  _sprSeconds.drawString(secondsStr.c_str(), _sprSeconds.width(), 0);
 #ifdef DEBUG_BORDERS
-  sprSeconds.drawRect(0, 0, sprSeconds.width(), sprSeconds.height(), TFT_MAGENTA);
+  _sprSeconds.drawRect(0, 0, _sprSeconds.width(), _sprSeconds.height(), TFT_MAGENTA);
 #endif
   // Position the seconds sprite under the AM/PM sprite's location
-  sprSeconds.pushSprite(secondsX, secondsY);
-  lastSeconds = secondsStr;
+  _sprSeconds.pushSprite(_secondsX, _secondsY);
+  _lastSeconds = secondsStr;
 }
 
 void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
 {
   String dayStr = TimeManager::getInstance().getDayOfWeek();
-  if (dayStr != lastDayOfWeek)
+  if (dayStr != _lastDayOfWeek)
   {
-    sprDayOfWeek.fillSprite(_bgColor);
-    sprDayOfWeek.drawString(dayStr.c_str(), 0, sprDayOfWeek.height() / 2);
+    _sprDayOfWeek.fillSprite(_bgColor);
+    _sprDayOfWeek.drawString(dayStr.c_str(), 0, _sprDayOfWeek.height() / 2);
 
 #ifdef DEBUG_BORDERS
-    sprDayOfWeek.drawRect(0, 0, sprDayOfWeek.width(), sprDayOfWeek.height(), TFT_BLUE);
+    _sprDayOfWeek.drawRect(0, 0, _sprDayOfWeek.width(), _sprDayOfWeek.height(), TFT_BLUE);
 #endif
 
-    sprDayOfWeek.pushSprite(MARGIN, dateY);
-    lastDayOfWeek = dayStr;
+    _sprDayOfWeek.pushSprite(MARGIN, _dateY);
+    _lastDayOfWeek = dayStr;
   }
 }
 
 void ClockPage::drawDate(TFT_eSPI &tft)
 {
   String dateStr = TimeManager::getInstance().getFormattedDate();
-  if (dateStr != lastDate)
+  if (dateStr != _lastDate)
   {
-    sprDate.fillSprite(_bgColor);
-    sprDate.drawString(dateStr.c_str(), sprDate.width(), sprDate.height() / 2);
+    _sprDate.fillSprite(_bgColor);
+    _sprDate.drawString(dateStr.c_str(), _sprDate.width(), _sprDate.height() / 2);
 
 #ifdef DEBUG_BORDERS
-    sprDate.drawRect(0, 0, sprDate.width(), sprDate.height(), TFT_YELLOW);
+    _sprDate.drawRect(0, 0, _sprDate.width(), _sprDate.height(), TFT_YELLOW);
 #endif
 
-    sprDate.pushSprite(tft.width() / 2, dateY);
-    lastDate = dateStr;
+    _sprDate.pushSprite(tft.width() / 2, _dateY);
+    _lastDate = dateStr;
   }
 }
 
 void ClockPage::drawTemperature(TFT_eSPI &tft)
 {
   float temp = getTemperature(); // Use the cached value
-  if (fabs(temp - lastTemp) < 0.1)
+  if (fabs(temp - _lastTemp) < 0.1)
     return;
 
   auto &config = ConfigManager::getInstance();
   uint16_t tempColor = hexToRGB565(config.getTempColor());
 
-  sprTemp.fillSprite(_bgColor); // Clear sprite
+  _sprTemp.fillSprite(_bgColor); // Clear sprite
 
   // Set the font for the temperature value
-  sprTemp.loadFont(DSEG14ModernBold48);
+  _sprTemp.loadFont(DSEG14ModernBold48);
 
   // Draw temperature value
   char tempBuf[16];
   snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
-  sprTemp.drawString(tempBuf, 0, sprTemp.height() / 2);
+  _sprTemp.drawString(tempBuf, 0, _sprTemp.height() / 2);
 
   // --- Draw degree symbol ---
-  int tempWidth = sprTemp.textWidth(tempBuf);
-  int fontHeight = sprTemp.fontHeight();
+  int tempWidth = _sprTemp.textWidth(tempBuf);
+  int fontHeight = _sprTemp.fontHeight();
 
   // Scale the circle's size and position based on the font
   int circleRadius = max(2, fontHeight / 14);
   int circleX = tempWidth + circleRadius + 2;
   // Position the circle near the top of the temperature digits
-  int circleY = (sprTemp.height() / 2) - (fontHeight / 2) + circleRadius;
-  sprTemp.fillCircle(circleX, circleY, circleRadius, tempColor);
+  int circleY = (_sprTemp.height() / 2) - (fontHeight / 2) + circleRadius;
+  _sprTemp.fillCircle(circleX, circleY, circleRadius, tempColor);
 
   // --- Draw the unit (C/F) ---
-  sprTemp.loadFont(DSEG14ModernBold32);
-  sprTemp.setTextDatum(TL_DATUM); // Set datum to Top-Left for correct alignment
+  _sprTemp.loadFont(DSEG14ModernBold32);
+  _sprTemp.setTextDatum(TL_DATUM); // Set datum to Top-Left for correct alignment
   char unit = config.isCelsius() ? 'C' : 'F';
   char unitBuf[2] = {unit, '\0'};
 
   // Position unit after the degree symbol, aligning its top with the temperature's top
   int unitX = circleX + circleRadius + 2;
-  int unitY = (sprTemp.height() / 2) - (fontHeight / 2);
-  sprTemp.drawString(unitBuf, unitX, unitY);
+  int unitY = (_sprTemp.height() / 2) - (fontHeight / 2);
+  _sprTemp.drawString(unitBuf, unitX, unitY);
 
-  sprTemp.setTextDatum(ML_DATUM); // Restore the original datum
+  _sprTemp.setTextDatum(ML_DATUM); // Restore the original datum
 
 #ifdef DEBUG_BORDERS
-  sprTemp.drawRect(0, 0, sprTemp.width(), sprTemp.height(), TFT_ORANGE);
+  _sprTemp.drawRect(0, 0, _sprTemp.width(), _sprTemp.height(), TFT_ORANGE);
 #endif
 
-  sprTemp.pushSprite(MARGIN, sensorY);
-  lastTemp = temp;
+  _sprTemp.pushSprite(MARGIN, _sensorY);
+  _lastTemp = temp;
 }
 
 void ClockPage::drawHumidity(TFT_eSPI &tft)
 {
   float humidity = getHumidity(); // Use the cached value
-  if (fabs(humidity - lastHumidity) < 0.1)
+  if (fabs(humidity - _lastHumidity) < 0.1)
     return;
 
   char buf[24];
@@ -340,15 +339,15 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
     snprintf(buf, sizeof(buf), "%.0f%%", humidity);
   }
 
-  sprHumidity.fillSprite(_bgColor);
-  sprHumidity.drawString(buf, sprHumidity.width(), sprHumidity.height() / 2);
+  _sprHumidity.fillSprite(_bgColor);
+  _sprHumidity.drawString(buf, _sprHumidity.width(), _sprHumidity.height() / 2);
 
 #ifdef DEBUG_BORDERS
-  sprHumidity.drawRect(0, 0, sprHumidity.width(), sprHumidity.height(), TFT_CYAN);
+  _sprHumidity.drawRect(0, 0, _sprHumidity.width(), _sprHumidity.height(), TFT_CYAN);
 #endif
 
-  sprHumidity.pushSprite(tft.width() / 2, sensorY);
-  lastHumidity = humidity;
+  _sprHumidity.pushSprite(tft.width() / 2, _sensorY);
+  _lastHumidity = humidity;
 }
 
 void ClockPage::setDismissProgress(float progress)
@@ -369,25 +368,25 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   if (config.is24HourFormat())
   {
     // In 24-hour mode, ensure the TOD sprite is cleared immediately on refresh.
-    sprTOD.fillSprite(_bgColor);
-    sprTOD.pushSprite(todX, todY);
+    _sprTOD.fillSprite(_bgColor);
+    _sprTOD.pushSprite(_todX, _todY);
   }
 
   // Force a redraw of all elements by resetting their last known values
-  lastTime = "";
-  lastDate = "";
-  lastDayOfWeek = "";
-  lastTemp = -999;
-  lastHumidity = -999;
-  lastTOD = "";
-  lastSeconds = "";
+  _lastTime = "";
+  _lastDate = "";
+  _lastDayOfWeek = "";
+  _lastTemp = -999;
+  _lastHumidity = -999;
+  _lastTOD = "";
+  _lastSeconds = "";
 }
 
 void ClockPage::initAlarmSprite(TFT_eSPI &tft)
 {
   tft.loadFont(CenturyGothicBold48);
   int textWidth = tft.textWidth("ALARM");
-  _alarmSprite.createSprite(textWidth + 20, 50);
+  _alarmSprite.createSprite(textWidth + ALARM_SPRITE_WIDTH_PADDING, ALARM_SPRITE_HEIGHT);
   _alarmSprite.loadFont(CenturyGothicBold48);
   _alarmSprite.setTextDatum(MC_DATUM);
   _alarmSprite.setTextColor(hexToRGB565(ConfigManager::getInstance().getAlarmTextColor().c_str()));
@@ -417,7 +416,7 @@ void ClockPage::updateAlarmSprite()
     if (_dismissProgress > 0.0f)
     {
       int barWidth = _alarmSprite.width() * _dismissProgress;
-      _alarmSprite.fillRect(0, _alarmSprite.height() - 10, barWidth, 10, hexToRGB565(config.getAlarmTextColor().c_str()));
+      _alarmSprite.fillRect(0, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT, barWidth, ALARM_PROGRESS_BAR_HEIGHT, hexToRGB565(config.getAlarmTextColor().c_str()));
     }
   }
   else if (anySnoozed)
@@ -454,7 +453,7 @@ void ClockPage::updateAlarmSprite()
     if (_dismissProgress > 0.0f)
     {
       int barWidth = _alarmSprite.width() * _dismissProgress;
-      _alarmSprite.fillRect(0, _alarmSprite.height() - 10, barWidth, 10, hexToRGB565(config.getAlarmTextColor().c_str()));
+      _alarmSprite.fillRect(0, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT, barWidth, ALARM_PROGRESS_BAR_HEIGHT, hexToRGB565(config.getAlarmTextColor().c_str()));
     }
   }
   else

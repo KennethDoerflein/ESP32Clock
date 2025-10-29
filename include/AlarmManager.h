@@ -6,9 +6,6 @@
 #include "Alarm.h"
 #include "TimeManager.h"
 
-// Define the GPIO pin for the active buzzer
-#define BUZZER_PIN 4
-
 /**
  * @class AlarmManager
  * @brief Manages the physical ringing of an alarm (buzzer and display).
