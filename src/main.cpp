@@ -26,6 +26,7 @@
 #include "pages/InfoPage.h"
 #include "ClockWebServer.h"
 #include "SerialLog.h"
+#include "ButtonManager.h"
 #if __has_include("version.h")
 // This file exists, so we'll include it.
 #include "version.h"
@@ -40,44 +41,21 @@ volatile bool g_alarm_triggered = false;
 
 // --- Global Variables for Timers & Button Handling ---
 unsigned long g_lastLoopTime = 0;
-volatile unsigned long g_pressDuration = 0;
-volatile bool g_newPress = false;
 unsigned long g_bootButtonPressTime = 0;
 
 // --- Button State for Alarm Handling ---
 static unsigned long s_alarmButtonPressTime = 0;
 static bool s_actionTaken = false;
 
-// --- Interrupt Service Routine (ISR) ---
-void IRAM_ATTR handleButtonInterrupt()
+enum AlarmState
 {
-  static unsigned long s_lastInterruptTime = 0;
-  static unsigned long s_buttonPressTime = 0;
-  unsigned long interruptTime = millis();
+  IDLE,
+  RINGING,
+  SNOOZED
+};
+AlarmState g_alarmState = IDLE;
 
-  // Basic debouncing
-  if (interruptTime - s_lastInterruptTime < DEBOUNCE_DELAY)
-  {
-    return;
-  }
-  s_lastInterruptTime = interruptTime;
-
-  if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
-  {
-    // Button was just pressed
-    s_buttonPressTime = interruptTime;
-  }
-  else
-  {
-    // Button was just released
-    if (s_buttonPressTime > 0)
-    { // Ensure we have a valid press time
-      g_pressDuration = interruptTime - s_buttonPressTime;
-      g_newPress = true;
-      s_buttonPressTime = 0; // Reset for next press
-    }
-  }
-}
+ButtonManager snoozeButton(SNOOZE_BUTTON_PIN);
 
 #ifdef USE_RTC_ALARMS
 // --- RTC Alarm ISR ---
@@ -201,7 +179,7 @@ void setup()
 
   // Initialize the snooze button interrupt
   logger.print("Initializing Snooze Button...\n");
-  attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
+  snoozeButton.begin();
 
 #ifdef USE_RTC_ALARMS
   // Initialize the RTC alarm interrupt
@@ -359,13 +337,12 @@ void loop()
 #endif
     config.clearDirtyFlag();
     SerialLog::getInstance().print("Settings changed, refreshing display.\n");
+    // Re-evaluate snooze state and update display
+    timeManager.updateSnoozeStates();
+    displayManager.update();
   }
 
-  // --- State-based Interrupt Management ---
-  // We use a state variable to detect the transition to/from ringing or snoozing,
-  // allowing us to detach the interrupt only once when an alarm-related
-  // action is possible, and re-attach it when it's not.
-  static bool s_wasInAlarmOrSnoozeState = false;
+  // --- Alarm State Machine ---
   bool isRinging = alarmManager.isRinging();
   bool isSnoozed = false;
   for (int i = 0; i < config.getNumAlarms(); ++i)
@@ -376,27 +353,48 @@ void loop()
       break;
     }
   }
-  bool isInAlarmOrSnoozeState = isRinging || isSnoozed;
 
-  if (isInAlarmOrSnoozeState && !s_wasInAlarmOrSnoozeState)
+  // State transitions
+  if (g_alarmState == IDLE)
   {
-    // An alarm is ringing or snoozed: detach the page-cycling interrupt
-    // so it doesn't conflict with the polling logic for snooze/dismiss.
-    detachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN));
-    g_newPress = false; // Clear any pending button press from the interrupt
-    SerialLog::getInstance().print("Alarm/Snooze state entered. Interrupt detached.\n");
+    if (isRinging)
+    {
+      g_alarmState = RINGING;
+      snoozeButton.detach();
+      snoozeButton.clearNewPress();
+    }
+    else if (isSnoozed)
+    {
+      g_alarmState = SNOOZED;
+      snoozeButton.detach();
+      snoozeButton.clearNewPress();
+    }
   }
-  else if (!isInAlarmOrSnoozeState && s_wasInAlarmOrSnoozeState)
+  else if (g_alarmState == RINGING && !isRinging)
   {
-    // Alarm has stopped and no alarm is snoozed: re-attach the interrupt for normal operation.
-    attachInterrupt(digitalPinToInterrupt(SNOOZE_BUTTON_PIN), handleButtonInterrupt, CHANGE);
-    SerialLog::getInstance().print("Alarm/Snooze state exited. Interrupt re-attached.\n");
+    g_alarmState = isSnoozed ? SNOOZED : IDLE;
+    if (g_alarmState == IDLE)
+    {
+      snoozeButton.attach();
+    }
   }
-  s_wasInAlarmOrSnoozeState = isInAlarmOrSnoozeState; // Update state for the next loop
+  else if (g_alarmState == SNOOZED && !isSnoozed)
+  {
+    if (isRinging)
+    {
+      g_alarmState = RINGING;
+    }
+    else
+    {
+      g_alarmState = IDLE;
+      snoozeButton.attach();
+    }
+  }
 
-  // --- Button Handling Logic (Switches between polling and interrupts) ---
-  if (isRinging)
+  // State actions
+  switch (g_alarmState)
   {
+  case RINGING:
     // --- Polling-based logic for when an alarm is active ---
     if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
     {
@@ -471,9 +469,9 @@ void loop()
       s_alarmButtonPressTime = 0;
       s_actionTaken = false;
     }
-  }
-  else if (isSnoozed)
-  {
+    break;
+
+  case SNOOZED:
     // --- Polling-based logic for when an alarm is snoozed ---
     if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
     {
@@ -497,8 +495,8 @@ void loop()
       }
 
       // If the button is held long enough, end the snooze for all snoozed alarms
-      if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > SNOOZE_DISMISS_HOLD_TIME) // 3-second hold
-      {
+      if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > SNOOZE_DISMISS_HOLD_TIME)
+      { // 3-second hold
         SerialLog::getInstance().print("Snooze active: Button held. Ending snooze.\n");
         for (int i = 0; i < config.getNumAlarms(); ++i)
         {
@@ -532,23 +530,22 @@ void loop()
         s_alarmButtonPressTime = 0;
       }
     }
-  }
-  else if (g_newPress)
-  {
-    // --- Interrupt-based logic for normal operations (page cycling) ---
-    // This code only runs when no alarm is ringing or snoozed, because the
-    // interrupt that sets `g_newPress` is detached during those states.
-    unsigned long duration;
-    noInterrupts();
-    duration = g_pressDuration;
-    g_newPress = false;
-    interrupts();
+    break;
 
-    SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", duration);
-    // A short press cycles pages.
-    int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
-    SerialLog::getInstance().printf("Cycling to page index: %d\n", newIndex);
-    displayManager.setPage(newIndex);
+  case IDLE:
+    if (snoozeButton.newPressAvailable())
+    {
+      // --- Interrupt-based logic for normal operations (page cycling) ---
+      unsigned long duration = snoozeButton.getPressDuration();
+      snoozeButton.clearNewPress();
+
+      SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", duration);
+      // A short press cycles pages.
+      int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
+      SerialLog::getInstance().printf("Cycling to page index: %d\n", newIndex);
+      displayManager.setPage(newIndex);
+    }
+    break;
   }
 
   // --- Update Alarm Icon (Runs regardless of WiFi connection) ---

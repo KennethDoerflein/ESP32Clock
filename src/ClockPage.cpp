@@ -42,13 +42,7 @@ void ClockPage::onEnter(TFT_eSPI &tft)
   setupLayout(tft);
 
   // Force a redraw of all elements
-  _lastTime = "";
-  _lastDate = "";
-  _lastDayOfWeek = "";
-  _lastTemp = -999;
-  _lastHumidity = -999;
-  _lastTOD = "";
-  _lastSeconds = "";
+  _lastData = {};
 }
 
 void ClockPage::onExit()
@@ -63,13 +57,41 @@ void ClockPage::update()
 
 void ClockPage::render(TFT_eSPI &tft)
 {
+  DisplayData currentData;
+  updateDisplayData(currentData);
+
   updateAlarmSprite();
-  drawSeconds(tft);
-  drawTemperature(tft);
-  drawHumidity(tft);
-  drawClock(tft);
-  drawDate(tft);
-  drawDayOfWeek(tft);
+  if (currentData.seconds != _lastData.seconds)
+  {
+    drawSeconds(tft);
+    _lastData.seconds = currentData.seconds;
+  }
+  if (fabs(currentData.temp - _lastData.temp) > 0.1)
+  {
+    drawTemperature(tft);
+    _lastData.temp = currentData.temp;
+  }
+  if (fabs(currentData.humidity - _lastData.humidity) > 0.1)
+  {
+    drawHumidity(tft);
+    _lastData.humidity = currentData.humidity;
+  }
+  if (currentData.time != _lastData.time || currentData.tod != _lastData.tod)
+  {
+    drawClock(tft);
+    _lastData.time = currentData.time;
+    _lastData.tod = currentData.tod;
+  }
+  if (currentData.date != _lastData.date)
+  {
+    drawDate(tft);
+    _lastData.date = currentData.date;
+  }
+  if (currentData.dayOfWeek != _lastData.dayOfWeek)
+  {
+    drawDayOfWeek(tft);
+    _lastData.dayOfWeek = currentData.dayOfWeek;
+  }
 }
 
 void ClockPage::setupLayout(TFT_eSPI &tft)
@@ -191,144 +213,95 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   String timeStr = timeManager.getFormattedTime();
   String todStr = timeManager.getTOD();
 
-  // Draw the main time (HH:MM) if it has changed
-  if (timeStr != _lastTime)
-  {
-    _sprClock.fillSprite(_bgColor);
-    _sprClock.drawString(timeStr.c_str(), _sprClock.width(), _sprClock.height() / 2);
+  _sprClock.fillSprite(_bgColor);
+  _sprClock.drawString(timeStr.c_str(), _sprClock.width(), _sprClock.height() / 2);
 #ifdef DEBUG_BORDERS
-    _sprClock.drawRect(0, 0, _sprClock.width(), _sprClock.height(), TFT_RED);
+  _sprClock.drawRect(0, 0, _sprClock.width(), _sprClock.height(), TFT_RED);
 #endif
-    _sprClock.pushSprite(_clockX, _clockY);
-    _lastTime = timeStr;
-  }
+  _sprClock.pushSprite(_clockX, _clockY);
 
-  // Handle drawing or clearing the AM/PM sprite
   if (!is24Hour)
   {
-    // In 12-hour mode, draw the TOD if it has changed
-    if (todStr != _lastTOD)
-    {
-      _sprTOD.fillSprite(_bgColor);
-      _sprTOD.drawString(todStr.c_str(), _sprTOD.width(), 0);
+    _sprTOD.fillSprite(_bgColor);
+    _sprTOD.drawString(todStr.c_str(), _sprTOD.width(), 0);
 #ifdef DEBUG_BORDERS
-      _sprTOD.drawRect(0, 0, _sprTOD.width(), _sprTOD.height(), TFT_GREEN);
+    _sprTOD.drawRect(0, 0, _sprTOD.width(), _sprTOD.height(), TFT_GREEN);
 #endif
-      _sprTOD.pushSprite(_todX, _todY);
-      _lastTOD = todStr;
-    }
+    _sprTOD.pushSprite(_todX, _todY);
   }
 }
 
 void ClockPage::drawSeconds(TFT_eSPI &tft)
 {
   String secondsStr = TimeManager::getInstance().getFormattedSeconds();
-  if (secondsStr == _lastSeconds)
-  {
-    return; // No change
-  }
-
   _sprSeconds.fillSprite(_bgColor);
   _sprSeconds.drawString(secondsStr.c_str(), _sprSeconds.width(), 0);
 #ifdef DEBUG_BORDERS
   _sprSeconds.drawRect(0, 0, _sprSeconds.width(), _sprSeconds.height(), TFT_MAGENTA);
 #endif
-  // Position the seconds sprite under the AM/PM sprite's location
   _sprSeconds.pushSprite(_secondsX, _secondsY);
-  _lastSeconds = secondsStr;
 }
 
 void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
 {
   String dayStr = TimeManager::getInstance().getDayOfWeek();
-  if (dayStr != _lastDayOfWeek)
-  {
-    _sprDayOfWeek.fillSprite(_bgColor);
-    _sprDayOfWeek.drawString(dayStr.c_str(), 0, _sprDayOfWeek.height() / 2);
-
+  _sprDayOfWeek.fillSprite(_bgColor);
+  _sprDayOfWeek.drawString(dayStr.c_str(), 0, _sprDayOfWeek.height() / 2);
 #ifdef DEBUG_BORDERS
-    _sprDayOfWeek.drawRect(0, 0, _sprDayOfWeek.width(), _sprDayOfWeek.height(), TFT_BLUE);
+  _sprDayOfWeek.drawRect(0, 0, _sprDayOfWeek.width(), _sprDayOfWeek.height(), TFT_BLUE);
 #endif
-
-    _sprDayOfWeek.pushSprite(MARGIN, _dateY);
-    _lastDayOfWeek = dayStr;
-  }
+  _sprDayOfWeek.pushSprite(MARGIN, _dateY);
 }
 
 void ClockPage::drawDate(TFT_eSPI &tft)
 {
   String dateStr = TimeManager::getInstance().getFormattedDate();
-  if (dateStr != _lastDate)
-  {
-    _sprDate.fillSprite(_bgColor);
-    _sprDate.drawString(dateStr.c_str(), _sprDate.width(), _sprDate.height() / 2);
-
+  _sprDate.fillSprite(_bgColor);
+  _sprDate.drawString(dateStr.c_str(), _sprDate.width(), _sprDate.height() / 2);
 #ifdef DEBUG_BORDERS
-    _sprDate.drawRect(0, 0, _sprDate.width(), _sprDate.height(), TFT_YELLOW);
+  _sprDate.drawRect(0, 0, _sprDate.width(), _sprDate.height(), TFT_YELLOW);
 #endif
-
-    _sprDate.pushSprite(tft.width() / 2, _dateY);
-    _lastDate = dateStr;
-  }
+  _sprDate.pushSprite(tft.width() / 2, _dateY);
 }
 
 void ClockPage::drawTemperature(TFT_eSPI &tft)
 {
-  float temp = getTemperature(); // Use the cached value
-  if (fabs(temp - _lastTemp) < 0.1)
-    return;
-
+  float temp = getTemperature();
   auto &config = ConfigManager::getInstance();
   uint16_t tempColor = hexToRGB565(config.getTempColor());
 
-  _sprTemp.fillSprite(_bgColor); // Clear sprite
-
-  // Set the font for the temperature value
+  _sprTemp.fillSprite(_bgColor);
   _sprTemp.loadFont(DSEG14ModernBold48);
 
-  // Draw temperature value
   char tempBuf[16];
   snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
   _sprTemp.drawString(tempBuf, 0, _sprTemp.height() / 2);
 
-  // --- Draw degree symbol ---
   int tempWidth = _sprTemp.textWidth(tempBuf);
   int fontHeight = _sprTemp.fontHeight();
-
-  // Scale the circle's size and position based on the font
   int circleRadius = max(2, fontHeight / 14);
   int circleX = tempWidth + circleRadius + 2;
-  // Position the circle near the top of the temperature digits
   int circleY = (_sprTemp.height() / 2) - (fontHeight / 2) + circleRadius;
   _sprTemp.fillCircle(circleX, circleY, circleRadius, tempColor);
 
-  // --- Draw the unit (C/F) ---
   _sprTemp.loadFont(DSEG14ModernBold32);
-  _sprTemp.setTextDatum(TL_DATUM); // Set datum to Top-Left for correct alignment
+  _sprTemp.setTextDatum(TL_DATUM);
   char unit = config.isCelsius() ? 'C' : 'F';
   char unitBuf[2] = {unit, '\0'};
-
-  // Position unit after the degree symbol, aligning its top with the temperature's top
   int unitX = circleX + circleRadius + 2;
   int unitY = (_sprTemp.height() / 2) - (fontHeight / 2);
   _sprTemp.drawString(unitBuf, unitX, unitY);
-
-  _sprTemp.setTextDatum(ML_DATUM); // Restore the original datum
+  _sprTemp.setTextDatum(ML_DATUM);
 
 #ifdef DEBUG_BORDERS
   _sprTemp.drawRect(0, 0, _sprTemp.width(), _sprTemp.height(), TFT_ORANGE);
 #endif
-
   _sprTemp.pushSprite(MARGIN, _sensorY);
-  _lastTemp = temp;
 }
 
 void ClockPage::drawHumidity(TFT_eSPI &tft)
 {
-  float humidity = getHumidity(); // Use the cached value
-  if (fabs(humidity - _lastHumidity) < 0.1)
-    return;
-
+  float humidity = getHumidity();
   char buf[24];
   if (humidity < 0)
   {
@@ -345,9 +318,19 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
 #ifdef DEBUG_BORDERS
   _sprHumidity.drawRect(0, 0, _sprHumidity.width(), _sprHumidity.height(), TFT_CYAN);
 #endif
-
   _sprHumidity.pushSprite(tft.width() / 2, _sensorY);
-  _lastHumidity = humidity;
+}
+
+void ClockPage::updateDisplayData(DisplayData &data)
+{
+  auto &timeManager = TimeManager::getInstance();
+  data.time = timeManager.getFormattedTime();
+  data.date = timeManager.getFormattedDate();
+  data.dayOfWeek = timeManager.getDayOfWeek();
+  data.temp = getTemperature();
+  data.humidity = getHumidity();
+  data.tod = timeManager.getTOD();
+  data.seconds = timeManager.getFormattedSeconds();
 }
 
 void ClockPage::setDismissProgress(float progress)
@@ -373,13 +356,7 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   }
 
   // Force a redraw of all elements by resetting their last known values
-  _lastTime = "";
-  _lastDate = "";
-  _lastDayOfWeek = "";
-  _lastTemp = -999;
-  _lastHumidity = -999;
-  _lastTOD = "";
-  _lastSeconds = "";
+  _lastData = {};
 }
 
 void ClockPage::initAlarmSprite(TFT_eSPI &tft)

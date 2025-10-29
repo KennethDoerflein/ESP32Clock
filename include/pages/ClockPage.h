@@ -4,6 +4,17 @@
 #include <TFT_eSPI.h>
 #include <cstdint>
 
+struct DisplayData
+{
+  String time;
+  String date;
+  String dayOfWeek;
+  float temp;
+  float humidity;
+  String tod;
+  String seconds;
+};
+
 /**
  * @class ClockPage
  * @brief A page that displays the main clock face, including time, date, and sensor data.
@@ -37,6 +48,7 @@ private:
   void drawSeconds(TFT_eSPI &tft);
   void updateSpriteColors();
   void initAlarmSprite(TFT_eSPI &tft);
+  void updateDisplayData(DisplayData &data);
 
   // Flag to track sprite creation
   bool _spritesCreated = false;
@@ -52,13 +64,7 @@ private:
   TFT_eSprite _alarmSprite;
 
   // Cached values to prevent unnecessary redraws
-  String _lastTime;
-  String _lastDate;
-  String _lastDayOfWeek;
-  String _lastTOD;
-  String _lastSeconds;
-  float _lastTemp = -999;
-  float _lastHumidity = -999;
+  DisplayData _lastData;
 
   // Layout position variables
   int _clockX;
