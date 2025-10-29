@@ -152,7 +152,6 @@ void ClockWebServer::begin()
               config.setAlarm(id, alarm);
             }
           }
-          config.save();
           request->send(200, "text/plain", "Alarms saved successfully!");
         } });
 
@@ -219,7 +218,6 @@ void ClockWebServer::begin()
               config.setTimezone(doc["timezone"]);
               config.setSnoozeDuration(doc["snoozeDuration"]);
               config.setDismissDuration(doc["dismissDuration"]);
-              config.save();
 
               if (oldScreenFlipped != config.isScreenFlipped())
               {
@@ -244,7 +242,6 @@ void ClockWebServer::begin()
       auto &config = ConfigManager::getInstance();
       bool oldScreenFlipped = config.isScreenFlipped();
       config.resetGeneralSettingsToDefaults();
-      config.save();
       if (oldScreenFlipped != config.isScreenFlipped())
       {
         Display::getInstance().updateRotation();
@@ -346,7 +343,6 @@ void ClockWebServer::begin()
               config.setDateColor(doc["dateColor"].as<String>());
               config.setTempColor(doc["tempColor"].as<String>());
               config.setHumidityColor(doc["humidityColor"].as<String>());
-              config.save();
 
               if (oldBgColor != newBgColor)
               {
@@ -368,7 +364,6 @@ void ClockWebServer::begin()
               {
       auto &config = ConfigManager::getInstance();
       config.resetDisplayToDefaults();
-      config.save();
       DisplayManager::getInstance().requestFullRefresh();
       
       // Give the main loop time to process the new default settings.

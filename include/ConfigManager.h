@@ -71,12 +71,10 @@ public:
    * default values. This should be called once at startup.
    */
   void begin();
+  void loop();
 
-  /**
-   * @brief Saves the current configuration to the JSON file on LittleFS.
-   * @return True if the configuration was saved successfully, false otherwise.
-   */
   bool save();
+  void scheduleSave();
 
   // Getters
   /**
@@ -216,6 +214,7 @@ public:
     wifiSSID = ssid;
     wifiCredsValid = false; // New credentials need validation
     _isDirty = true;
+    scheduleSave();
   }
 
   /**
@@ -227,6 +226,7 @@ public:
     wifiPassword = password;
     wifiCredsValid = false; // New credentials need validation
     _isDirty = true;
+    scheduleSave();
   }
 
   /**
@@ -237,6 +237,7 @@ public:
   {
     hostname = name;
     _isDirty = true;
+    scheduleSave();
   }
 
   /**
@@ -249,6 +250,7 @@ public:
     {
       wifiCredsValid = valid;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -258,6 +260,7 @@ public:
     {
       snoozeDuration = duration;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -267,6 +270,7 @@ public:
     {
       dismissDuration = duration;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -305,6 +309,7 @@ public:
     {
       screenFlipped = flipped;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -318,6 +323,7 @@ public:
     {
       autoBrightness = enabled;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -331,6 +337,7 @@ public:
     {
       brightness = value;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -344,6 +351,7 @@ public:
     {
       autoBrightnessStartHour = value;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -357,6 +365,7 @@ public:
     {
       autoBrightnessEndHour = value;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -370,6 +379,7 @@ public:
     {
       dayBrightness = value;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -383,6 +393,7 @@ public:
     {
       nightBrightness = value;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -396,6 +407,7 @@ public:
     {
       use24HourFormat = enabled;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -409,6 +421,7 @@ public:
     {
       useCelsius = enabled;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -422,6 +435,7 @@ public:
     {
       timezone = tz;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -438,6 +452,7 @@ public:
     {
       backgroundColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -447,6 +462,7 @@ public:
     {
       timeColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -456,6 +472,7 @@ public:
     {
       todColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -465,6 +482,7 @@ public:
     {
       secondsColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -474,6 +492,7 @@ public:
     {
       dayOfWeekColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -483,6 +502,7 @@ public:
     {
       dateColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -492,6 +512,7 @@ public:
     {
       tempColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -501,6 +522,7 @@ public:
     {
       humidityColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -510,6 +532,7 @@ public:
     {
       alarmIconColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -519,6 +542,7 @@ public:
     {
       snoozeIconColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -528,6 +552,7 @@ public:
     {
       alarmTextColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -537,6 +562,7 @@ public:
     {
       errorTextColor = color;
       _isDirty = true;
+      scheduleSave();
     }
   }
 
@@ -578,7 +604,7 @@ private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
    */
-  ConfigManager() : _isDirty(false) {}
+  ConfigManager() : _isDirty(false), _savePending(false), _saveDebounceTimer(0) {}
 
   // Configuration variables with default values
   String wifiSSID = DEFAULT_WIFI_SSID;
@@ -615,6 +641,8 @@ private:
   String errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
 
   bool _isDirty;
+  bool _savePending;
+  unsigned long _saveDebounceTimer;
   Alarm _alarms[MAX_ALARMS];
   Preferences _preferences;
 

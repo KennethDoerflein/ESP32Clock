@@ -361,6 +361,7 @@ void loop()
   auto &config = ConfigManager::getInstance();
 
   // Perform periodic tasks that don't require WiFi.
+  config.loop();
   alarmManager.update();
   bool timeUpdated = timeManager.update(); // Updates time from the RTC
 #ifdef USE_RTC_ALARMS

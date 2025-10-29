@@ -6,6 +6,22 @@
 
 // Define the namespace for preferences
 #define PREFERENCES_NAMESPACE "clock_config"
+#define SAVE_DEBOUNCE_DELAY 5000 // 5 seconds
+
+void ConfigManager::loop()
+{
+  if (_savePending && (millis() - _saveDebounceTimer >= SAVE_DEBOUNCE_DELAY))
+  {
+    save();
+    _savePending = false;
+  }
+}
+
+void ConfigManager::scheduleSave()
+{
+  _savePending = true;
+  _saveDebounceTimer = millis();
+}
 
 void ConfigManager::begin()
 {
@@ -243,6 +259,7 @@ void ConfigManager::setAlarm(int index, const Alarm &alarm)
   }
   _alarms[index] = alarm;
   _isDirty = true;
+  scheduleSave();
 }
 
 void ConfigManager::factoryReset()
@@ -316,6 +333,7 @@ void ConfigManager::resetDisplayToDefaults()
   }
 
   _isDirty = true;
+  scheduleSave();
 }
 
 void ConfigManager::resetGeneralSettingsToDefaults()
@@ -334,6 +352,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
   _isDirty = true;
+  scheduleSave();
 }
 
 bool ConfigManager::isAnyAlarmSnoozed() const
