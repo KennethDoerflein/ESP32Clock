@@ -88,6 +88,9 @@ bool TimeManager::update()
 #ifdef USE_RTC_ALARMS
   if (!_rtc_alarms_initialized)
   {
+    // On the first run, check if any alarms were missed while the device was off.
+    checkMissedAlarms();
+    // Then, set the hardware alarms for future events.
     setNextAlarms();
     _rtc_alarms_initialized = true;
   }
@@ -388,6 +391,56 @@ bool TimeManager::isTimeSet() const
 }
 
 #ifdef USE_RTC_ALARMS
+
+void TimeManager::checkMissedAlarms()
+{
+  if (AlarmManager::getInstance().isRinging())
+  {
+    return;
+  }
+
+  SerialLog::getInstance().print("Checking for missed alarms on boot...\n");
+
+  DateTime now = RTC.now();
+  // Don't look back further than 30 minutes.
+  const uint32_t lookbehindSeconds = 30 * 60;
+  DateTime startTime = now - TimeSpan(lookbehindSeconds);
+
+  int8_t mostRecentMissedAlarmId = -1;
+  auto &config = ConfigManager::getInstance();
+
+  // To find the most recent missed alarm, we iterate chronologically through
+  // the look-behind window and check all alarms for each minute. The last
+  // one we find will be the most recent.
+  DateTime t = DateTime(startTime.unixtime());
+  DateTime checkTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute());
+
+  for (; checkTime <= now; checkTime = checkTime + TimeSpan(0, 0, 1, 0))
+  {
+    for (int i = 0; i < config.getNumAlarms(); ++i)
+    {
+      Alarm &alarm = config.getAlarm(i);
+
+      if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkTime))
+      {
+        // This alarm should have rung. We record it as the most recent candidate.
+        // If we find another one later in the loop, it will overwrite this one.
+        mostRecentMissedAlarmId = alarm.getId();
+      }
+    }
+  }
+
+  if (mostRecentMissedAlarmId != -1)
+  {
+    SerialLog::getInstance().printf("Found missed alarm %d. Triggering now.\n", mostRecentMissedAlarmId);
+    AlarmManager::getInstance().trigger(mostRecentMissedAlarmId);
+  }
+  else
+  {
+    SerialLog::getInstance().print("No missed alarms found.\n");
+  }
+}
+
 void TimeManager::handleAlarm()
 {
   if (RTC.alarmFired(1))

@@ -151,6 +151,12 @@ public:
    * @brief Sets the RTC's hardware alarms for the next two upcoming alarms.
    */
   void setNextAlarms();
+
+  /**
+   * @brief Checks for any alarms that were missed while the device was off.
+   * @note This is intended to be called once at boot.
+   */
+  void checkMissedAlarms();
 #endif
 
 private:
