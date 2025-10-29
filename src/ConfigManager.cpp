@@ -1,27 +1,15 @@
 // ConfigManager.cpp
 
 #include "ConfigManager.h"
-#include <LittleFS.h>
-#include <ArduinoJson.h>
 #include "SerialLog.h"
 #include "nvs_flash.h"
 
-// Define the path for the configuration file on the LittleFS filesystem.
-#define CONFIG_FILE "/config.json"
+// Define the namespace for preferences
+#define PREFERENCES_NAMESPACE "clock_config"
 
 void ConfigManager::begin()
 {
-  _fileMutex = xSemaphoreCreateMutex();
-  // Initialize LittleFS. The `true` parameter formats the filesystem if mounting fails.
-  // This is crucial for the first boot or if the filesystem becomes corrupted.
-  if (!LittleFS.begin(true))
-  {
-
-    SerialLog::getInstance().print("An error occurred while mounting LittleFS. Halting.");
-    // Halt execution if the filesystem cannot be prepared, as configuration is critical.
-    while (1)
-      ; // Infinite loop to stop the device
-  }
+  _preferences.begin(PREFERENCES_NAMESPACE, false); // R/W mode
   // After ensuring the filesystem is ready, load the configuration.
   load();
 }
@@ -72,120 +60,91 @@ void ConfigManager::setDefaults()
 
 void ConfigManager::load()
 {
-  // Check if the configuration file exists.
-  if (!LittleFS.exists(CONFIG_FILE))
+  // Check if this is the first boot
+  bool firstBoot = !_preferences.getBool("first_boot_done", false);
+  if (firstBoot)
   {
-    SerialLog::getInstance().print("Config file not found, creating with defaults.");
-    // If it doesn't exist, apply default settings and save them to a new file.
+    SerialLog::getInstance().print("First boot detected. Loading default configuration.");
     setDefaults();
-    save();
+    save(); // Save defaults to preferences
+    _preferences.putBool("first_boot_done", true);
     return;
   }
 
-  // Open the configuration file for reading.
-  File configFile = LittleFS.open(CONFIG_FILE, "r");
-  if (!configFile)
-  {
-    SerialLog::getInstance().print("Failed to open config file for reading. Using defaults.");
-    // If the file can't be opened, fall back to default settings.
-    setDefaults();
-    return;
-  }
+  SerialLog::getInstance().print("Loading configuration from Preferences...");
 
-  // Create a JSON document to hold the configuration data.
-  // The size is determined by ArduinoJson's recommendation algorithm.
-  JsonDocument doc;
-  // Parse the JSON data from the file.
-  DeserializationError error = deserializeJson(doc, configFile);
-  // Close the file as soon as it's no longer needed.
-  configFile.close();
+  // Load each setting from the Preferences
+  wifiSSID = _preferences.getString("wifiSSID", DEFAULT_WIFI_SSID);
+  wifiPassword = _preferences.getString("wifiPassword", DEFAULT_WIFI_PASSWORD);
+  hostname = _preferences.getString("hostname", DEFAULT_HOSTNAME);
+  wifiCredsValid = _preferences.getBool("wifiCredsValid", DEFAULT_WIFI_CREDS_VALID);
+  ringingAlarmId = _preferences.getChar("ringingAlarmId", DEFAULT_RINGING_ALARM_ID);
+  ringingAlarmStartTimestamp = _preferences.getUInt("ringingAlarmStart", DEFAULT_RINGING_ALARM_TIMESTAMP);
+  autoBrightness = _preferences.getBool("autoBrightness", DEFAULT_AUTO_BRIGHTNESS);
+  brightness = _preferences.getUChar("brightness", DEFAULT_BRIGHTNESS);
+  autoBrightnessStartHour = _preferences.getUChar("autoBrightStart", DEFAULT_AUTO_BRIGHTNESS_START_HOUR);
+  autoBrightnessEndHour = _preferences.getUChar("autoBrightEnd", DEFAULT_AUTO_BRIGHTNESS_END_HOUR);
+  dayBrightness = _preferences.getUChar("dayBrightness", DEFAULT_DAY_BRIGHTNESS);
+  nightBrightness = _preferences.getUChar("nightBrightness", DEFAULT_NIGHT_BRIGHTNESS);
+  use24HourFormat = _preferences.getBool("use24HourFormat", DEFAULT_USE_24_HOUR_FORMAT);
+  useCelsius = _preferences.getBool("useCelsius", DEFAULT_USE_CELSIUS);
+  screenFlipped = _preferences.getBool("screenFlipped", DEFAULT_SCREEN_FLIPPED);
+  timezone = _preferences.getString("timezone", DEFAULT_TIMEZONE);
+  snoozeDuration = _preferences.getUChar("snoozeDuration", DEFAULT_SNOOZE_DURATION);
+  dismissDuration = _preferences.getUChar("dismissDuration", DEFAULT_DISMISS_DURATION);
 
-  // Check for parsing errors.
-  if (error)
-  {
-    Serial.print("Failed to parse config file: ");
-    SerialLog::getInstance().print(error.c_str());
-    // If parsing fails, the file is likely corrupt. Use default settings.
-    setDefaults();
-    return;
-  }
+  backgroundColor = _preferences.getString("backgroundColor", DEFAULT_BACKGROUND_COLOR);
+  timeColor = _preferences.getString("timeColor", DEFAULT_TIME_COLOR);
+  todColor = _preferences.getString("todColor", DEFAULT_TOD_COLOR);
+  secondsColor = _preferences.getString("secondsColor", DEFAULT_SECONDS_COLOR);
+  dayOfWeekColor = _preferences.getString("dayOfWeekColor", DEFAULT_DAY_OF_WEEK_COLOR);
+  dateColor = _preferences.getString("dateColor", DEFAULT_DATE_COLOR);
+  tempColor = _preferences.getString("tempColor", DEFAULT_TEMP_COLOR);
+  humidityColor = _preferences.getString("humidityColor", DEFAULT_HUMIDITY_COLOR);
+  alarmIconColor = _preferences.getString("alarmIconColor", DEFAULT_ALARM_ICON_COLOR);
+  snoozeIconColor = _preferences.getString("snoozeIconColor", DEFAULT_SNOOZE_ICON_COLOR);
+  alarmTextColor = _preferences.getString("alarmTextColor", DEFAULT_ALARM_TEXT_COLOR);
+  errorTextColor = _preferences.getString("errorTextColor", DEFAULT_ERROR_TEXT_COLOR);
 
-  // Load each setting from the JSON document.
-  // The `|` operator provides a default value if the key is missing.
-  wifiSSID = doc["wifiSSID"] | DEFAULT_WIFI_SSID;
-  wifiPassword = doc["wifiPassword"] | DEFAULT_WIFI_PASSWORD;
-  hostname = doc["hostname"] | DEFAULT_HOSTNAME;
-  wifiCredsValid = doc["wifiCredsValid"] | DEFAULT_WIFI_CREDS_VALID;
-  ringingAlarmId = doc["ringingAlarmId"] | DEFAULT_RINGING_ALARM_ID;
-  ringingAlarmStartTimestamp = doc["ringingAlarmStartTimestamp"] | DEFAULT_RINGING_ALARM_TIMESTAMP;
-  autoBrightness = doc["autoBrightness"] | DEFAULT_AUTO_BRIGHTNESS;
-  brightness = doc["brightness"] | DEFAULT_BRIGHTNESS;
-  autoBrightnessStartHour = doc["autoBrightnessStartHour"] | DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
-  autoBrightnessEndHour = doc["autoBrightnessEndHour"] | DEFAULT_AUTO_BRIGHTNESS_END_HOUR;
-  dayBrightness = doc["dayBrightness"] | DEFAULT_DAY_BRIGHTNESS;
-  nightBrightness = doc["nightBrightness"] | DEFAULT_NIGHT_BRIGHTNESS;
-  use24HourFormat = doc["use24HourFormat"] | DEFAULT_USE_24_HOUR_FORMAT;
-  useCelsius = doc["useCelsius"] | DEFAULT_USE_CELSIUS;
-  screenFlipped = doc["screenFlipped"] | DEFAULT_SCREEN_FLIPPED;
-  timezone = doc["timezone"] | DEFAULT_TIMEZONE;
-  snoozeDuration = doc["snoozeDuration"] | DEFAULT_SNOOZE_DURATION;
-  dismissDuration = doc["dismissDuration"] | DEFAULT_DISMISS_DURATION;
-
-  backgroundColor = doc["backgroundColor"] | DEFAULT_BACKGROUND_COLOR;
+  // Validate colors to prevent issues with URL-encoded values
   if (backgroundColor.startsWith("%"))
     backgroundColor = DEFAULT_BACKGROUND_COLOR;
-  timeColor = doc["timeColor"] | DEFAULT_TIME_COLOR;
   if (timeColor.startsWith("%"))
     timeColor = DEFAULT_TIME_COLOR;
-  todColor = doc["todColor"] | DEFAULT_TOD_COLOR;
   if (todColor.startsWith("%"))
     todColor = DEFAULT_TOD_COLOR;
-  secondsColor = doc["secondsColor"] | DEFAULT_SECONDS_COLOR;
   if (secondsColor.startsWith("%"))
     secondsColor = DEFAULT_SECONDS_COLOR;
-  dayOfWeekColor = doc["dayOfWeekColor"] | DEFAULT_DAY_OF_WEEK_COLOR;
   if (dayOfWeekColor.startsWith("%"))
     dayOfWeekColor = DEFAULT_DAY_OF_WEEK_COLOR;
-  dateColor = doc["dateColor"] | DEFAULT_DATE_COLOR;
   if (dateColor.startsWith("%"))
     dateColor = DEFAULT_DATE_COLOR;
-  tempColor = doc["tempColor"] | DEFAULT_TEMP_COLOR;
   if (tempColor.startsWith("%"))
     tempColor = DEFAULT_TEMP_COLOR;
-  humidityColor = doc["humidityColor"] | DEFAULT_HUMIDITY_COLOR;
   if (humidityColor.startsWith("%"))
     humidityColor = DEFAULT_HUMIDITY_COLOR;
-  alarmIconColor = doc["alarmIconColor"] | DEFAULT_ALARM_ICON_COLOR;
   if (alarmIconColor.startsWith("%"))
     alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
-  snoozeIconColor = doc["snoozeIconColor"] | DEFAULT_SNOOZE_ICON_COLOR;
   if (snoozeIconColor.startsWith("%"))
     snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
-  alarmTextColor = doc["alarmTextColor"] | DEFAULT_ALARM_TEXT_COLOR;
   if (alarmTextColor.startsWith("%"))
     alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
-  errorTextColor = doc["errorTextColor"] | DEFAULT_ERROR_TEXT_COLOR;
   if (errorTextColor.startsWith("%"))
     errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
 
-  // Deserialize the alarms array
-  JsonArray alarmsArray = doc["alarms"];
-  if (!alarmsArray.isNull())
+  // Load alarms
+  for (int i = 0; i < MAX_ALARMS; ++i)
   {
-    int i = 0;
-    for (JsonObject alarmObj : alarmsArray)
-    {
-      if (i >= MAX_ALARMS)
-        break;
-      _alarms[i].setId(alarmObj["id"] | i);
-      _alarms[i].setEnabled(alarmObj["enabled"] | false);
-      _alarms[i].setHour(alarmObj["hour"] | 6);
-      _alarms[i].setMinute(alarmObj["minute"] | 0);
-      _alarms[i].setDays(alarmObj["days"] | 0);
-      _alarms[i].setSnoozeState(alarmObj["snoozed"] | false, alarmObj["snoozeUntil"] | 0);
-      _alarms[i].setLastDismissedDay(alarmObj["lastDismissedDay"] | 8);
-      i++;
-    }
+    String prefix = "alarm_" + String(i) + "_";
+    _alarms[i].setId(i);
+    _alarms[i].setEnabled(_preferences.getBool((prefix + "enabled").c_str(), false));
+    _alarms[i].setHour(_preferences.getUChar((prefix + "hour").c_str(), 6));
+    _alarms[i].setMinute(_preferences.getUChar((prefix + "minute").c_str(), 0));
+    _alarms[i].setDays(_preferences.getUChar((prefix + "days").c_str(), 0));
+    bool snoozed = _preferences.getBool((prefix + "snoozed").c_str(), false);
+    uint32_t snoozeUntil = _preferences.getUInt((prefix + "snoozeUntil").c_str(), 0);
+    _alarms[i].setSnoozeState(snoozed, snoozeUntil);
+    _alarms[i].setLastDismissedDay(_preferences.getUChar((prefix + "lastDismissed").c_str(), 8));
   }
 
   SerialLog::getInstance().print("Configuration loaded successfully.");
@@ -193,81 +152,52 @@ void ConfigManager::load()
 
 bool ConfigManager::save()
 {
-  // Take the mutex to ensure exclusive access to the file system.
-  xSemaphoreTake(_fileMutex, portMAX_DELAY);
+  _preferences.putString("wifiSSID", wifiSSID);
+  _preferences.putString("wifiPassword", wifiPassword);
+  _preferences.putString("hostname", hostname);
+  _preferences.putBool("wifiCredsValid", wifiCredsValid);
+  _preferences.putChar("ringingAlarmId", ringingAlarmId);
+  _preferences.putUInt("ringingAlarmStart", ringingAlarmStartTimestamp);
+  _preferences.putBool("autoBrightness", autoBrightness);
+  _preferences.putUChar("brightness", brightness);
+  _preferences.putUChar("autoBrightStart", autoBrightnessStartHour);
+  _preferences.putUChar("autoBrightEnd", autoBrightnessEndHour);
+  _preferences.putUChar("dayBrightness", dayBrightness);
+  _preferences.putUChar("nightBrightness", nightBrightness);
+  _preferences.putBool("use24HourFormat", use24HourFormat);
+  _preferences.putBool("useCelsius", useCelsius);
+  _preferences.putBool("screenFlipped", screenFlipped);
+  _preferences.putString("timezone", timezone);
+  _preferences.putUChar("snoozeDuration", snoozeDuration);
+  _preferences.putUChar("dismissDuration", dismissDuration);
 
-  // Open the configuration file in write mode, which creates/truncates it.
-  File configFile = LittleFS.open(CONFIG_FILE, "w");
-  if (!configFile)
-  {
-    SerialLog::getInstance().print("Failed to open config file for writing.");
-    xSemaphoreGive(_fileMutex); // Release the mutex before returning.
-    return false;
-  }
+  _preferences.putString("backgroundColor", backgroundColor);
+  _preferences.putString("timeColor", timeColor);
+  _preferences.putString("todColor", todColor);
+  _preferences.putString("secondsColor", secondsColor);
+  _preferences.putString("dayOfWeekColor", dayOfWeekColor);
+  _preferences.putString("dateColor", dateColor);
+  _preferences.putString("tempColor", tempColor);
+  _preferences.putString("humidityColor", humidityColor);
+  _preferences.putString("alarmIconColor", alarmIconColor);
+  _preferences.putString("snoozeIconColor", snoozeIconColor);
+  _preferences.putString("alarmTextColor", alarmTextColor);
+  _preferences.putString("errorTextColor", errorTextColor);
 
-  // Create a JSON document to store the current settings.
-  JsonDocument doc;
-  doc["wifiSSID"] = wifiSSID;
-  doc["wifiPassword"] = wifiPassword;
-  doc["hostname"] = hostname;
-  doc["wifiCredsValid"] = wifiCredsValid;
-  doc["ringingAlarmId"] = ringingAlarmId;
-  doc["ringingAlarmStartTimestamp"] = ringingAlarmStartTimestamp;
-  doc["autoBrightness"] = autoBrightness;
-  doc["brightness"] = brightness;
-  doc["autoBrightnessStartHour"] = autoBrightnessStartHour;
-  doc["autoBrightnessEndHour"] = autoBrightnessEndHour;
-  doc["dayBrightness"] = dayBrightness;
-  doc["nightBrightness"] = nightBrightness;
-  doc["use24HourFormat"] = use24HourFormat;
-  doc["useCelsius"] = useCelsius;
-  doc["screenFlipped"] = screenFlipped;
-  doc["timezone"] = timezone;
-  doc["snoozeDuration"] = snoozeDuration;
-  doc["dismissDuration"] = dismissDuration;
-
-  doc["backgroundColor"] = backgroundColor;
-  doc["timeColor"] = timeColor;
-  doc["todColor"] = todColor;
-  doc["secondsColor"] = secondsColor;
-  doc["dayOfWeekColor"] = dayOfWeekColor;
-  doc["dateColor"] = dateColor;
-  doc["tempColor"] = tempColor;
-  doc["humidityColor"] = humidityColor;
-  doc["alarmIconColor"] = alarmIconColor;
-  doc["snoozeIconColor"] = snoozeIconColor;
-  doc["alarmTextColor"] = alarmTextColor;
-  doc["errorTextColor"] = errorTextColor;
-
-  // Serialize the alarms array
-  JsonArray alarmsArray = doc["alarms"].to<JsonArray>();
+  // Save alarms
   for (int i = 0; i < MAX_ALARMS; ++i)
   {
-    JsonObject alarmObj = alarmsArray.add<JsonObject>();
-    alarmObj["id"] = _alarms[i].getId();
-    alarmObj["enabled"] = _alarms[i].isEnabled();
-    alarmObj["hour"] = _alarms[i].getHour();
-    alarmObj["minute"] = _alarms[i].getMinute();
-    alarmObj["days"] = _alarms[i].getDays();
-    alarmObj["snoozed"] = _alarms[i].isSnoozed();
-    alarmObj["snoozeUntil"] = _alarms[i].getSnoozeUntil();
-    alarmObj["lastDismissedDay"] = _alarms[i].getLastDismissedDay();
+    String prefix = "alarm_" + String(i) + "_";
+    _preferences.putBool((prefix + "enabled").c_str(), _alarms[i].isEnabled());
+    _preferences.putUChar((prefix + "hour").c_str(), _alarms[i].getHour());
+    _preferences.putUChar((prefix + "minute").c_str(), _alarms[i].getMinute());
+    _preferences.putUChar((prefix + "days").c_str(), _alarms[i].getDays());
+    _preferences.putBool((prefix + "snoozed").c_str(), _alarms[i].isSnoozed());
+    _preferences.putUInt((prefix + "snoozeUntil").c_str(), _alarms[i].getSnoozeUntil());
+    _preferences.putUChar((prefix + "lastDismissed").c_str(), _alarms[i].getLastDismissedDay());
   }
 
-  // Serialize the JSON document into the file.
-  if (serializeJson(doc, configFile) == 0)
-  {
-    SerialLog::getInstance().print("Failed to write to config file.");
-    // Close the file and report the failure.
-    configFile.close();
-    xSemaphoreGive(_fileMutex); // Release the mutex before returning.
-    return false;
-  }
-
-  // Close the file and confirm the save was successful.
-  configFile.close();
   SerialLog::getInstance().print("Configuration saved.");
-  xSemaphoreGive(_fileMutex); // Release the mutex.
   return true;
 }
 
@@ -326,7 +256,7 @@ void ConfigManager::factoryReset()
     SerialLog::getInstance().print("Error erasing NVS.\n");
   }
 
-  // After erasing, the NVS needs to be re-initialized.
+  // After erasing, the NVS needs to be re-initialized for the next boot.
   err = nvs_flash_init();
   if (err == ESP_OK)
   {
