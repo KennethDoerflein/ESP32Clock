@@ -307,9 +307,14 @@ void ConfigManager::resetDisplayToDefaults()
   tempColor = DEFAULT_TEMP_COLOR;
   humidityColor = DEFAULT_HUMIDITY_COLOR;
   alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
-  snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
   alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+
+  if (!isAnyAlarmSnoozed())
+  {
+    snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
+  }
+
   _isDirty = true;
 }
 
@@ -325,7 +330,23 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   useCelsius = DEFAULT_USE_CELSIUS;
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
   timezone = DEFAULT_TIMEZONE;
-  snoozeDuration = DEFAULT_SNOOZE_DURATION;
-  dismissDuration = DEFAULT_DISMISS_DURATION;
+
+  if (!isAnyAlarmSnoozed())
+  {
+    snoozeDuration = DEFAULT_SNOOZE_DURATION;
+    dismissDuration = DEFAULT_DISMISS_DURATION;
+  }
   _isDirty = true;
+}
+
+bool ConfigManager::isAnyAlarmSnoozed() const
+{
+  for (int i = 0; i < MAX_ALARMS; ++i)
+  {
+    if (_alarms[i].isSnoozed())
+    {
+      return true;
+    }
+  }
+  return false;
 }

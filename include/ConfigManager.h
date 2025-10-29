@@ -572,6 +572,8 @@ public:
    */
   void resetGeneralSettingsToDefaults();
 
+  bool isAnyAlarmSnoozed() const;
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.

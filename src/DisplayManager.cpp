@@ -52,6 +52,8 @@ void DisplayManager::update()
     }
     _fullRefresh = false;
     _partialRefresh = false; // A full refresh implies a partial one
+    // After a full refresh, we must force the alarm icon to be redrawn.
+    _alarmIconVisible = false;
   }
   else if (_partialRefresh)
   {
