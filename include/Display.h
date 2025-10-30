@@ -70,7 +70,12 @@ public:
   void setBacklightFlashing(bool enabled);
 
 private:
+  /**
+   * @brief Private constructor to enforce the singleton pattern.
+   */
   Display() : actualBrightness(255) {} // Initialize to a default value
+
+  // --- Private Members ---
 
   TFT_eSPI tft;         ///< The main TFT_eSPI driver instance.
   int actualBrightness; ///< Stores the current brightness duty cycle.

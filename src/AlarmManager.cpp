@@ -1,4 +1,11 @@
-// AlarmManager.cpp
+/**
+ * @file AlarmManager.cpp
+ * @brief Implements the AlarmManager class for handling alarm ringing logic.
+ *
+ * This file contains the implementation of the AlarmManager, which controls
+ * the physical buzzer, manages the alarm sound progression (ramping), and
+ * handles auto-shutoff and resuming alarms after a reboot.
+ */
 
 #include "AlarmManager.h"
 #include "Display.h"
@@ -7,6 +14,12 @@
 #include "ConfigManager.h"
 #include "constants.h"
 
+/**
+ * @brief Initializes the AlarmManager.
+ *
+ * Sets up the buzzer pin and checks if an alarm was ringing when the device
+ * was last powered off. If so, it schedules a deferred resume of the alarm.
+ */
 void AlarmManager::begin()
 {
   pinMode(BUZZER_PIN, OUTPUT);
@@ -23,6 +36,14 @@ void AlarmManager::begin()
   }
 }
 
+/**
+ * @brief Updates the state of the ringing alarm.
+ *
+ * This method should be called in the main loop. It handles the progressive
+ * ramping of the alarm sound, from slow beeps to a continuous tone. It also
+ * contains the logic for automatically shutting off the alarm after a prolonged
+ * period.
+ */
 void AlarmManager::update()
 {
   // --- Handle deferred resume first ---
@@ -95,6 +116,13 @@ void AlarmManager::update()
   }
 }
 
+/**
+ * @brief Stops the currently ringing alarm.
+ *
+ * This function deactivates the buzzer, resets the alarm state machine,
+ * and clears the persisted ringing state from the configuration. It also
+ * stops the backlight from flashing.
+ */
 void AlarmManager::stop()
 {
   if (!_isRinging)
@@ -118,16 +146,33 @@ void AlarmManager::stop()
   Display::getInstance().setBacklightFlashing(false);
 }
 
+/**
+ * @brief Checks if an alarm is currently ringing.
+ * @return True if an alarm is active, false otherwise.
+ */
 bool AlarmManager::isRinging() const
 {
   return _isRinging;
 }
 
+/**
+ * @brief Gets the ID of the currently active alarm.
+ * @return The ID of the alarm, or -1 if no alarm is ringing.
+ */
 int AlarmManager::getActiveAlarmId() const
 {
   return _activeAlarmId;
 }
 
+/**
+ * @brief Triggers a new alarm to start ringing.
+ *
+ * This function initiates the alarm sequence. It sets up the state machine
+ * for the ramping sound, persists the ringing state to handle reboots, and
+ * activates the visual feedback on the display.
+ *
+ * @param alarmId The ID of the alarm to trigger.
+ */
 void AlarmManager::trigger(uint8_t alarmId)
 {
   if (_isRinging)
@@ -155,6 +200,17 @@ void AlarmManager::trigger(uint8_t alarmId)
   Display::getInstance().setBacklightFlashing(true);
 }
 
+/**
+ * @brief Resumes an alarm that was ringing before a reboot.
+ *
+ * This function is called at startup if a ringing alarm was detected in
+ * the saved configuration. It recalculates the current ramp stage based on
+
+ * the original start time and continues the alarm sequence.
+ *
+ * @param alarmId The ID of the alarm to resume.
+ * @param startTimestamp The original Unix timestamp when the alarm started.
+ */
 void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
 {
   if (_isRinging)

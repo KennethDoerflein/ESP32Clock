@@ -115,6 +115,9 @@ public:
   void showErrorScreen(const char *message);
 
 private:
+  /**
+   * @brief Private constructor to enforce the singleton pattern.
+   */
   DisplayManager() : _tft(nullptr), _currentPage(nullptr) {}
 
   TFT_eSPI *_tft;                            ///< Pointer to the main TFT object.

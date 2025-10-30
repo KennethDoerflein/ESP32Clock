@@ -71,9 +71,28 @@ public:
    * default values. This should be called once at startup.
    */
   void begin();
+
+  /**
+   * @brief Handles periodic tasks for the ConfigManager, like debounced saves.
+   *
+   * This should be called in the main application loop. It checks if a save
+   * operation is pending and executes it after a debounce delay.
+   */
   void loop();
 
+  /**
+   * @brief Saves the current configuration to the JSON file.
+   * @return True if the save was successful, false otherwise.
+   */
   bool save();
+
+  /**
+   * @brief Schedules a save operation.
+   *
+   * This method sets a flag to save the configuration after a short delay.
+   * This is used to prevent rapid, successive writes to the filesystem when
+   * multiple settings are changed in quick succession.
+   */
   void scheduleSave();
 
   // Getters
@@ -169,21 +188,90 @@ public:
    */
   String getTimezone() const { return timezone; }
 
+  /**
+   * @brief Gets the snooze duration for alarms.
+   * @return The snooze duration in minutes.
+   */
   uint8_t getSnoozeDuration() const { return snoozeDuration; }
+
+  /**
+   * @brief Gets the hold duration to dismiss an alarm.
+   * @return The dismiss duration in seconds.
+   */
   uint8_t getDismissDuration() const { return dismissDuration; }
 
   // Display Colors
+
+  /**
+   * @brief Gets the background color of the display.
+   * @return The color as a hex string (e.g., "#RRGGBB").
+   */
   String getBackgroundColor() const { return backgroundColor; }
+
+  /**
+   * @brief Gets the color of the time display.
+   * @return The color as a hex string.
+   */
   String getTimeColor() const { return timeColor; }
+
+  /**
+   * @brief Gets the color of the AM/PM indicator.
+   * @return The color as a hex string.
+   */
   String getTodColor() const { return todColor; }
+
+  /**
+   * @brief Gets the color of the seconds display.
+   * @return The color as a hex string.
+   */
   String getSecondsColor() const { return secondsColor; }
+
+  /**
+   * @brief Gets the color of the day of the week display.
+   * @return The color as a hex string.
+   */
   String getDayOfWeekColor() const { return dayOfWeekColor; }
+
+  /**
+   * @brief Gets the color of the date display.
+   * @return The color as a hex string.
+   */
   String getDateColor() const { return dateColor; }
+
+  /**
+   * @brief Gets the color of the temperature display.
+   * @return The color as a hex string.
+   */
   String getTempColor() const { return tempColor; }
+
+  /**
+   * @brief Gets the color of the humidity display.
+   * @return The color as a hex string.
+   */
   String getHumidityColor() const { return humidityColor; }
+
+  /**
+   * @brief Gets the color of the alarm icon.
+   * @return The color as a hex string.
+   */
   String getAlarmIconColor() const { return alarmIconColor; }
+
+  /**
+   * @brief Gets the color of the snooze icon.
+   * @return The color as a hex string.
+   */
   String getSnoozeIconColor() const { return snoozeIconColor; }
+
+  /**
+   * @brief Gets the color of the alarm text when ringing.
+   * @return The color as a hex string.
+   */
   String getAlarmTextColor() const { return alarmTextColor; }
+
+  /**
+   * @brief Gets the color of error text messages.
+   * @return The color as a hex string.
+   */
   String getErrorTextColor() const { return errorTextColor; }
 
   /**
@@ -254,6 +342,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the snooze duration for alarms.
+   * @param duration The snooze duration in minutes.
+   */
   void setSnoozeDuration(uint8_t duration)
   {
     if (snoozeDuration != duration)
@@ -264,6 +356,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the hold duration to dismiss an alarm.
+   * @param duration The dismiss duration in seconds.
+   */
   void setDismissDuration(uint8_t duration)
   {
     if (dismissDuration != duration)
@@ -446,6 +542,10 @@ public:
    */
   void setAlarm(int index, const Alarm &alarm);
 
+  /**
+   * @brief Sets the background color of the display.
+   * @param color The new color as a hex string (e.g., "#RRGGBB").
+   */
   void setBackgroundColor(const String &color)
   {
     if (backgroundColor != color)
@@ -456,6 +556,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the time display.
+   * @param color The new color as a hex string.
+   */
   void setTimeColor(const String &color)
   {
     if (timeColor != color)
@@ -466,6 +570,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the AM/PM indicator.
+   * @param color The new color as a hex string.
+   */
   void setTodColor(const String &color)
   {
     if (todColor != color)
@@ -476,6 +584,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the seconds display.
+   * @param color The new color as a hex string.
+   */
   void setSecondsColor(const String &color)
   {
     if (secondsColor != color)
@@ -486,6 +598,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the day of the week display.
+   * @param color The new color as a hex string.
+   */
   void setDayOfWeekColor(const String &color)
   {
     if (dayOfWeekColor != color)
@@ -496,6 +612,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the date display.
+   * @param color The new color as a hex string.
+   */
   void setDateColor(const String &color)
   {
     if (dateColor != color)
@@ -506,6 +626,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the temperature display.
+   * @param color The new color as a hex string.
+   */
   void setTempColor(const String &color)
   {
     if (tempColor != color)
@@ -516,6 +640,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the humidity display.
+   * @param color The new color as a hex string.
+   */
   void setHumidityColor(const String &color)
   {
     if (humidityColor != color)
@@ -526,6 +654,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the alarm icon.
+   * @param color The new color as a hex string.
+   */
   void setAlarmIconColor(const String &color)
   {
     if (alarmIconColor != color)
@@ -536,6 +668,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the snooze icon.
+   * @param color The new color as a hex string.
+   */
   void setSnoozeIconColor(const String &color)
   {
     if (snoozeIconColor != color)
@@ -546,6 +682,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of the alarm text when ringing.
+   * @param color The new color as a hex string.
+   */
   void setAlarmTextColor(const String &color)
   {
     if (alarmTextColor != color)
@@ -556,6 +696,10 @@ public:
     }
   }
 
+  /**
+   * @brief Sets the color of error text messages.
+   * @param color The new color as a hex string.
+   */
   void setErrorTextColor(const String &color)
   {
     if (errorTextColor != color)
@@ -576,6 +720,12 @@ public:
    * @brief Clears the dirty flag, usually after handling the changes.
    */
   void clearDirtyFlag() { _isDirty = false; }
+
+  /**
+   * @brief Saves the state of a ringing alarm to persistent storage.
+   *
+   * This is used to resume an alarm if the device reboots while it's ringing.
+   */
   void saveRingingAlarmState();
 
   /**

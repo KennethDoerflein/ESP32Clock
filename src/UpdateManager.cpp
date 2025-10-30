@@ -1,3 +1,11 @@
+/**
+ * @file UpdateManager.cpp
+ * @brief Implements the UpdateManager class for handling firmware updates.
+ *
+ * This file contains the implementation for managing Over-the-Air (OTA) updates.
+ * It handles updates from both file uploads via the web interface and direct
+ * downloads from GitHub releases.
+ */
 #include "UpdateManager.h"
 #include <Update.h>
 #include <ArduinoJson.h>
@@ -13,15 +21,33 @@
 #include "version.h.default"
 #endif
 
+/**
+ * @brief Gets the singleton instance of the UpdateManager.
+ * @return A reference to the singleton instance.
+ */
 UpdateManager &UpdateManager::getInstance()
 {
   static UpdateManager instance;
   return instance;
 }
 
-// Private constructor
+/**
+ * @brief Private constructor to enforce the singleton pattern.
+ */
 UpdateManager::UpdateManager() {}
 
+/**
+ * @brief Processes a chunk of firmware data from a file upload.
+ *
+ * This function is called repeatedly by the web server's upload handler.
+ * It initializes the update process on the first chunk and writes subsequent
+ * chunks to the flash memory.
+ *
+ * @param data Pointer to the data chunk.
+ * @param len Length of the data chunk.
+ * @param index Starting index of the chunk in the total file.
+ * @param total Total size of the firmware file.
+ */
 void UpdateManager::handleFileUpload(uint8_t *data, size_t len, size_t index, size_t total)
 {
   // If a previous write failed, don't continue
@@ -56,6 +82,15 @@ void UpdateManager::handleFileUpload(uint8_t *data, size_t len, size_t index, si
   }
 }
 
+/**
+ * @brief Finalizes the firmware update.
+ *
+ * This should be called after the last chunk of data has been received.
+ * It checks if the update was successful and either commits the changes
+ * or aborts the process.
+ *
+ * @return True if the update was successful, false otherwise.
+ */
 bool UpdateManager::endUpdate()
 {
   bool success = false;
@@ -79,11 +114,25 @@ bool UpdateManager::endUpdate()
   return success;
 }
 
+/**
+ * @brief Checks if an update is currently in progress.
+ * @return True if an update is in progress, false otherwise.
+ */
 bool UpdateManager::isUpdateInProgress()
 {
   return _updateInProgress;
 }
 
+/**
+ * @brief Checks for updates on GitHub and initiates the update process.
+ *
+ * This function fetches the latest release information from the GitHub API,
+ * compares the tag name with the current firmware version, and if a newer
+ * version is found, it creates a new FreeRTOS task to download and apply
+ * the update in the background.
+ *
+ * @return A string indicating the status of the update check.
+ */
 String UpdateManager::handleGithubUpdate()
 {
   if (_updateInProgress)
@@ -161,6 +210,15 @@ String UpdateManager::handleGithubUpdate()
   return "Update found, but no .bin file in release assets.";
 }
 
+/**
+ * @brief FreeRTOS task to perform the GitHub update.
+ *
+ * This function runs in a separate task to avoid blocking the main application
+ * loop during the download and flashing process. It handles the HTTP download,
+ * including redirects, and writes the firmware to flash.
+ *
+ * @param pvParameters A void pointer to a String object containing the download URL.
+ */
 void UpdateManager::runGithubUpdateTask(void *pvParameters)
 {
   String *downloadUrl = (String *)pvParameters;
