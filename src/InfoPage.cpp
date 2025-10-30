@@ -1,3 +1,12 @@
+/**
+ * @file InfoPage.cpp
+ * @brief Implements the InfoPage class for displaying system information.
+ *
+ * This file contains the implementation for the InfoPage, which shows details
+ * like the device's hostname, IP address, and the current firmware version.
+ * The content is static and rendered only once upon entering the page.
+ */
+
 #include "pages/InfoPage.h"
 #include "fonts/CenturyGothic28.h"
 #include <WiFi.h>
@@ -9,10 +18,24 @@
 #include "version.h.default"
 #endif
 
+/**
+ * @brief Constructs a new InfoPage.
+ */
 InfoPage::InfoPage() {}
 
+/**
+ * @brief Destroys the InfoPage.
+ */
 InfoPage::~InfoPage() {}
 
+/**
+ * @brief Called when the page becomes the active view.
+ *
+ * Renders the static information to the screen. This is done only once, as
+ * the content does not change.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void InfoPage::onEnter(TFT_eSPI &tft)
 {
   tft.fillScreen(TFT_BLACK);
@@ -48,16 +71,35 @@ void InfoPage::onEnter(TFT_eSPI &tft)
   tft.unloadFont();
 }
 
+/**
+ * @brief Called when the page is no longer the active view.
+ *
+ * This method is a no-op as there is no cleanup required for this simple page.
+ */
 void InfoPage::onExit()
 {
   // Nothing to do here
 }
 
+/**
+ * @brief Updates the internal state of the page.
+ *
+ * This method is a no-op because the page displays static information that
+ * does not need to be updated in the main loop.
+ */
 void InfoPage::update()
 {
   // Static content, nothing to do here
 }
 
+/**
+ * @brief Renders the page to the display.
+ *
+ * This method is a no-op because all rendering is done in the `onEnter`
+ * method. The content is static and does not need to be redrawn repeatedly.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void InfoPage::render(TFT_eSPI &tft)
 {
   // Static content, no need for continuous rendering

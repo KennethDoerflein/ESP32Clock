@@ -1,4 +1,13 @@
-#include "display.h"
+/**
+ * @file Display.cpp
+ * @brief Implements the Display class for low-level screen and backlight control.
+ *
+ * This file contains the implementation for initializing the TFT display,
+ * managing the backlight brightness using PWM, and drawing simple status
+ * messages to the screen.
+ */
+
+#include "Display.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
 #include "fonts/CenturyGothic28.h"
@@ -10,6 +19,13 @@
 #define BACKLIGHT_FREQ 5000    // 5 kHz frequency
 #define BACKLIGHT_RESOLUTION 8 // 8-bit resolution (0-255)
 
+/**
+ * @brief Initializes the display and backlight.
+ *
+ * This function sets up the LEDC peripheral for PWM control of the backlight,
+ * attaches the backlight pin, and initializes the TFT display driver.
+ * It also sets a default full brightness and clears the screen.
+ */
 void Display::begin()
 {
   // Configure the LEDC peripheral for PWM control of the backlight.
@@ -25,11 +41,21 @@ void Display::begin()
   tft.fillScreen(TFT_BLACK);
 }
 
+/**
+ * @brief Updates the screen's rotation based on the current configuration.
+ *
+ * Reads the `screenFlipped` setting from the ConfigManager and sets the
+ * TFT rotation accordingly.
+ */
 void Display::updateRotation()
 {
   tft.setRotation(ConfigManager::getInstance().isScreenFlipped() ? 1 : 3);
 }
 
+/**
+ * @brief Displays a single-line status message centered on the screen.
+ * @param message The message to display.
+ */
 void Display::drawStatusMessage(const char *message)
 {
   tft.fillScreen(TFT_BLACK);
@@ -40,6 +66,11 @@ void Display::drawStatusMessage(const char *message)
   tft.unloadFont(); // Unload font to free up memory
 }
 
+/**
+ * @brief Displays a two-line status message centered on the screen.
+ * @param line1 The first line of the message.
+ * @param line2 The second line of the message.
+ */
 void Display::drawMultiLineStatusMessage(const char *line1, const char *line2)
 {
   tft.fillScreen(TFT_BLACK);
@@ -51,6 +82,13 @@ void Display::drawMultiLineStatusMessage(const char *line1, const char *line2)
   tft.unloadFont(); // Unload font to free up memory
 }
 
+/**
+ * @brief Enables or disables the backlight flashing effect.
+ *
+ * This is used to provide a visual cue when an alarm is ringing.
+ *
+ * @param enabled True to enable flashing, false to disable.
+ */
 void Display::setBacklightFlashing(bool enabled)
 {
   _isFlashing = enabled;
@@ -61,6 +99,14 @@ void Display::setBacklightFlashing(bool enabled)
   }
 }
 
+/**
+ * @brief Updates the backlight brightness based on current settings.
+ *
+ * This function implements the logic for both manual and automatic brightness
+ * control. It reads the settings from the ConfigManager, determines the
+ * appropriate brightness level, and applies it to the backlight PWM channel.
+ * It also handles the flashing effect when an alarm is active.
+ */
 void Display::updateBrightness()
 {
   if (_isFlashing)

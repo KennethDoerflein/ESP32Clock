@@ -1,10 +1,8 @@
-// web_content.h
-
 #ifndef WEB_CONTENT_H
 #define WEB_CONTENT_H
 
 /**
- * @file web_content.h
+ * @file WebContent.h
  * @brief Contains the HTML, CSS, and JavaScript for the web interface.
  *
  * All content is stored as C-style string literals in PROGMEM to conserve RAM.
@@ -864,11 +862,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
     <script>
-      const DEBOUNCE_DELAY_MS = 10000;
       const ERROR_DISPLAY_MS = 3000;
       let saveGeneralTimeout;
       let saveDisplayTimeout;
-      let saveCountdownInterval;
 
       const BRIGHTNESS_MIN = 10;
       const BRIGHTNESS_MAX = 255;
@@ -926,36 +922,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         resetColorsBtn.disabled = isBusy;
       }
 
-      function stopSaveCountdown() {
-        clearInterval(saveCountdownInterval);
-      }
-
-      function startSaveCountdown() {
-        stopSaveCountdown(); // Ensure no multiple intervals running
-        let countdown = Math.ceil(DEBOUNCE_DELAY_MS / 1000);
-        const textSpan = statusEl.querySelector("span.text-warning");
-
-        if (textSpan) {
-            const originalText = "Unsaved";
-            const updateCountdownText = () => {
-                textSpan.innerHTML = `${originalText} (saving in ${countdown}s)`;
-            };
-
-            updateCountdownText();
-            
-            saveCountdownInterval = setInterval(() => {
-                countdown--;
-                if (countdown > 0) {
-                    updateCountdownText();
-                } else {
-                    stopSaveCountdown();
-                }
-            }, 1000);
-        }
-      }
-
       function setStatus(status) {
-        stopSaveCountdown();
         statusEl.innerHTML = status;
       }
 
@@ -985,15 +952,13 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       function handleGeneralInputChange() {
         clearTimeout(saveGeneralTimeout);
         setStatus(STATUS_INDICATORS.UNSAVED);
-        startSaveCountdown();
-        saveGeneralTimeout = setTimeout(saveGeneralSettings, DEBOUNCE_DELAY_MS);
+        saveGeneralTimeout = setTimeout(saveGeneralSettings, 50);
       }
 
       function handleDisplayInputChange() {
         clearTimeout(saveDisplayTimeout);
         setStatus(STATUS_INDICATORS.UNSAVED);
-        startSaveCountdown();
-        saveDisplayTimeout = setTimeout(saveDisplaySettings, DEBOUNCE_DELAY_MS);
+        saveDisplayTimeout = setTimeout(saveDisplaySettings, 50);
       }
 
       function toggleBrightnessSlider() {
@@ -1330,10 +1295,8 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const alarmsContainer = document.getElementById("alarms-container");
       const statusEl = document.querySelector(".status-indicator");
 
-      const DEBOUNCE_DELAY_MS = 3000;
       const ERROR_DISPLAY_MS = 3000;
       let saveTimeout;
-      let countdownInterval;
 
       const STATUS_INDICATORS = {
         SAVED:
@@ -1346,41 +1309,10 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
           '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
       };
 
-      function stopSaveCountdown() {
-        clearInterval(countdownInterval);
-      }
-
-      function startSaveCountdown() {
-        stopSaveCountdown();
-        let countdown = Math.ceil(DEBOUNCE_DELAY_MS / 1000);
-        const textSpan = statusEl.querySelector("span.text-warning");
-
-        if (textSpan) {
-          const originalText = "Unsaved";
-          const updateCountdownText = () => {
-            if (countdown > 0) {
-              textSpan.innerHTML = `${originalText} (saving in ${countdown}s)`;
-            }
-          };
-
-          updateCountdownText();
-
-          countdownInterval = setInterval(() => {
-            countdown--;
-            if (countdown > 0) {
-              updateCountdownText();
-            } else {
-              stopSaveCountdown();
-            }
-          }, 1000);
-        }
-      }
-
       function handleInputChange() {
         clearTimeout(saveTimeout);
         statusEl.innerHTML = STATUS_INDICATORS.UNSAVED;
-        startSaveCountdown();
-        saveTimeout = setTimeout(saveAllAlarms, DEBOUNCE_DELAY_MS);
+        saveTimeout = setTimeout(saveAllAlarms, 50);
       }
 
       function createAlarmCard(alarm) {

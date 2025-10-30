@@ -1,12 +1,21 @@
+/**
+ * @file ClockPage.cpp
+ * @brief Implements the ClockPage class for displaying the main clock face.
+ *
+ * This file contains the implementation of the ClockPage, which is responsible
+ * for rendering the time, date, sensor data, and alarm indicators. It uses
+ * sprites for efficient updates and to prevent flickering.
+ */
+
 // Comment out the next line to disable sprite borders for debugging
 // #define DEBUG_BORDERS
 
 #include "pages/ClockPage.h"
-#include "constants.h"
-#include "utils.h"
+#include "Constants.h"
+#include "Utils.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
-#include "sensors.h"
+#include "SensorModule.h"
 #include "AlarmManager.h"
 #include "fonts/DSEG7ModernBold104.h"
 #include "fonts/DSEG14ModernBold32.h"
@@ -16,6 +25,14 @@
 
 #include <Arduino.h>
 
+/**
+ * @brief Constructs a new ClockPage.
+ *
+ * Initializes all the sprites used for rendering different parts of the clock face.
+ * The TFT_eSPI driver instance is passed to each sprite's constructor.
+ *
+ * @param tft A pointer to the TFT_eSPI driver instance.
+ */
 ClockPage::ClockPage(TFT_eSPI *tft)
     : _sprClock(tft), _sprDayOfWeek(tft), _sprDate(tft), _sprTemp(tft), _sprHumidity(tft), _sprTOD(tft), _sprSeconds(tft),
       _alarmSprite(tft), _tft(tft)
@@ -23,11 +40,26 @@ ClockPage::ClockPage(TFT_eSPI *tft)
   // Sprites are initialized in the member initializer list
 }
 
+/**
+ * @brief Destroys the ClockPage.
+ *
+ * The sprites, being stack-allocated objects with a reference to the TFT driver,
+ * are automatically destructed. No manual memory management is needed.
+ */
 ClockPage::~ClockPage()
 {
   // Sprites with TFT_eSPI driver reference are destructed automatically
 }
 
+/**
+ * @brief Called when the page becomes the active view.
+ *
+ * This method sets up the display for the clock page. It creates the sprites
+ * on the first entry, recalculates the layout, and clears the screen.
+ * It also forces a full redraw of all elements by clearing the last known data.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::onEnter(TFT_eSPI &tft)
 {
   updateSpriteColors();
@@ -42,36 +74,90 @@ void ClockPage::onEnter(TFT_eSPI &tft)
   setupLayout(tft);
 
   // Force a redraw of all elements
-  _lastTime = "";
-  _lastDate = "";
-  _lastDayOfWeek = "";
-  _lastTemp = -999;
-  _lastHumidity = -999;
-  _lastTOD = "";
-  _lastSeconds = "";
+  _lastData = {};
 }
 
+/**
+ * @brief Called when the page is no longer the active view.
+ *
+ * This method is currently a no-op, as sprites are preserved between page
+ * switches to improve performance.
+ */
 void ClockPage::onExit()
 {
-  // Sprites are no longer deleted on exit to preserve them.
+  // Sprites are not deleted on exit to preserve them.
 }
 
+/**
+ * @brief Updates the internal state of the page.
+ *
+ * This method is currently a no-op, as all update logic is handled within
+ * the `render` method for simplicity.
+ */
 void ClockPage::update()
 {
   // The rendering logic handles this currently.
 }
 
+/**
+ * @brief Renders the clock face to the display.
+ *
+ * This is the core rendering loop for the clock page. It fetches the current
+ * display data and compares it to the last rendered data. If any data has
+ * changed, it calls the appropriate draw function to update only the
+ * necessary parts of the screen.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::render(TFT_eSPI &tft)
 {
+  DisplayData currentData;
+  updateDisplayData(currentData);
+
   updateAlarmSprite();
-  drawSeconds(tft);
-  drawTemperature(tft);
-  drawHumidity(tft);
-  drawClock(tft);
-  drawDate(tft);
-  drawDayOfWeek(tft);
+  if (currentData.seconds != _lastData.seconds)
+  {
+    drawSeconds(tft);
+    _lastData.seconds = currentData.seconds;
+  }
+  if (fabs(currentData.temp - _lastData.temp) > 0.1)
+  {
+    drawTemperature(tft);
+    _lastData.temp = currentData.temp;
+  }
+  if (fabs(currentData.humidity - _lastData.humidity) > 0.1)
+  {
+    drawHumidity(tft);
+    _lastData.humidity = currentData.humidity;
+  }
+  if (currentData.time != _lastData.time || currentData.tod != _lastData.tod)
+  {
+    drawClock(tft);
+    _lastData.time = currentData.time;
+    _lastData.tod = currentData.tod;
+  }
+  if (currentData.date != _lastData.date)
+  {
+    drawDate(tft);
+    _lastData.date = currentData.date;
+  }
+  if (currentData.dayOfWeek != _lastData.dayOfWeek)
+  {
+    drawDayOfWeek(tft);
+    _lastData.dayOfWeek = currentData.dayOfWeek;
+  }
 }
 
+/**
+ * @brief Calculates the positions of all sprites on the screen.
+ *
+ * This method computes the coordinates for each element of the clock face
+ * based on the screen dimensions and predefined margins. It ensures that the
+ * layout is responsive to different screen sizes and that elements are
+ * centered and aligned correctly.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance, used to get screen dimensions.
+ */
 void ClockPage::setupLayout(TFT_eSPI &tft)
 {
   int screenWidth = tft.width();
@@ -124,11 +210,26 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   _alarmSpriteY = (screenHeight / 2) - (_alarmSprite.height() / 2);
 }
 
+/**
+ * @brief Clears the area of the screen where the alarm sprite is displayed.
+ *
+ * This is a helper function to manually clear the alarm sprite's footprint
+ * on the screen, which can be useful when transitioning between alarm states.
+ */
 void ClockPage::clearAlarmSprite()
 {
   _tft->fillRect(_alarmSpriteX, _alarmSpriteY, _alarmSprite.width(), _alarmSprite.height(), _bgColor);
 }
 
+/**
+ * @brief Creates and configures all the sprites for the clock face.
+ *
+ * This method is called once on the first entry to the page. It allocates
+ * memory for each sprite, loads the required fonts, and sets default text
+ * alignment and colors.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::setupSprites(TFT_eSPI &tft)
 {
   // Create the sprites and configure them
@@ -163,6 +264,13 @@ void ClockPage::setupSprites(TFT_eSPI &tft)
   updateSpriteColors();
 }
 
+/**
+ * @brief Updates the colors of all sprites from the configuration.
+ *
+ * This method reads the latest color settings from the ConfigManager, converts
+ * them from hex strings to RGB565 format, and applies them to the text
+ * color of each sprite.
+ */
 void ClockPage::updateSpriteColors()
 {
   auto &config = ConfigManager::getInstance();
@@ -184,6 +292,16 @@ void ClockPage::updateSpriteColors()
   _sprHumidity.setTextColor(humidityColor, _bgColor);
 }
 
+/**
+ * @brief Draws the main clock time (HH:MM) and AM/PM indicator.
+ *
+ * This function renders the current time into the clock sprite and pushes it
+ * to the screen. If not in 24-hour format, it also renders the AM/PM
+ * indicator into its own sprite.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance (not directly used,
+ *            but required by the Page interface).
+ */
 void ClockPage::drawClock(TFT_eSPI &tft)
 {
   auto &timeManager = TimeManager::getInstance();
@@ -191,144 +309,122 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   String timeStr = timeManager.getFormattedTime();
   String todStr = timeManager.getTOD();
 
-  // Draw the main time (HH:MM) if it has changed
-  if (timeStr != _lastTime)
-  {
-    _sprClock.fillSprite(_bgColor);
-    _sprClock.drawString(timeStr.c_str(), _sprClock.width(), _sprClock.height() / 2);
+  _sprClock.fillSprite(_bgColor);
+  _sprClock.drawString(timeStr.c_str(), _sprClock.width(), _sprClock.height() / 2);
 #ifdef DEBUG_BORDERS
-    _sprClock.drawRect(0, 0, _sprClock.width(), _sprClock.height(), TFT_RED);
+  _sprClock.drawRect(0, 0, _sprClock.width(), _sprClock.height(), TFT_RED);
 #endif
-    _sprClock.pushSprite(_clockX, _clockY);
-    _lastTime = timeStr;
-  }
+  _sprClock.pushSprite(_clockX, _clockY);
 
-  // Handle drawing or clearing the AM/PM sprite
   if (!is24Hour)
   {
-    // In 12-hour mode, draw the TOD if it has changed
-    if (todStr != _lastTOD)
-    {
-      _sprTOD.fillSprite(_bgColor);
-      _sprTOD.drawString(todStr.c_str(), _sprTOD.width(), 0);
+    _sprTOD.fillSprite(_bgColor);
+    _sprTOD.drawString(todStr.c_str(), _sprTOD.width(), 0);
 #ifdef DEBUG_BORDERS
-      _sprTOD.drawRect(0, 0, _sprTOD.width(), _sprTOD.height(), TFT_GREEN);
+    _sprTOD.drawRect(0, 0, _sprTOD.width(), _sprTOD.height(), TFT_GREEN);
 #endif
-      _sprTOD.pushSprite(_todX, _todY);
-      _lastTOD = todStr;
-    }
+    _sprTOD.pushSprite(_todX, _todY);
   }
 }
 
+/**
+ * @brief Draws the seconds display.
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::drawSeconds(TFT_eSPI &tft)
 {
   String secondsStr = TimeManager::getInstance().getFormattedSeconds();
-  if (secondsStr == _lastSeconds)
-  {
-    return; // No change
-  }
-
   _sprSeconds.fillSprite(_bgColor);
   _sprSeconds.drawString(secondsStr.c_str(), _sprSeconds.width(), 0);
 #ifdef DEBUG_BORDERS
   _sprSeconds.drawRect(0, 0, _sprSeconds.width(), _sprSeconds.height(), TFT_MAGENTA);
 #endif
-  // Position the seconds sprite under the AM/PM sprite's location
   _sprSeconds.pushSprite(_secondsX, _secondsY);
-  _lastSeconds = secondsStr;
 }
 
+/**
+ * @brief Draws the day of the week display.
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
 {
   String dayStr = TimeManager::getInstance().getDayOfWeek();
-  if (dayStr != _lastDayOfWeek)
-  {
-    _sprDayOfWeek.fillSprite(_bgColor);
-    _sprDayOfWeek.drawString(dayStr.c_str(), 0, _sprDayOfWeek.height() / 2);
-
+  _sprDayOfWeek.fillSprite(_bgColor);
+  _sprDayOfWeek.drawString(dayStr.c_str(), 0, _sprDayOfWeek.height() / 2);
 #ifdef DEBUG_BORDERS
-    _sprDayOfWeek.drawRect(0, 0, _sprDayOfWeek.width(), _sprDayOfWeek.height(), TFT_BLUE);
+  _sprDayOfWeek.drawRect(0, 0, _sprDayOfWeek.width(), _sprDayOfWeek.height(), TFT_BLUE);
 #endif
-
-    _sprDayOfWeek.pushSprite(MARGIN, _dateY);
-    _lastDayOfWeek = dayStr;
-  }
+  _sprDayOfWeek.pushSprite(MARGIN, _dateY);
 }
 
+/**
+ * @brief Draws the date display.
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::drawDate(TFT_eSPI &tft)
 {
   String dateStr = TimeManager::getInstance().getFormattedDate();
-  if (dateStr != _lastDate)
-  {
-    _sprDate.fillSprite(_bgColor);
-    _sprDate.drawString(dateStr.c_str(), _sprDate.width(), _sprDate.height() / 2);
-
+  _sprDate.fillSprite(_bgColor);
+  _sprDate.drawString(dateStr.c_str(), _sprDate.width(), _sprDate.height() / 2);
 #ifdef DEBUG_BORDERS
-    _sprDate.drawRect(0, 0, _sprDate.width(), _sprDate.height(), TFT_YELLOW);
+  _sprDate.drawRect(0, 0, _sprDate.width(), _sprDate.height(), TFT_YELLOW);
 #endif
-
-    _sprDate.pushSprite(tft.width() / 2, _dateY);
-    _lastDate = dateStr;
-  }
+  _sprDate.pushSprite(tft.width() / 2, _dateY);
 }
 
+/**
+ * @brief Draws the temperature display.
+ *
+ * This function renders the temperature value, a degree symbol, and the
+ * temperature unit (C/F) into the temperature sprite.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::drawTemperature(TFT_eSPI &tft)
 {
-  float temp = getTemperature(); // Use the cached value
-  if (fabs(temp - _lastTemp) < 0.1)
-    return;
-
+  float temp = getTemperature();
   auto &config = ConfigManager::getInstance();
   uint16_t tempColor = hexToRGB565(config.getTempColor());
 
-  _sprTemp.fillSprite(_bgColor); // Clear sprite
-
-  // Set the font for the temperature value
+  _sprTemp.fillSprite(_bgColor);
   _sprTemp.loadFont(DSEG14ModernBold48);
 
-  // Draw temperature value
   char tempBuf[16];
   snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
   _sprTemp.drawString(tempBuf, 0, _sprTemp.height() / 2);
 
-  // --- Draw degree symbol ---
   int tempWidth = _sprTemp.textWidth(tempBuf);
   int fontHeight = _sprTemp.fontHeight();
-
-  // Scale the circle's size and position based on the font
   int circleRadius = max(2, fontHeight / 14);
   int circleX = tempWidth + circleRadius + 2;
-  // Position the circle near the top of the temperature digits
   int circleY = (_sprTemp.height() / 2) - (fontHeight / 2) + circleRadius;
   _sprTemp.fillCircle(circleX, circleY, circleRadius, tempColor);
 
-  // --- Draw the unit (C/F) ---
   _sprTemp.loadFont(DSEG14ModernBold32);
-  _sprTemp.setTextDatum(TL_DATUM); // Set datum to Top-Left for correct alignment
+  _sprTemp.setTextDatum(TL_DATUM);
   char unit = config.isCelsius() ? 'C' : 'F';
   char unitBuf[2] = {unit, '\0'};
-
-  // Position unit after the degree symbol, aligning its top with the temperature's top
   int unitX = circleX + circleRadius + 2;
   int unitY = (_sprTemp.height() / 2) - (fontHeight / 2);
   _sprTemp.drawString(unitBuf, unitX, unitY);
-
-  _sprTemp.setTextDatum(ML_DATUM); // Restore the original datum
+  _sprTemp.setTextDatum(ML_DATUM);
 
 #ifdef DEBUG_BORDERS
   _sprTemp.drawRect(0, 0, _sprTemp.width(), _sprTemp.height(), TFT_ORANGE);
 #endif
-
   _sprTemp.pushSprite(MARGIN, _sensorY);
-  _lastTemp = temp;
 }
 
+/**
+ * @brief Draws the humidity display.
+ *
+ * Renders the humidity value and a percent symbol into the humidity sprite.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::drawHumidity(TFT_eSPI &tft)
 {
-  float humidity = getHumidity(); // Use the cached value
-  if (fabs(humidity - _lastHumidity) < 0.1)
-    return;
-
+  float humidity = getHumidity();
   char buf[24];
   if (humidity < 0)
   {
@@ -345,16 +441,53 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
 #ifdef DEBUG_BORDERS
   _sprHumidity.drawRect(0, 0, _sprHumidity.width(), _sprHumidity.height(), TFT_CYAN);
 #endif
-
   _sprHumidity.pushSprite(tft.width() / 2, _sensorY);
-  _lastHumidity = humidity;
 }
 
+/**
+ * @brief Populates a DisplayData struct with the latest data.
+ *
+ * This helper function gathers all the necessary information from the
+ * TimeManager and SensorModule and stores it in the provided struct.
+ * This is used by the `render` method to check for changes.
+ *
+ * @param data A reference to the DisplayData struct to be filled.
+ */
+void ClockPage::updateDisplayData(DisplayData &data)
+{
+  auto &timeManager = TimeManager::getInstance();
+  data.time = timeManager.getFormattedTime();
+  data.date = timeManager.getFormattedDate();
+  data.dayOfWeek = timeManager.getDayOfWeek();
+  data.temp = getTemperature();
+  data.humidity = getHumidity();
+  data.tod = timeManager.getTOD();
+  data.seconds = timeManager.getFormattedSeconds();
+}
+
+/**
+ * @brief Sets the progress of the alarm dismiss action.
+ *
+ * This is called from the main loop to update the visual progress bar when
+ * the user is holding down the button to dismiss an alarm.
+ *
+ * @param progress The progress, from 0.0 (empty) to 1.0 (full).
+ */
 void ClockPage::setDismissProgress(float progress)
 {
   _dismissProgress = progress;
 }
 
+/**
+ * @brief Refreshes the display after settings have changed.
+ *
+ * This method is called when the configuration has been updated. It reapplies
+ * colors and optionally clears the entire screen. It also forces a full
+ * redraw of all elements on the next render pass.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ * @param fullRefresh If true, the entire screen is cleared.
+ */
 void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
 {
   auto &config = ConfigManager::getInstance();
@@ -373,15 +506,17 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   }
 
   // Force a redraw of all elements by resetting their last known values
-  _lastTime = "";
-  _lastDate = "";
-  _lastDayOfWeek = "";
-  _lastTemp = -999;
-  _lastHumidity = -999;
-  _lastTOD = "";
-  _lastSeconds = "";
+  _lastData = {};
 }
 
+/**
+ * @brief Initializes the alarm sprite.
+ *
+ * Creates the sprite used for displaying "ALARM" or the snooze countdown.
+ * It's sized based on the text width to be efficient.
+ *
+ * @param tft A reference to the TFT_eSPI driver instance.
+ */
 void ClockPage::initAlarmSprite(TFT_eSPI &tft)
 {
   tft.loadFont(CenturyGothicBold48);
@@ -393,6 +528,17 @@ void ClockPage::initAlarmSprite(TFT_eSPI &tft)
   tft.unloadFont();
 }
 
+/**
+ * @brief Updates and renders the alarm sprite.
+ *
+ * This function contains the logic to display the correct alarm state:
+ * - "ALARM" when an alarm is ringing.
+ * - A snooze countdown when an alarm is snoozed.
+ * - A progress bar when the user is holding the dismiss button.
+ * - Nothing when no alarm is active.
+ *
+ * The updated sprite is then pushed to the screen.
+ */
 void ClockPage::updateAlarmSprite()
 {
   _alarmSprite.fillSprite(_bgColor);

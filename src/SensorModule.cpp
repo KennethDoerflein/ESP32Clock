@@ -1,6 +1,14 @@
-// sensors.cpp
+/**
+ * @file SensorModule.cpp
+ * @brief Implements sensor initialization and data handling.
+ *
+ * This file contains the implementation for setting up and reading data from
+ * the BME280 environmental sensor, the DS3231 Real-Time Clock, and the
+ * ESP32's internal temperature sensor. It uses a caching mechanism to avoid
+ * reading the sensors too frequently.
+ */
 
-#include "sensors.h"
+#include "SensorModule.h"
 #include "ConfigManager.h"
 #include "driver/temp_sensor.h"
 
@@ -19,6 +27,13 @@ static bool rtc_found = false;    // Track RTC status
 /// @brief Stores the timestamp of the last sensor update for interval timing.
 static unsigned long prevSensorMillis = 0;
 
+/**
+ * @brief Initializes all hardware sensors.
+ *
+ * This function attempts to initialize the BME280 sensor and the RTC.
+ * It also sets up the ESP32's internal temperature sensor. It then performs
+ * an initial sensor read to populate the cached values.
+ */
 void setupSensors()
 {
   bme280_found = BME.begin(0x76);
@@ -45,17 +60,32 @@ void setupSensors()
   handleSensorUpdates(true);
 }
 
+/**
+ * @brief Checks if the RTC module was found.
+ * @return True if the RTC is available, false otherwise.
+ */
 bool isRtcFound()
 {
   return rtc_found;
 }
 
+/**
+ * @brief Checks if the BME280 sensor was found.
+ * @return True if the BME280 is available, false otherwise.
+ */
 bool isBmeFound()
 {
   return bme280_found;
 }
 
-// Cached-value getter functions
+/**
+ * @brief Gets the primary temperature reading.
+ *
+ * Returns the BME280 temperature if available, otherwise falls back to the
+ * RTC temperature. The value is converted to the user's preferred unit (C/F).
+ *
+ * @return The current temperature.
+ */
 float getTemperature()
 {
   if (bme280_found)
@@ -68,11 +98,19 @@ float getTemperature()
   }
 }
 
+/**
+ * @brief Gets the last cached humidity reading.
+ * @return The relative humidity, or -1 if the BME280 is not available.
+ */
 float getHumidity()
 {
   return cached_humidity;
 }
 
+/**
+ * @brief Gets the BME280 temperature, converted to the user's preferred unit.
+ * @return The BME280 temperature.
+ */
 float getBmeTemperature()
 {
   bool useCelsius = ConfigManager::getInstance().isCelsius();
@@ -86,6 +124,10 @@ float getBmeTemperature()
   }
 }
 
+/**
+ * @brief Gets the RTC's internal temperature, converted to the user's preferred unit.
+ * @return The RTC temperature.
+ */
 float getRtcTemperature()
 {
   bool useCelsius = ConfigManager::getInstance().isCelsius();
@@ -99,6 +141,10 @@ float getRtcTemperature()
   }
 }
 
+/**
+ * @brief Gets the ESP32's internal core temperature, converted to the user's preferred unit.
+ * @return The core temperature.
+ */
 float getCoreTemperature()
 {
   bool useCelsius = ConfigManager::getInstance().isCelsius();
@@ -112,6 +158,15 @@ float getCoreTemperature()
   }
 }
 
+/**
+ * @brief Periodically reads sensor data and updates the cache.
+ *
+ * This function is designed to be called in the main loop. It uses a timer
+ * to read from the sensors at a defined interval, preventing excessive I2C
+ * traffic.
+ *
+ * @param force If true, forces an immediate sensor read, ignoring the timer.
+ */
 void handleSensorUpdates(bool force)
 {
   unsigned long now = millis();

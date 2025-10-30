@@ -1,18 +1,26 @@
-// src/ClockWebServer.cpp
+/**
+ * @file ClockWebServer.cpp
+ * @brief Implements the ClockWebServer class for managing the web interface.
+ *
+ * This file contains the implementation of the web server, including all route
+ * handlers, API endpoints, and the template processor for dynamic HTML content.
+ * It handles both the initial captive portal setup and the main configuration
+ * interface.
+ */
 
 #include "ClockWebServer.h"
 #include "ConfigManager.h"
 #include "DisplayManager.h"
 #include "WiFiManager.h"
-#include "web_content.h"
+#include "WebContent.h"
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <WiFi.h>
-#include "sensors.h"
-#include "display.h"
+#include "SensorModule.h"
+#include "Display.h"
 #include "UpdateManager.h"
 #include "SerialLog.h"
-#include "ntp.h"
+#include "NtpSync.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -22,27 +30,41 @@
 #include "version.h.default"
 #endif
 
-// --- Singleton Implementation ---
+/**
+ * @brief Gets the singleton instance of the ClockWebServer.
+ * @return A reference to the singleton instance.
+ */
 ClockWebServer &ClockWebServer::getInstance()
 {
   static ClockWebServer instance;
   return instance;
 }
 
-// --- Constructor ---
+/**
+ * @brief Constructs a new ClockWebServer.
+ * Initializes the web server on port 80.
+ */
 ClockWebServer::ClockWebServer() : server(80), _captivePortalActive(false) {}
-
-// --- Public Methods ---
 
 /**
  * @brief Enables captive portal mode.
- * Sets a flag that modifies the server's behavior on `begin()`.
+ *
+ * Sets a flag that modifies the server's behavior on `begin()`. This should
+ * be called before `begin()` if a captive portal is needed for initial setup.
  */
 void ClockWebServer::enableCaptivePortal()
 {
   _captivePortalActive = true;
 }
 
+/**
+ * @brief Starts the web server and sets up all the routes.
+ *
+ * This is the main setup method for the web server. It checks if captive
+ * portal mode is active and registers the appropriate set of URL handlers.
+ * It also sets up API endpoints for interacting with the clock's configuration
+ * and system functions.
+ */
 void ClockWebServer::begin()
 {
   // Bind class methods to web server routes
@@ -152,7 +174,6 @@ void ClockWebServer::begin()
               config.setAlarm(id, alarm);
             }
           }
-          config.save();
           request->send(200, "text/plain", "Alarms saved successfully!");
         } });
 
@@ -219,7 +240,6 @@ void ClockWebServer::begin()
               config.setTimezone(doc["timezone"]);
               config.setSnoozeDuration(doc["snoozeDuration"]);
               config.setDismissDuration(doc["dismissDuration"]);
-              config.save();
 
               if (oldScreenFlipped != config.isScreenFlipped())
               {
@@ -244,7 +264,6 @@ void ClockWebServer::begin()
       auto &config = ConfigManager::getInstance();
       bool oldScreenFlipped = config.isScreenFlipped();
       config.resetGeneralSettingsToDefaults();
-      config.save();
       if (oldScreenFlipped != config.isScreenFlipped())
       {
         Display::getInstance().updateRotation();
@@ -346,7 +365,6 @@ void ClockWebServer::begin()
               config.setDateColor(doc["dateColor"].as<String>());
               config.setTempColor(doc["tempColor"].as<String>());
               config.setHumidityColor(doc["humidityColor"].as<String>());
-              config.save();
 
               if (oldBgColor != newBgColor)
               {
@@ -368,7 +386,6 @@ void ClockWebServer::begin()
               {
       auto &config = ConfigManager::getInstance();
       config.resetDisplayToDefaults();
-      config.save();
       DisplayManager::getInstance().requestFullRefresh();
       
       // Give the main loop time to process the new default settings.
@@ -496,34 +513,56 @@ void ClockWebServer::begin()
   server.begin();
 }
 
-// --- Private Methods ---
-
-// --- Request Handlers ---
-
+/**
+ * @brief Handles requests to the root URL ("/").
+ * Serves the main index page.
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onRootRequest(AsyncWebServerRequest *request)
 {
   request->send_P(200, "text/html", INDEX_HTML, [this](const String &var)
                   { return processor(var); });
 }
 
+/**
+ * @brief Handles requests for the WiFi configuration page.
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onWifiRequest(AsyncWebServerRequest *request)
 {
   request->send_P(200, "text/html", WIFI_CONFIG_HTML, [this](const String &var)
                   { return processor(var); });
 }
 
+/**
+ * @brief Handles requests for the settings page.
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onSettingsRequest(AsyncWebServerRequest *request)
 {
   request->send_P(200, "text/html", SETTINGS_PAGE_HTML, [this](const String &var)
                   { return settingsProcessor(var); });
 }
 
+/**
+ * @brief Handles requests for the alarms configuration page.
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onAlarmsRequest(AsyncWebServerRequest *request)
 {
   request->send_P(200, "text/html", ALARMS_PAGE_HTML, [this](const String &var)
                   { return processor(var); });
 }
 
+/**
+ * @brief Handles the form submission for saving WiFi credentials.
+ *
+ * This function's behavior depends on the mode. In captive portal mode, it
+ * starts a non-blocking connection test. In normal mode, it saves the
+ * credentials and reboots the device.
+ *
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onWifiSaveRequest(AsyncWebServerRequest *request)
 {
   String ssid = request->arg("ssid");
@@ -551,6 +590,10 @@ void ClockWebServer::onWifiSaveRequest(AsyncWebServerRequest *request)
   }
 }
 
+/**
+ * @brief Handles a request to test WiFi credentials without saving them.
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onWifiTestRequest(AsyncWebServerRequest *request)
 {
   String ssid = request->arg("ssid");
@@ -566,6 +609,14 @@ void ClockWebServer::onWifiTestRequest(AsyncWebServerRequest *request)
   request->send(200, "text/plain", "Test started. Polling for status...");
 }
 
+/**
+ * @brief Handles API requests for the status of a WiFi connection test.
+ *
+ * This is used by the client to poll for the result of a connection test
+ * initiated by `onWifiSaveRequest` or `onWifiTestRequest`.
+ *
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onWifiStatusRequest(AsyncWebServerRequest *request)
 {
   auto &wifiManager = WiFiManager::getInstance();
@@ -596,11 +647,19 @@ void ClockWebServer::onWifiStatusRequest(AsyncWebServerRequest *request)
   }
 }
 
+/**
+ * @brief Serves the simplified WiFi setup page for the captive portal.
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onCaptivePortalRequest(AsyncWebServerRequest *request)
 {
   request->send_P(200, "text/html", SIMPLE_WIFI_SETUP_HTML);
 }
 
+/**
+ * @brief Handles captive portal redirection for various operating systems.
+ * @param request The incoming web request.
+ */
 void ClockWebServer::onCaptivePortalRedirect(AsyncWebServerRequest *request)
 {
   AsyncWebServerResponse *response = request->beginResponse(302);
@@ -608,9 +667,11 @@ void ClockWebServer::onCaptivePortalRedirect(AsyncWebServerRequest *request)
   request->send(response);
 }
 
-// --- Template Processor ---
-
-// Helper function to convert a brightness value (0-255) to a percentage string
+/**
+ * @brief Converts a raw brightness value (0-255) to a percentage string.
+ * @param brightness The raw brightness value.
+ * @return A string representing the brightness as a percentage (e.g., "50%").
+ */
 String brightnessToPercent(int brightness)
 {
   const int BRIGHTNESS_MIN = 10;
@@ -622,7 +683,12 @@ String brightnessToPercent(int brightness)
   return String(percentage) + "&#37;";
 }
 
-// Helper function to format an hour value into a 12-hour AM/PM string
+/**
+ * @brief Formats an hour value for display in the web UI.
+ * @param hour The hour to format (0-23).
+ * @param is24Hour True if the display should be in 24-hour format.
+ * @return A formatted string (e.g., "07", "12 PM").
+ */
 String formatHour(int hour, bool is24Hour)
 {
   if (is24Hour)
@@ -645,6 +711,12 @@ String formatHour(int hour, bool is24Hour)
   }
 }
 
+/**
+ * @brief Sets up the mDNS responder.
+ *
+ * This allows the device to be accessed on the local network using a
+ * hostname like "ESP32Clock_XXXXXX.local".
+ */
 void ClockWebServer::setupMDNS()
 {
   // Start the mDNS responder for ESP32Clock_XXXXXX.local
@@ -660,6 +732,16 @@ void ClockWebServer::setupMDNS()
   }
 }
 
+/**
+ * @brief Processes placeholders in the HTML templates.
+ *
+ * This function is used as a callback by the web server to replace
+ * placeholders (like `%%FIRMWARE_VERSION%%`) in the HTML files with
+ * dynamic values.
+ *
+ * @param var The name of the placeholder variable.
+ * @return The value to be substituted for the placeholder.
+ */
 String ClockWebServer::processor(const String &var)
 {
   if (var == "HEAD")
@@ -702,6 +784,15 @@ String ClockWebServer::processor(const String &var)
   return String();
 }
 
+/**
+ * @brief A specialized template processor for the settings page.
+ *
+ * This extends the base processor with additional placeholders specific to
+ * the settings and display configuration pages.
+ *
+ * @param var The name of the placeholder variable.
+ * @return The value to be substituted.
+ */
 String ClockWebServer::settingsProcessor(const String &var)
 {
   auto &config = ConfigManager::getInstance();

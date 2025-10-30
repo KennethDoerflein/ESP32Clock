@@ -1,10 +1,16 @@
-// src/WiFiManager.cpp
-
+/**
+ * @file WiFiManager.cpp
+ * @brief Implements the WiFiManager class for handling WiFi connectivity.
+ *
+ * This file contains the implementation for managing WiFi connections, including
+ * connecting to a saved network, handling disconnections and reconnections,
+ * running a captive portal for initial setup, and managing connection tests.
+ */
 #include "WiFiManager.h"
 #include <WiFi.h>
 #include <DNSServer.h>
 #include "ConfigManager.h"
-#include "display.h"
+#include "Display.h"
 #include "ClockWebServer.h"
 #include <ArduinoJson.h>
 #include "SerialLog.h"
@@ -13,6 +19,17 @@
 const char *WiFiManager::AP_SSID = "Clock-Setup";
 volatile bool WiFiManager::_connectionResult = false;
 
+/**
+ * @brief Static event handler for WiFi events.
+ *
+ * This function is registered with the ESP-IDF WiFi system to receive
+ * notifications about connection status changes. It contains a state machine
+ * to handle both normal connection events and the specific sequence of events
+ * that occur during a non-blocking connection test.
+ *
+ * @param event The WiFi event that occurred.
+ * @param info Additional information about the event.
+ */
 void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
 {
   auto &logger = SerialLog::getInstance();
@@ -95,6 +112,13 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
   }
 }
 
+/**
+ * @brief Manages the WiFi connection state, handling automatic reconnections.
+ *
+ * This should be called in the main loop. If the WiFi connection is lost,
+ * this function will attempt to reconnect at progressively longer intervals
+ * to avoid spamming connection requests.
+ */
 void WiFiManager::handleConnection()
 {
   if (isCaptivePortal())
@@ -137,7 +161,10 @@ void WiFiManager::handleConnection()
   }
 }
 
-// --- Singleton Implementation ---
+/**
+ * @brief Gets the singleton instance of the WiFiManager.
+ * @return A reference to the singleton instance.
+ */
 WiFiManager &WiFiManager::getInstance()
 {
   static WiFiManager instance;
@@ -146,11 +173,10 @@ WiFiManager &WiFiManager::getInstance()
 
 /**
  * @brief Private constructor for the WiFiManager.
- * Initializes the connection status to false.
+ * Initializes internal state variables.
  */
 WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr), _pendingReboot(false) {}
 
-// --- Public Methods ---
 /**
  * @brief Initializes the WiFi module.
  *
@@ -158,6 +184,7 @@ WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr), _pendingR
  * credentials stored in the ConfigManager. If the SSID is not configured or
  * the connection fails, it launches a captive portal for configuration.
  * It also provides visual feedback on the display during this process.
+ *
  * @return True if the captive portal was started, false otherwise.
  */
 bool WiFiManager::begin()
@@ -269,6 +296,9 @@ bool WiFiManager::isCaptivePortal() const
   return _dnsServer != nullptr;
 }
 
+/**
+ * @brief Starts a non-blocking WiFi scan.
+ */
 void WiFiManager::startScan()
 {
   // Clear previous scan results before starting a new one.
@@ -278,6 +308,15 @@ void WiFiManager::startScan()
   WiFi.scanNetworks(true);
 }
 
+/**
+ * @brief Gets the results of a WiFi scan.
+ *
+ * This function is non-blocking. It checks the status of the scan and returns
+ * a JSON string indicating whether the scan is "idle", "scanning", or
+ * contains the results of a completed scan.
+ *
+ * @return A JSON formatted string with the scan status or results.
+ */
 String WiFiManager::getScanResults()
 {
   int16_t scanResult = WiFi.scanComplete();
@@ -344,8 +383,6 @@ String WiFiManager::getScanResults()
   }
 }
 
-// --- Private Methods ---
-
 /**
  * @brief Starts the Access Point and DNS server for the captive portal.
  */
@@ -387,6 +424,10 @@ String WiFiManager::getHostname() const
   return _hostname;
 }
 
+/**
+ * @brief Sets the hostname of the device.
+ * @param hostname The new hostname to set.
+ */
 void WiFiManager::setHostname(const String &hostname)
 {
   _hostname = hostname;
@@ -399,6 +440,12 @@ void WiFiManager::setHostname(const String &hostname)
   }
 }
 
+/**
+ * @brief Starts a non-blocking test of WiFi credentials.
+ * @param ssid The SSID to test.
+ * @param password The password to test.
+ * @param saveOnSuccess If true, the credentials will be saved upon a successful connection.
+ */
 void WiFiManager::startConnectionTest(const String &ssid, const String &password, bool saveOnSuccess)
 {
   if (_pendingReboot)
@@ -430,6 +477,11 @@ void WiFiManager::startConnectionTest(const String &ssid, const String &password
   WiFi.begin(ssid.c_str(), password.c_str());
 }
 
+/**
+ * @brief Saves new WiFi credentials and reboots the device.
+ * @param ssid The SSID to save.
+ * @param password The password to save.
+ */
 void WiFiManager::saveCredentialsAndReboot(const String &ssid, const String &password)
 {
   auto &config = ConfigManager::getInstance();
@@ -441,16 +493,27 @@ void WiFiManager::saveCredentialsAndReboot(const String &ssid, const String &pas
   ESP.restart();
 }
 
+/**
+ * @brief Gets the current status of the connection test.
+ * @return The current ConnectionTestStatus.
+ */
 WiFiManager::ConnectionTestStatus WiFiManager::getConnectionTestStatus() const
 {
   return _testStatus;
 }
 
+/**
+ * @brief Checks if a reboot is pending after a successful WiFi test.
+ * @return True if a reboot is pending, false otherwise.
+ */
 bool WiFiManager::isPendingReboot() const
 {
   return _pendingReboot;
 }
 
+/**
+ * @brief Resets the connection test status back to idle.
+ */
 void WiFiManager::resetConnectionTestStatus()
 {
   _testStatus = TEST_IDLE;

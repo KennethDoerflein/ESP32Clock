@@ -1,10 +1,17 @@
-// TimeManager.cpp
+/**
+ * @file TimeManager.cpp
+ * @brief Implements the TimeManager class for timekeeping and synchronization.
+ *
+ * This file contains the implementation for managing the device's time,
+ * including RTC communication, NTP synchronization, time formatting, and
+ * alarm checking logic.
+ */
 
 // #define LOG_TICKS
 
 #include "TimeManager.h"
-#include "ntp.h"
-#include "sensors.h"
+#include "NtpSync.h"
+#include "SensorModule.h"
 #include "ConfigManager.h"
 #include "AlarmManager.h"
 #include "SerialLog.h"
@@ -62,6 +69,12 @@ DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
 }
 #endif
 
+/**
+ * @brief Initializes the TimeManager.
+ *
+ * Performs an initial, blocking NTP sync to set the time as soon as possible
+ * after boot.
+ */
 void TimeManager::begin()
 {
   // Note: RTC hardware initialization is handled externally in setupSensors()
@@ -71,6 +84,15 @@ void TimeManager::begin()
   syncWithNTP();
 }
 
+/**
+ * @brief Main update loop for the TimeManager.
+ *
+ * This should be called repeatedly from the main application loop. It runs
+ * approximately once per second and handles periodic tasks like checking for
+ * missed alarms on the first run.
+ *
+ * @return True if a one-second tick has occurred, false otherwise.
+ */
 bool TimeManager::update()
 {
   // Use a non-blocking delay to run the update logic approximately once per second.
@@ -98,6 +120,9 @@ bool TimeManager::update()
   return true; // An update occurred.
 }
 
+/**
+ * @brief Performs a blocking NTP sync and updates the last sync date.
+ */
 void TimeManager::syncWithNTP()
 {
   // This will be the initial, blocking sync
@@ -112,6 +137,12 @@ void TimeManager::syncWithNTP()
   }
 }
 
+/**
+ * @brief Drives the non-blocking NTP synchronization state machine.
+ *
+ * This should be called in the main loop. It checks the status of the
+ * ongoing NTP sync and, upon success, updates the last sync date.
+ */
 void TimeManager::updateNtp()
 {
   NtpSyncState state = updateNtpSync();
@@ -131,6 +162,13 @@ void TimeManager::updateNtp()
   }
 }
 
+/**
+ * @brief Gets the current time formatted as a string.
+ *
+ * The format depends on the user's 12/24-hour preference.
+ *
+ * @return The formatted time string (e.g., "14:30" or "2:30").
+ */
 String TimeManager::getFormattedTime() const
 {
   DateTime now = RTC.now();
@@ -152,6 +190,10 @@ String TimeManager::getFormattedTime() const
   return String(timeStr);
 }
 
+/**
+ * @brief Gets the seconds part of the current time, zero-padded.
+ * @return The formatted seconds string (e.g., "05").
+ */
 String TimeManager::getFormattedSeconds() const
 {
   DateTime now = RTC.now();
@@ -160,6 +202,10 @@ String TimeManager::getFormattedSeconds() const
   return String(secondsStr);
 }
 
+/**
+ * @brief Gets the current date formatted as "MON DAY".
+ * @return The formatted date string (e.g., "OCT 26").
+ */
 String TimeManager::getFormattedDate() const
 {
   DateTime now = RTC.now();
@@ -173,6 +219,10 @@ String TimeManager::getFormattedDate() const
   return String(dateStr);
 }
 
+/**
+ * @brief Gets the time-of-day indicator (AM/PM).
+ * @return "AM", "PM", or an empty string if in 24-hour format.
+ */
 String TimeManager::getTOD() const
 {
   // Return an empty string if in 24-hour mode, as AM/PM is not needed.
@@ -185,6 +235,10 @@ String TimeManager::getTOD() const
   return (now.hour() < 12) ? "AM" : "PM";
 }
 
+/**
+ * @brief Gets the day of the week as a three-letter abbreviation.
+ * @return The abbreviated day of the week (e.g., "SUN").
+ */
 String TimeManager::getDayOfWeek() const
 {
   DateTime now = RTC.now();
@@ -196,12 +250,20 @@ String TimeManager::getDayOfWeek() const
   return String(dayNames[now.dayOfTheWeek()]);
 }
 
+/**
+ * @brief Checks if the clock is set to 24-hour format.
+ * @return True if 24-hour format is enabled, false for 12-hour.
+ */
 bool TimeManager::is24HourFormat() const
 {
   // Delegate the check to the ConfigManager to centralize settings access.
   return ConfigManager::getInstance().is24HourFormat();
 }
 
+/**
+ * @brief Gets the current hour in 24-hour format.
+ * @return The hour (0-23).
+ */
 uint8_t TimeManager::getHour() const
 {
   // Return the raw hour (0-23) from the RTC.
@@ -209,6 +271,12 @@ uint8_t TimeManager::getHour() const
   return now.hour();
 }
 
+/**
+ * @brief Checks if a daily NTP sync is required.
+ *
+ * This function is designed to run once a day (e.g., at 3 AM) to correct
+ * any clock drift. It compares the current date with the last sync date.
+ */
 void TimeManager::checkDailySync()
 {
   DateTime now = RTC.now();
@@ -231,6 +299,13 @@ void TimeManager::checkDailySync()
 }
 
 #ifndef USE_RTC_ALARMS
+/**
+ * @brief Software-based alarm checking.
+ *
+ * This function iterates through all enabled alarms and checks if they should
+ * have rung between the last check and the current time. This is a robust
+ * way to catch alarms that might have been missed if the main loop was delayed.
+ */
 void TimeManager::checkAlarms()
 {
   // If an alarm is already ringing, there's no need to check for others.
@@ -314,6 +389,13 @@ void TimeManager::checkAlarms()
 }
 #endif
 
+/**
+ * @brief Periodically checks the RTC's drift against an NTP server.
+ *
+ * This function runs at a set interval (e.g., every 4 hours) to compare the
+ * local RTC time with the accurate time from an NTP server. If the drift
+ * exceeds a predefined threshold, it triggers a non-blocking resynchronization.
+ */
 void TimeManager::checkDriftAndResync()
 {
   // How often to check for drift (e.g., every 4 hours).

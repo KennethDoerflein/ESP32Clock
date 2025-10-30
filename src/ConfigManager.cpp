@@ -1,12 +1,55 @@
-// ConfigManager.cpp
+/**
+ * @file ConfigManager.cpp
+ * @brief Implements the ConfigManager class for handling application settings.
+ *
+ * This file contains the implementation for loading, saving, and managing all
+ * configuration settings for the clock. It uses the ESP32's Preferences library
+ * for persistent storage in non-volatile flash memory.
+ */
 
 #include "ConfigManager.h"
 #include "SerialLog.h"
 #include "nvs_flash.h"
+#include "Constants.h"
 
 // Define the namespace for preferences
-#define PREFERENCES_NAMESPACE "clock_config"
 
+
+/**
+ * @brief Handles periodic tasks for the ConfigManager, like debounced saves.
+ *
+ * This should be called in the main application loop. It checks if a save
+ * operation is pending and executes it after a debounce delay, preventing
+ * excessive writes to flash memory.
+ */
+void ConfigManager::loop()
+{
+  if (_savePending && (millis() - _saveDebounceTimer >= SAVE_DEBOUNCE_DELAY))
+  {
+    save();
+    _savePending = false;
+  }
+}
+
+/**
+ * @brief Schedules a configuration save.
+ *
+ * Sets a flag and a timer to save the configuration after a short delay.
+ * This debouncing mechanism prevents rapid, successive writes to flash
+ * when multiple settings are changed quickly via the web interface.
+ */
+void ConfigManager::scheduleSave()
+{
+  _savePending = true;
+  _saveDebounceTimer = millis();
+}
+
+/**
+ * @brief Initializes the ConfigManager.
+ *
+ * Opens the "clock_config" namespace in the Preferences library and then
+ * calls `load()` to populate the configuration variables from flash memory.
+ */
 void ConfigManager::begin()
 {
   _preferences.begin(PREFERENCES_NAMESPACE, false); // R/W mode
@@ -14,6 +57,12 @@ void ConfigManager::begin()
   load();
 }
 
+/**
+ * @brief Sets all configuration variables to their default values.
+ *
+ * This is used during a factory reset or on the very first boot to ensure
+ * the device starts in a known, stable state.
+ */
 void ConfigManager::setDefaults()
 {
   // Set all configuration parameters to their default initial state.
@@ -58,6 +107,13 @@ void ConfigManager::setDefaults()
   SerialLog::getInstance().print("Loaded default configuration.");
 }
 
+/**
+ * @brief Loads the configuration from persistent storage (Preferences).
+ *
+ * Checks for a "first boot" flag. If it's the first time the device has
+ * run, it loads the default settings and saves them. Otherwise, it reads
+ * each configuration value from flash memory.
+ */
 void ConfigManager::load()
 {
   // Check if this is the first boot
@@ -150,6 +206,15 @@ void ConfigManager::load()
   SerialLog::getInstance().print("Configuration loaded successfully.");
 }
 
+/**
+ * @brief Saves the current configuration to persistent storage.
+ *
+ * Writes all configuration variables to flash memory using the Preferences
+ * library.
+ *
+ * @return True on success, false on failure (though Preferences does not
+ *         currently indicate failure).
+ */
 bool ConfigManager::save()
 {
   _preferences.putString("wifiSSID", wifiSSID);
@@ -201,12 +266,24 @@ bool ConfigManager::save()
   return true;
 }
 
+/**
+ * @brief Saves only the state of a ringing alarm.
+ *
+ * This is a specialized, lightweight save function used to quickly persist
+ * which alarm is ringing and when it started. This ensures that if the
+ * device reboots, it can resume the alarm correctly.
+ */
 void ConfigManager::saveRingingAlarmState()
 {
   _preferences.putChar("ringAlarmId", ringingAlarmId);
   _preferences.putUInt("ringAlarmTS", ringingAlarmStartTimestamp);
 }
 
+/**
+ * @brief Gets a constant reference to a specific alarm.
+ * @param index The index of the alarm (0 to MAX_ALARMS-1).
+ * @return A constant reference to the Alarm object.
+ */
 const Alarm &ConfigManager::getAlarm(int index) const
 {
   if (index < 0 || index >= MAX_ALARMS)
@@ -218,6 +295,11 @@ const Alarm &ConfigManager::getAlarm(int index) const
   return _alarms[index];
 }
 
+/**
+ * @brief Gets a mutable reference to a specific alarm.
+ * @param index The index of the alarm (0 to MAX_ALARMS-1).
+ * @return A mutable reference to the Alarm object.
+ */
 Alarm &ConfigManager::getAlarm(int index)
 {
   if (index < 0 || index >= MAX_ALARMS)
@@ -229,11 +311,20 @@ Alarm &ConfigManager::getAlarm(int index)
   return _alarms[index];
 }
 
+/**
+ * @brief Gets the total number of alarms supported.
+ * @return The maximum number of alarms.
+ */
 int ConfigManager::getNumAlarms() const
 {
   return MAX_ALARMS;
 }
 
+/**
+ * @brief Updates an alarm's configuration.
+ * @param index The index of the alarm to update.
+ * @param alarm The new alarm data to set.
+ */
 void ConfigManager::setAlarm(int index, const Alarm &alarm)
 {
   if (index < 0 || index >= MAX_ALARMS)
@@ -243,8 +334,16 @@ void ConfigManager::setAlarm(int index, const Alarm &alarm)
   }
   _alarms[index] = alarm;
   _isDirty = true;
+  scheduleSave();
 }
 
+/**
+ * @brief Performs a full factory reset.
+ *
+ * This function erases all configuration settings, including saved WiFi
+ * credentials, by clearing the entire Preferences namespace and erasing the
+ * NVS partition. The device is then reset to its default state.
+ */
 void ConfigManager::factoryReset()
 {
   SerialLog::getInstance().print("Performing factory reset...\n");
@@ -277,6 +376,14 @@ void ConfigManager::factoryReset()
   save();
 }
 
+/**
+ * @brief Performs a factory reset while preserving WiFi credentials.
+ *
+ * This function resets all settings to their default values but first reads
+ * and then restores the existing WiFi SSID, password, and validity status.
+ * This is useful for resetting the clock's settings without needing to
+ * re-configure the network connection.
+ */
 void ConfigManager::factoryResetExceptWiFi()
 {
   SerialLog::getInstance().print("Performing factory reset, but keeping WiFi credentials...\n");
@@ -296,6 +403,9 @@ void ConfigManager::factoryResetExceptWiFi()
   save();
 }
 
+/**
+ * @brief Resets only the display color settings to their default values.
+ */
 void ConfigManager::resetDisplayToDefaults()
 {
   backgroundColor = DEFAULT_BACKGROUND_COLOR;
@@ -316,8 +426,12 @@ void ConfigManager::resetDisplayToDefaults()
   }
 
   _isDirty = true;
+  scheduleSave();
 }
 
+/**
+ * @brief Resets general settings to their default values.
+ */
 void ConfigManager::resetGeneralSettingsToDefaults()
 {
   autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
@@ -331,14 +445,16 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
   timezone = DEFAULT_TIMEZONE;
 
-  if (!isAnyAlarmSnoozed())
-  {
-    snoozeDuration = DEFAULT_SNOOZE_DURATION;
-    dismissDuration = DEFAULT_DISMISS_DURATION;
-  }
+  snoozeDuration = DEFAULT_SNOOZE_DURATION;
+  dismissDuration = DEFAULT_DISMISS_DURATION;
   _isDirty = true;
+  scheduleSave();
 }
 
+/**
+ * @brief Checks if any of the configured alarms are currently snoozed.
+ * @return True if at least one alarm is snoozed, false otherwise.
+ */
 bool ConfigManager::isAnyAlarmSnoozed() const
 {
   for (int i = 0; i < MAX_ALARMS; ++i)

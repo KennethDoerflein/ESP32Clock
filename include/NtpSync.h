@@ -1,9 +1,7 @@
-// ntp.h
-
 #pragma once
 #include <RTClib.h>
 /**
- * @file ntp.h
+ * @file NtpSync.h
  * @brief Handles Network Time Protocol (NTP) synchronization.
  *
  * This file declares the constants and functions required to fetch time
