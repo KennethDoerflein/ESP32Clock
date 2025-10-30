@@ -16,7 +16,7 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 - [Features and Settings in Detail](#features-and-settings-in-detail)
 - [Project Roadmap](#project-roadmap)
 
-## Features
+## Features (V1.0.0)
 
 - **Large Color Display**: A 3.5" 480x320 color TFT display provides a clear and vibrant user interface.
 - **Web-Based Configuration**: A mobile-friendly web UI allows for easy setup and configuration without needing to re-flash the firmware.
