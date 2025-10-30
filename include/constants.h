@@ -1,5 +1,5 @@
 /**
- * @file constants.h
+ * @file Constants.h
  * @brief Global constants and pin definitions for the ESP32 Clock.
  *
  * This file centralizes hardware pin assignments, timing values, and other
@@ -22,6 +22,8 @@
 #define SETUP_CANCEL_DELAY 2000            ///< Duration to display the "Reset cancelled" message.
 #define WEB_SERVER_STABILIZATION_DELAY 100 ///< Brief delay to allow the web server to stabilize after starting.
 #define OFFLINE_MODE_MESSAGE_DELAY 5000    ///< Duration to display the "Offline Mode" message.
+#define PREFERENCES_NAMESPACE "clock_config"
+#define SAVE_DEBOUNCE_DELAY 5000 // 5 seconds
 
 // --- Alarm Constants ---
 #define ALARM_RESUME_DELAY_MS 5000    ///< Delay after boot before resuming a ringing alarm.

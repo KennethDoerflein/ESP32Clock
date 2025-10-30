@@ -8,7 +8,7 @@
  */
 
 #include "DisplayManager.h"
-#include "constants.h"
+#include "Constants.h"
 #include "Utils.h"
 #include "ConfigManager.h"
 

@@ -11,7 +11,7 @@
 // #define DEBUG_BORDERS
 
 #include "pages/ClockPage.h"
-#include "constants.h"
+#include "Constants.h"
 #include "Utils.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"

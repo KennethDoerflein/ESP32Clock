@@ -10,10 +10,10 @@
 #include "ConfigManager.h"
 #include "SerialLog.h"
 #include "nvs_flash.h"
+#include "Constants.h"
 
 // Define the namespace for preferences
-#define PREFERENCES_NAMESPACE "clock_config"
-#define SAVE_DEBOUNCE_DELAY 5000 // 5 seconds
+
 
 /**
  * @brief Handles periodic tasks for the ConfigManager, like debounced saves.
