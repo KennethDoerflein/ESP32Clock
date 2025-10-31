@@ -56,7 +56,7 @@ const char SERIAL_LOG_SCRIPT_JS[] PROGMEM = R"rawliteral(
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
       return;
     }
-    socket = new WebSocket(`ws://${window.location.host}/ws`);
+    socket = new WebSocket(`ws://${window.location.host}/ws/log`);
     socket.onopen = () => {
         logDiv.innerHTML = '<span class="log-connect">[SYSTEM] WebSocket connection established. Listening...</span><br>';
     };
