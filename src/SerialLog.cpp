@@ -29,7 +29,42 @@ SerialLog &SerialLog::getInstance()
  */
 void SerialLog::begin(AsyncWebServer *server)
 {
+  _ws.onEvent(onEvent);
   server->addHandler(&_ws);
+}
+
+/**
+ * @brief Handles WebSocket events.
+ * @param server The WebSocket server.
+ * @param client The WebSocket client.
+ * @param type The type of event.
+ * @param arg A pointer to additional arguments.
+ * @param data A pointer to the data.
+ * @param len The length of the data.
+ */
+void SerialLog::onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
+{
+  if (type == WS_EVT_CONNECT)
+  {
+    // client connected
+    Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
+    client->ping();
+  }
+  else if (type == WS_EVT_DISCONNECT)
+  {
+    // client disconnected
+    Serial.printf("ws[%s][%u] disconnect\n", server->url(), client->id());
+  }
+  else if (type == WS_EVT_ERROR)
+  {
+    // error was received from the other side
+    Serial.printf("ws[%s][%u] error(%u): %s\n", server->url(), client->id(), *((uint16_t *)arg), (char *)data);
+  }
+  else if (type == WS_EVT_PONG)
+  {
+    // pong message was received (in response to a ping)
+    Serial.printf("ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len) ? (char *)data : "");
+  }
 }
 
 /**

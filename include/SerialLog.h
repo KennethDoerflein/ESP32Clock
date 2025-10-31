@@ -52,6 +52,13 @@ private:
    * @brief Private constructor to enforce the singleton pattern.
    */
   SerialLog();
+
+  // The WebSocket object for logging.
   AsyncWebSocket _ws;
+
+  // Flag to control whether logging is active.
   bool _loggingEnabled = true;
+
+  // WebSocket event handler.
+  static void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 };
