@@ -182,6 +182,9 @@ void setup()
   pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP); // Use Snooze button for boot-time reset
   auto &logger = SerialLog::getInstance();
   bool displayInitialized = false;
+  // Initialize ConfigManager.
+  logger.print("Initializing ConfigManager...\n");
+  ConfigManager::getInstance().begin();
 
   // Check for factory reset request at boot using the Snooze button.
   // This avoids conflicts with the ESP32's hardware bootloader mode.
@@ -227,9 +230,6 @@ void setup()
 
   logger.print("\n\n--- ESP32 Clock Booting Up ---\n");
 
-  // Initialize managers and hardware.
-  logger.print("Initializing ConfigManager...\n");
-  ConfigManager::getInstance().begin();
 
   // Initialize the snooze button interrupt
   logger.print("Initializing Snooze Button...\n");

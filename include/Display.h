@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arduino.h>
 #include <TFT_eSPI.h>
 
 /**
@@ -74,11 +75,24 @@ public:
    */
   void setBacklightFlashing(bool enabled);
 
+  /**
+   * @brief Locks the TFT mutex for exclusive access.
+   */
+  void lock();
+
+  /**
+   * @brief Unlocks the TFT mutex.
+   */
+  void unlock();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
    */
   Display() : actualBrightness(255) {} // Initialize to a default value
+
+  void _updateRotation();
+  void _updateInversion();
 
   // --- Private Members ---
 
@@ -86,4 +100,6 @@ private:
   int actualBrightness; ///< Stores the current brightness duty cycle.
   bool _isFlashing = false;
   unsigned long _lastFlashTime = 0;
+
+  SemaphoreHandle_t tft_mutex; ///< Mutex for thread-safe access to the TFT.
 };

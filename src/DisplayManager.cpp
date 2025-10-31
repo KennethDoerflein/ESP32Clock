@@ -11,6 +11,7 @@
 #include "Constants.h"
 #include "Utils.h"
 #include "ConfigManager.h"
+#include "Display.h"
 
 /**
  * @brief Initializes the DisplayManager.
@@ -57,6 +58,7 @@ void DisplayManager::setPage(int index, bool forceRedraw)
     return;
   }
 
+  Display::getInstance().lock();
   if (_currentPage)
   {
     _currentPage->onExit();
@@ -65,6 +67,7 @@ void DisplayManager::setPage(int index, bool forceRedraw)
   _currentPageIndex = index;
   _currentPage = _pages[_currentPageIndex].get();
   _currentPage->onEnter(*_tft);
+  Display::getInstance().unlock();
 
   // After a page change, the screen is cleared, so the icon is no longer visible.
   // We need to reset its state to force a redraw on the next loop.
@@ -80,6 +83,7 @@ void DisplayManager::setPage(int index, bool forceRedraw)
  */
 void DisplayManager::update()
 {
+  Display::getInstance().lock();
   if (_fullRefresh)
   {
     if (_currentPage)
@@ -105,6 +109,7 @@ void DisplayManager::update()
     _currentPage->update();
     _currentPage->render(*_tft);
   }
+  Display::getInstance().unlock();
 }
 
 /**
@@ -167,6 +172,7 @@ void DisplayManager::drawAlarmIcon(bool enabled, bool snoozing)
   _alarmIconVisible = enabled;
   _isSnoozing = snoozing;
 
+  Display::getInstance().lock();
   if (enabled)
   {
     String colorHex = snoozing ? ConfigManager::getInstance().getSnoozeIconColor() : ConfigManager::getInstance().getAlarmIconColor();
@@ -183,6 +189,7 @@ void DisplayManager::drawAlarmIcon(bool enabled, bool snoozing)
     // Erase the icon by drawing a black rectangle over its bounding box
     _tft->fillRect(ALARM_ICON_X, ALARM_ICON_Y, ALARM_ICON_WIDTH, ALARM_ICON_HEIGHT, hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str()));
   }
+  Display::getInstance().unlock();
 }
 
 /**
@@ -195,6 +202,7 @@ void DisplayManager::drawAlarmIcon(bool enabled, bool snoozing)
  */
 void DisplayManager::showErrorScreen(const char *message)
 {
+  Display::getInstance().lock();
   _tft->fillScreen(hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str()));
   _tft->setTextDatum(MC_DATUM);
   _tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getErrorTextColor().c_str()));
@@ -203,4 +211,5 @@ void DisplayManager::showErrorScreen(const char *message)
   // Reset text datum and color for any potential subsequent drawing
   _tft->setTextDatum(TL_DATUM);
   _tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getTimeColor().c_str()));
+  Display::getInstance().unlock();
 }

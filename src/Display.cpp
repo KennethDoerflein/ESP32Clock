@@ -28,6 +28,9 @@
  */
 void Display::begin()
 {
+  // Create the mutex before any TFT operations begin.
+  tft_mutex = xSemaphoreCreateMutex();
+
   // Configure the LEDC peripheral for PWM control of the backlight.
   ledcSetup(BACKLIGHT_CHANNEL, BACKLIGHT_FREQ, BACKLIGHT_RESOLUTION);
   ledcAttachPin(TFT_BL, BACKLIGHT_CHANNEL);
@@ -36,10 +39,38 @@ void Display::begin()
   ledcWrite(BACKLIGHT_CHANNEL, 255);
 
   // Initialize the TFT display driver.
-  tft.init();
-  updateRotation();
-  updateInversion();
-  tft.fillScreen(TFT_BLACK);
+  if (xSemaphoreTake(tft_mutex, portMAX_DELAY))
+  {
+    tft.init();
+    tft.fillScreen(TFT_BLACK);
+    _updateRotation();
+    _updateInversion();
+    xSemaphoreGive(tft_mutex);
+  }
+}
+
+/**
+ * @brief Private implementation for updating screen rotation.
+ *
+ * This function contains the hardware-specific call to set the rotation.
+ * It is designed to be called only when the `tft_mutex` is already held,
+ * preventing nested locks and potential deadlocks.
+ */
+void Display::_updateRotation()
+{
+  tft.setRotation(ConfigManager::getInstance().isScreenFlipped() ? 1 : 3);
+}
+
+/**
+ * @brief Private implementation for updating screen color inversion.
+ *
+ * This function contains the hardware-specific call to invert the display.
+ * It is designed to be called only when the `tft_mutex` is already held,
+ * preventing nested locks and potential deadlocks.
+ */
+void Display::_updateInversion()
+{
+  tft.invertDisplay(ConfigManager::getInstance().isInvertColors());
 }
 
 /**
@@ -50,7 +81,11 @@ void Display::begin()
  */
 void Display::updateRotation()
 {
-  tft.setRotation(ConfigManager::getInstance().isScreenFlipped() ? 1 : 3);
+  if (xSemaphoreTake(tft_mutex, portMAX_DELAY))
+  {
+    _updateRotation();
+    xSemaphoreGive(tft_mutex);
+  }
 }
 
 /**
@@ -61,7 +96,11 @@ void Display::updateRotation()
  */
 void Display::updateInversion()
 {
-  tft.invertDisplay(ConfigManager::getInstance().isInvertColors());
+  if (xSemaphoreTake(tft_mutex, portMAX_DELAY))
+  {
+    _updateInversion();
+    xSemaphoreGive(tft_mutex);
+  }
 }
 
 /**
@@ -70,12 +109,16 @@ void Display::updateInversion()
  */
 void Display::drawStatusMessage(const char *message)
 {
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextDatum(MC_DATUM);
-  tft.loadFont(CenturyGothic28);
-  tft.drawString(message, tft.width() / 2, tft.height() / 2);
-  tft.unloadFont(); // Unload font to free up memory
+  if (xSemaphoreTake(tft_mutex, portMAX_DELAY))
+  {
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.loadFont(CenturyGothic28);
+    tft.drawString(message, tft.width() / 2, tft.height() / 2);
+    tft.unloadFont(); // Unload font to free up memory
+    xSemaphoreGive(tft_mutex);
+  }
 }
 
 /**
@@ -85,13 +128,17 @@ void Display::drawStatusMessage(const char *message)
  */
 void Display::drawMultiLineStatusMessage(const char *line1, const char *line2)
 {
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextDatum(MC_DATUM);
-  tft.loadFont(CenturyGothic28);
-  tft.drawString(line1, tft.width() / 2, tft.height() / 2 - 15);
-  tft.drawString(line2, tft.width() / 2, tft.height() / 2 + 15);
-  tft.unloadFont(); // Unload font to free up memory
+  if (xSemaphoreTake(tft_mutex, portMAX_DELAY))
+  {
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.loadFont(CenturyGothic28);
+    tft.drawString(line1, tft.width() / 2, tft.height() / 2 - 15);
+    tft.drawString(line2, tft.width() / 2, tft.height() / 2 + 15);
+    tft.unloadFont(); // Unload font to free up memory
+    xSemaphoreGive(tft_mutex);
+  }
 }
 
 /**
@@ -194,4 +241,26 @@ void Display::updateBrightness()
 
   // Apply the calculated brightness value to the backlight LED.
   ledcWrite(BACKLIGHT_CHANNEL, dutyCycle);
+}
+
+/**
+ * @brief Locks the TFT mutex to ensure exclusive access to the display.
+ *
+ * This function should be called before any direct operations on the TFT object
+ * from outside the Display class.
+ */
+void Display::lock()
+{
+  xSemaphoreTake(tft_mutex, portMAX_DELAY);
+}
+
+/**
+ * @brief Unlocks the TFT mutex, releasing exclusive access.
+ *
+ * This function must be called after operations on the TFT object are complete
+ * to allow other tasks to access the display.
+ */
+void Display::unlock()
+{
+  xSemaphoreGive(tft_mutex);
 }
