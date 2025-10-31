@@ -38,6 +38,7 @@ void Display::begin()
   // Initialize the TFT display driver.
   tft.init();
   updateRotation();
+  updateInversion();
   tft.fillScreen(TFT_BLACK);
 }
 
@@ -50,6 +51,17 @@ void Display::begin()
 void Display::updateRotation()
 {
   tft.setRotation(ConfigManager::getInstance().isScreenFlipped() ? 1 : 3);
+}
+
+/**
+ * @brief Updates the screen's color inversion based on the current configuration.
+ *
+ * Reads the `invertColors` setting from the ConfigManager and sets the
+ * TFT inversion accordingly.
+ */
+void Display::updateInversion()
+{
+  tft.invertDisplay(ConfigManager::getInstance().isInvertColors());
 }
 
 /**

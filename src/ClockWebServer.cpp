@@ -192,6 +192,7 @@ void ClockWebServer::begin()
       doc["use24HourFormat"] = config.is24HourFormat();
       doc["useCelsius"] = config.isCelsius();
       doc["screenFlipped"] = config.isScreenFlipped();
+      doc["invertColors"] = config.isInvertColors();
       doc["timezone"] = config.getTimezone();
       doc["snoozeDuration"] = config.getSnoozeDuration();
       doc["dismissDuration"] = config.getDismissDuration();
@@ -228,6 +229,7 @@ void ClockWebServer::begin()
               auto &config = ConfigManager::getInstance();
               String oldTimezone = config.getTimezone();
               bool oldScreenFlipped = config.isScreenFlipped();
+              bool oldInvertColors = config.isInvertColors();
               config.setAutoBrightness(doc["autoBrightness"]);
               config.setBrightness(doc["brightness"]);
               config.setAutoBrightnessStartHour(doc["autoBrightnessStartHour"]);
@@ -237,6 +239,7 @@ void ClockWebServer::begin()
               config.set24HourFormat(doc["use24HourFormat"]);
               config.setCelsius(doc["useCelsius"]);
               config.setScreenFlipped(doc["screenFlipped"]);
+              config.setInvertColors(doc["invertColors"]);
               config.setTimezone(doc["timezone"]);
               config.setSnoozeDuration(doc["snoozeDuration"]);
               config.setDismissDuration(doc["dismissDuration"]);
@@ -244,6 +247,12 @@ void ClockWebServer::begin()
               if (oldScreenFlipped != config.isScreenFlipped())
               {
                 Display::getInstance().updateRotation();
+                DisplayManager::getInstance().requestFullRefresh();
+              }
+
+              if (oldInvertColors != config.isInvertColors())
+              {
+                Display::getInstance().updateInversion();
                 DisplayManager::getInstance().requestFullRefresh();
               }
 
@@ -832,6 +841,8 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.isAutoBrightness() ? "d-none" : "";
   if (var == "SCREEN_FLIPPED_CHECKED")
     return config.isScreenFlipped() ? "checked" : "";
+  if (var == "INVERT_COLORS_CHECKED")
+    return config.isInvertColors() ? "checked" : "";
   if (var == "BACKGROUND_COLOR")
     return config.getBackgroundColor();
   if (var == "TIME_COLOR")

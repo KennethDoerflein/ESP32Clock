@@ -49,6 +49,7 @@ public:
   static constexpr bool DEFAULT_USE_24_HOUR_FORMAT = false;
   static constexpr bool DEFAULT_USE_CELSIUS = false;
   static constexpr bool DEFAULT_SCREEN_FLIPPED = false;
+  static constexpr bool DEFAULT_INVERT_COLORS = false;
   static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0,M11.1.0";
   static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
   static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
@@ -181,6 +182,12 @@ public:
    * @return True if the screen is flipped, false otherwise.
    */
   bool isScreenFlipped() const { return screenFlipped; }
+
+  /**
+   * @brief Checks if the screen colors are inverted.
+   * @return True if the screen is inverted, false otherwise.
+   */
+  bool isInvertColors() const { return invertColors; }
 
   /**
    * @brief Gets the timezone string.
@@ -337,6 +344,20 @@ public:
     if (wifiCredsValid != valid)
     {
       wifiCredsValid = valid;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Sets the screen color inversion.
+   * @param inverted True to invert the screen, false for normal.
+   */
+  void setInvertColors(bool inverted)
+  {
+    if (invertColors != inverted)
+    {
+      invertColors = inverted;
       _isDirty = true;
       scheduleSave();
     }
@@ -772,6 +793,7 @@ private:
   bool use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
   bool useCelsius = DEFAULT_USE_CELSIUS;
   bool screenFlipped = DEFAULT_SCREEN_FLIPPED;
+  bool invertColors = DEFAULT_INVERT_COLORS;
   String timezone = DEFAULT_TIMEZONE;
   uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
   uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;

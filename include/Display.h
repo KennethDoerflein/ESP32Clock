@@ -34,6 +34,11 @@ public:
   void updateRotation();
 
   /**
+   * @brief Updates the screen's color inversion based on the current configuration.
+   */
+  void updateInversion();
+
+  /**
    * @brief Updates the screen's backlight brightness.
    */
   void updateBrightness();

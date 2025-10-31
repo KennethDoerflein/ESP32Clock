@@ -770,6 +770,14 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                     <label class="form-check-label" for="screen-flipped" title="Flip the screen orientation 180 degrees.">Flip Screen</label>
                     <input class="form-check-input" type="checkbox" role="switch" id="screen-flipped" name="screenFlipped" %SCREEN_FLIPPED_CHECKED% />
                   </div>
+                  <hr class="my-2">
+                  <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
+                    <div>
+                      <label class="form-check-label" for="invert-colors" title="Invert the display colors.">Invert Colors</label>
+                      <small class="form-text text-muted d-block">Needed for some IPS displays</small>
+                    </div>
+                    <input class="form-check-input" type="checkbox" role="switch" id="invert-colors" name="invertColors" %INVERT_COLORS_CHECKED% />
+                  </div>
                 </div>
                 <div class="mb-3 p-3 border rounded">
                   <label for="timezone-select" class="form-label">Timezone</label>
@@ -889,6 +897,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const twentyFourHourEl = document.getElementById("24hour");
       const celsiusEl = document.getElementById("celsius");
       const screenFlippedEl = document.getElementById("screen-flipped");
+      const invertColorsEl = document.getElementById("invert-colors");
       const timezoneEl = document.getElementById("timezone-select");
       const colorPickers = displaySettingsForm.querySelectorAll('input[type="color"]');
       const resetGeneralBtn = document.getElementById('reset-general-btn');
@@ -1001,6 +1010,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         autoBrightnessEl.checked = settings.autoBrightness || false;
         celsiusEl.checked = settings.useCelsius || false;
         screenFlippedEl.checked = settings.screenFlipped || false;
+        invertColorsEl.checked = settings.invertColors || false;
         timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0,M11.1.0";
         document.getElementById('snooze-duration').value = settings.snoozeDuration || 9;
         document.getElementById('dismiss-duration').value = settings.dismissDuration || 3;
@@ -1063,6 +1073,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           use24HourFormat: twentyFourHourEl.checked,
           useCelsius: celsiusEl.checked,
           screenFlipped: screenFlippedEl.checked,
+          invertColors: invertColorsEl.checked,
           timezone: timezoneEl.value,
           snoozeDuration: parseInt(document.getElementById('snooze-duration').value),
           dismissDuration: parseInt(document.getElementById('dismiss-duration').value)

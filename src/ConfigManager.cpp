@@ -14,7 +14,6 @@
 
 // Define the namespace for preferences
 
-
 /**
  * @brief Handles periodic tasks for the ConfigManager, like debounced saves.
  *
@@ -81,6 +80,7 @@ void ConfigManager::setDefaults()
   use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
   useCelsius = DEFAULT_USE_CELSIUS;
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
+  invertColors = DEFAULT_INVERT_COLORS;
   timezone = DEFAULT_TIMEZONE;
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
@@ -145,6 +145,7 @@ void ConfigManager::load()
   use24HourFormat = _preferences.getBool("is24Hour", DEFAULT_USE_24_HOUR_FORMAT);
   useCelsius = _preferences.getBool("useCelsius", DEFAULT_USE_CELSIUS);
   screenFlipped = _preferences.getBool("screenFlip", DEFAULT_SCREEN_FLIPPED);
+  invertColors = _preferences.getBool("invertColors", DEFAULT_INVERT_COLORS);
   timezone = _preferences.getString("timezone", DEFAULT_TIMEZONE);
   snoozeDuration = _preferences.getUChar("snoozeDur", DEFAULT_SNOOZE_DURATION);
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
@@ -232,6 +233,7 @@ bool ConfigManager::save()
   _preferences.putBool("is24Hour", use24HourFormat);
   _preferences.putBool("useCelsius", useCelsius);
   _preferences.putBool("screenFlip", screenFlipped);
+  _preferences.putBool("invertColors", invertColors);
   _preferences.putString("timezone", timezone);
   _preferences.putUChar("snoozeDur", snoozeDuration);
   _preferences.putUChar("dismissDur", dismissDuration);
@@ -443,6 +445,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
   useCelsius = DEFAULT_USE_CELSIUS;
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
+  invertColors = DEFAULT_INVERT_COLORS;
   timezone = DEFAULT_TIMEZONE;
 
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
