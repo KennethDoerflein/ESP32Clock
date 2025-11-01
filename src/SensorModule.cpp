@@ -36,14 +36,28 @@ static unsigned long prevSensorMillis = 0;
  */
 void setupSensors()
 {
-  bme280_found = BME.begin(0x76);
+  for (int i = 0; i < SENSOR_RETRY_COUNT; ++i)
+  {
+    bme280_found = BME.begin(0x76);
+    if (bme280_found)
+      break;
+    delay(SENSOR_RETRY_DELAY);
+  }
+
   if (!bme280_found)
   {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
     // The device will now rely on the RTC for temperature.
   }
 
-  rtc_found = RTC.begin();
+  for (int i = 0; i < SENSOR_RETRY_COUNT; ++i)
+  {
+    rtc_found = RTC.begin();
+    if (rtc_found)
+      break;
+    delay(SENSOR_RETRY_DELAY);
+  }
+
   if (!rtc_found)
   {
     Serial.println("Couldn't find RTC");

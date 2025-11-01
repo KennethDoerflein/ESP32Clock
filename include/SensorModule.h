@@ -4,6 +4,12 @@
 #include <RTClib.h>
 #include <Adafruit_BME280.h>
 
+/// @brief The number of times to retry sensor initialization.
+const int SENSOR_RETRY_COUNT = 3;
+
+/// @brief The delay between sensor initialization retries, in milliseconds.
+const int SENSOR_RETRY_DELAY = 250;
+
 /**
  * @file SensorModule.h
  * @brief Manages hardware sensors like the BME280 and the RTC.

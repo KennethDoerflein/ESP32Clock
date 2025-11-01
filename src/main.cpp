@@ -230,7 +230,6 @@ void setup()
 
   logger.print("\n\n--- ESP32 Clock Booting Up ---\n");
 
-
   // Initialize the snooze button interrupt
   logger.print("Initializing Snooze Button...\n");
   snoozeButton.begin();
@@ -250,6 +249,10 @@ void setup()
   logger.print("Initializing DisplayManager...\n");
   displayManager.begin(display.getTft());
   display.drawStatusMessage("Initializing...");
+
+  // Add a delay before initializing sensors to allow hardware to stabilize.
+  logger.print("Waiting for hardware to stabilize...\n");
+  delay(500);
 
   logger.print("Initializing Sensors...\n");
   setupSensors();
