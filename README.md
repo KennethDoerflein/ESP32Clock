@@ -61,9 +61,9 @@ The components are connected using the I2C and SPI buses.
 |                            | RST       | GPIO 11       | Reset                 |
 |                            | DC        | GPIO 12       | Data/Command          |
 |                            | MOSI      | GPIO 13       | Data In               |
-|                            | MISO      | UNUSED        | Data Out              |
 |                            | SCK       | GPIO 14       | Clock                 |
 |                            | LED       | GPIO 6        | Backlight (PWM)       |
+|                            | MISO      | UNUSED        | Data Out              |
 | **DS3231 & BME280 (I2C)**  | VCC       | 3.3V          | Shared 3.3V           |
 |                            | GND       | GND           | Shared ground         |
 |                            | SDA       | GPIO 8        | Shared data line      |
