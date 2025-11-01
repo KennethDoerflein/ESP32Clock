@@ -45,6 +45,10 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 | **Sensor**          | **BME280** Temperature, Humidity, and Pressure Sensor Module (I2C)   |
 | **Power Supply**    | A reliable 5V USB-C power supply                                     |
 
+## 3D Models and Assembly
+
+A parts list, 3D models for the case, and assembly instructions are coming soon.
+
 ## Wiring
 
 The components are connected using the I2C and SPI buses.
