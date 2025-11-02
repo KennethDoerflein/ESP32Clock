@@ -1748,6 +1748,13 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
         </div>`;
     }
 
+    function setSystemButtonsDisabled(disabled) {
+      ntpSyncButton.disabled = disabled;
+      if (rebootBtn) rebootBtn.disabled = disabled;
+      if (resetBtn) resetBtn.disabled = disabled;
+      if (resetKeepWifiBtn) resetKeepWifiBtn.disabled = disabled;
+    }
+
     function setButtonsDisabled(disabled) {
         uploadButton.disabled = disabled;
         onlineButton.disabled = disabled;
@@ -1759,9 +1766,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
             backButton.classList.remove('disabled');
         }
 
-        if (rebootBtn) rebootBtn.disabled = disabled;
-        if (resetBtn) resetBtn.disabled = disabled;
-        if (resetKeepWifiBtn) resetKeepWifiBtn.disabled = disabled;
+        setSystemButtonsDisabled(disabled);
     }
 
     uploadForm.addEventListener('submit', function(e) {
@@ -1841,7 +1846,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     });
 
     ntpSyncButton.addEventListener('click', function() {
-      ntpSyncButton.disabled = true;
+      setButtonsDisabled(true);
 
       fetch('/api/system/ntp-sync', { method: 'POST' })
         .then(response => {
@@ -1860,7 +1865,9 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
           ntpSyncStatusDiv.innerHTML = `<span class="text-danger">${error.message}</span>`;
         })
         .finally(() => {
-          ntpSyncButton.disabled = false;
+          if (!isUpdating) {
+            setButtonsDisabled(false);
+          }
         });
     });
 
