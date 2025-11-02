@@ -48,7 +48,6 @@ void SerialLog::onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, Aw
   {
     // client connected
     Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
-    client->ping();
   }
   else if (type == WS_EVT_DISCONNECT)
   {
