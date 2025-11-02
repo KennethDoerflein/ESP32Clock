@@ -82,6 +82,8 @@ void ConfigManager::setDefaults()
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
   invertColors = DEFAULT_INVERT_COLORS;
   timezone = DEFAULT_TIMEZONE;
+  setenv("TZ", timezone.c_str(), 1);
+  tzset();
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
 
@@ -147,6 +149,8 @@ void ConfigManager::load()
   screenFlipped = _preferences.getBool("screenFlip", DEFAULT_SCREEN_FLIPPED);
   invertColors = _preferences.getBool("invertColors", DEFAULT_INVERT_COLORS);
   timezone = _preferences.getString("timezone", DEFAULT_TIMEZONE);
+  setenv("TZ", timezone.c_str(), 1);
+  tzset();
   snoozeDuration = _preferences.getUChar("snoozeDur", DEFAULT_SNOOZE_DURATION);
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
 
