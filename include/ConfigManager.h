@@ -50,7 +50,7 @@ public:
   static constexpr bool DEFAULT_USE_CELSIUS = false;
   static constexpr bool DEFAULT_SCREEN_FLIPPED = false;
   static constexpr bool DEFAULT_INVERT_COLORS = false;
-  static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0,M11.1.0";
+  static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
   static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
   static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
 

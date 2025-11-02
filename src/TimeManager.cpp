@@ -280,7 +280,7 @@ uint8_t TimeManager::getHour() const
 void TimeManager::checkDailySync()
 {
   DateTime now = RTC.now();
-  if (now.hour() < 3)
+  if (now.hour() < 2)
   {
     return;
   }

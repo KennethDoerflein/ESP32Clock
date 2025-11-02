@@ -782,12 +782,12 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 <div class="mb-3 p-3 border rounded">
                   <label for="timezone-select" class="form-label">Timezone</label>
                   <select class="form-select" id="timezone-select" name="timezone">
-                    <option value="EST5EDT,M3.2.0,M11.1.0">Eastern Time</option>
-                    <option value="CST6CDT,M3.2.0,M11.1.0">Central Time</option>
-                    <option value="MST7MDT,M3.2.0,M11.1.0">Mountain Time</option>
-                    <option value="PST8PDT,M3.2.0,M11.1.0">Pacific Time</option>
+                    <option value="EST5EDT,M3.2.0/2:00,M11.1.0/2:00">Eastern Time</option>
+                    <option value="CST6CDT,M3.2.0/2:00,M11.1.0/2:00">Central Time</option>
+                    <option value="MST7MDT,M3.2.0/2:00,M11.1.0/2:00">Mountain Time</option>
+                    <option value="PST8PDT,M3.2.0/2:00,M11.1.0/2:00">Pacific Time</option>
                     <option value="MST7">Arizona</option>
-                    <option value="AKST9AKDT,M3.2.0,M11.1.0">Alaska</option>
+                    <option value="AKST9AKDT,M3.2.0/2:00,M11.1.0/2:00">Alaska</option>
                     <option value="HST10">Hawaii</option>
                   </select>
                 </div>
@@ -1011,7 +1011,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         celsiusEl.checked = settings.useCelsius || false;
         screenFlippedEl.checked = settings.screenFlipped || false;
         invertColorsEl.checked = settings.invertColors || false;
-        timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0,M11.1.0";
+        timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
         document.getElementById('snooze-duration').value = settings.snoozeDuration || 9;
         document.getElementById('dismiss-duration').value = settings.dismissDuration || 3;
 
