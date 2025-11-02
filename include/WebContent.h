@@ -782,13 +782,13 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 <div class="mb-3 p-3 border rounded">
                   <label for="timezone-select" class="form-label">Timezone</label>
                   <select class="form-select" id="timezone-select" name="timezone">
-                    <option value="EST5EDT,M3.2.0/2:00,M11.1.0/2:00">Eastern Time</option>
-                    <option value="CST6CDT,M3.2.0/2:00,M11.1.0/2:00">Central Time</option>
-                    <option value="MST7MDT,M3.2.0/2:00,M11.1.0/2:00">Mountain Time</option>
-                    <option value="PST8PDT,M3.2.0/2:00,M11.1.0/2:00">Pacific Time</option>
-                    <option value="MST7">Arizona</option>
-                    <option value="AKST9AKDT,M3.2.0/2:00,M11.1.0/2:00">Alaska</option>
-                    <option value="HST10">Hawaii</option>
+                    <option value="EST5EDT,M3.2.0/2:00,M11.1.0/2:00" %TIMEZONE_SELECTED_EST%>Eastern Time</option>
+                    <option value="CST6CDT,M3.2.0/2:00,M11.1.0/2:00" %TIMEZONE_SELECTED_CST%>Central Time</option>
+                    <option value="MST7MDT,M3.2.0/2:00,M11.1.0/2:00" %TIMEZONE_SELECTED_MST%>Mountain Time</option>
+                    <option value="PST8PDT,M3.2.0/2:00,M11.1.0/2:00" %TIMEZONE_SELECTED_PST%>Pacific Time</option>
+                    <option value="MST7" %TIMEZONE_SELECTED_AZ%>Arizona</option>
+                    <option value="AKST9AKDT,M3.2.0/2:00,M11.1.0/2:00" %TIMEZONE_SELECTED_AK%>Alaska</option>
+                    <option value="HST10" %TIMEZONE_SELECTED_HI%>Hawaii</option>
                   </select>
                 </div>
                 <div class="mb-3 p-3 border rounded">

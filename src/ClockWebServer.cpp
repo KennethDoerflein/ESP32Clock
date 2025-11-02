@@ -864,5 +864,21 @@ String ClockWebServer::settingsProcessor(const String &var)
   if (var == "DISMISS_DURATION")
     return String(config.getDismissDuration());
 
+  // Timezone selections
+  String timezone = config.getTimezone();
+  if (var == "TIMEZONE_SELECTED_EST")
+    return timezone == "EST5EDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
+  if (var == "TIMEZONE_SELECTED_CST")
+    return timezone == "CST6CDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
+  if (var == "TIMEZONE_SELECTED_MST")
+    return timezone == "MST7MDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
+  if (var == "TIMEZONE_SELECTED_PST")
+    return timezone == "PST8PDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
+  if (var == "TIMEZONE_SELECTED_AZ")
+    return timezone == "MST7" ? "selected" : "";
+  if (var == "TIMEZONE_SELECTED_AK")
+    return timezone == "AKST9AKDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
+  if (var == "TIMEZONE_SELECTED_HI")
+    return timezone == "HST10" ? "selected" : "";
   return String();
 }
