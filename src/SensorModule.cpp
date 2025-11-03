@@ -11,6 +11,7 @@
 #include "SensorModule.h"
 #include "ConfigManager.h"
 #include "driver/temp_sensor.h"
+#include <math.h>
 
 // Instantiate the global sensor objects declared in the header.
 Adafruit_BME280 BME;
@@ -21,8 +22,60 @@ static float cached_bme_temp_c = 0.0;
 static float cached_rtc_temp_c = 0.0;
 static float cached_core_temp_c = 0.0;
 static float cached_humidity = 0.0;
+static float cached_offset_c = 0.0;
 static bool bme280_found = false; // Track BME280 sensor status
-static bool rtc_found = false;    // Track RTC status
+
+/**
+ * @brief Calculates the corrected relative humidity based on a temperature offset.
+ *
+ * This function uses the August-Roche-Magnus approximation to first calculate
+ * the dew point from the original temperature and humidity, and then calculates
+ * the new relative humidity at the adjusted temperature.
+ *
+ * @param temp_c The original temperature in Celsius.
+ * @param humidity The original relative humidity.
+ * @param offset_c The temperature offset in Celsius.
+ * @return The corrected relative humidity.
+ */
+float calculateCorrectedHumidity(float temp_c, float humidity, float offset_c)
+{
+  if (humidity < 0 || humidity > 100)
+  {
+    return humidity; // Return original value if it's invalid
+  }
+
+  float temp_compensated_c = temp_c + offset_c;
+
+  // August-Roche-Magnus approximation constants
+  const float A = 17.625;
+  const float B = 243.04;
+
+  // Calculate dew point from original temperature and humidity
+  float alpha = log(humidity / 100.0) + (A * temp_c) / (B + temp_c);
+  float dew_point = (B * alpha) / (A - alpha);
+
+  // Calculate new saturation vapor pressure at the compensated temperature
+  float compensated_svp = exp((A * temp_compensated_c) / (B + temp_compensated_c));
+
+  // Calculate saturation vapor pressure at the dew point
+  float actual_vp = exp((A * dew_point) / (B + dew_point));
+
+  // Calculate new relative humidity
+  float new_humidity = 100.0 * (actual_vp / compensated_svp);
+
+  // Clamp the result to a valid range
+  if (new_humidity > 100.0)
+  {
+    new_humidity = 100.0;
+  }
+  else if (new_humidity < 0.0)
+  {
+    new_humidity = 0.0;
+  }
+
+  return new_humidity;
+}
+static bool rtc_found = false; // Track RTC status
 
 /// @brief Stores the timestamp of the last sensor update for interval timing.
 static unsigned long prevSensorMillis = 0;
@@ -189,8 +242,24 @@ void handleSensorUpdates(bool force)
     prevSensorMillis = now;
     if (bme280_found)
     {
-      cached_bme_temp_c = BME.readTemperature();
-      cached_humidity = BME.readHumidity();
+      float raw_bme_temp_c = BME.readTemperature();
+      float raw_humidity = BME.readHumidity();
+
+      if (rtc_found && ConfigManager::getInstance().isTempCorrectionEnabled())
+      {
+        float raw_rtc_temp_c = RTC.getTemperature();
+        float correction = ConfigManager::getInstance().getTempCorrection();
+        cached_offset_c = -((raw_rtc_temp_c - raw_bme_temp_c)) + correction;
+        cached_bme_temp_c = raw_bme_temp_c + cached_offset_c;
+        cached_humidity = calculateCorrectedHumidity(raw_bme_temp_c, raw_humidity, cached_offset_c);
+      }
+      else
+      {
+        // Correction is disabled or RTC is not found, use raw values
+        cached_bme_temp_c = raw_bme_temp_c;
+        cached_humidity = raw_humidity;
+        cached_offset_c = 0.0;
+      }
     }
     else
     {

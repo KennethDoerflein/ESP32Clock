@@ -8,52 +8,54 @@
 
 const int MAX_ALARMS = 5; // Maximum number of alarms that can be set
 
+// Default Colors
+static constexpr const char *DEFAULT_BACKGROUND_COLOR = "#000000";
+static constexpr const char *DEFAULT_TIME_COLOR = "#079ae4";
+static constexpr const char *DEFAULT_TOD_COLOR = "#FFFFFF";
+static constexpr const char *DEFAULT_SECONDS_COLOR = "#02e3ab";
+static constexpr const char *DEFAULT_DAY_OF_WEEK_COLOR = "#FFFFFF";
+static constexpr const char *DEFAULT_DATE_COLOR = "#FFFFFF";
+static constexpr const char *DEFAULT_TEMP_COLOR = "#02e3ab";
+static constexpr const char *DEFAULT_HUMIDITY_COLOR = "#079ae4";
+static constexpr const char *DEFAULT_ALARM_ICON_COLOR = "#FFFF00";
+static constexpr const char *DEFAULT_SNOOZE_ICON_COLOR = "#0000FF";
+static constexpr const char *DEFAULT_ALARM_TEXT_COLOR = "#FF0000";
+static constexpr const char *DEFAULT_ERROR_TEXT_COLOR = "#FF0000";
+
+// Default System Settings
+static constexpr const char *DEFAULT_WIFI_SSID = "";
+static constexpr const char *DEFAULT_WIFI_PASSWORD = "";
+static constexpr const char *DEFAULT_HOSTNAME = "";
+static constexpr bool DEFAULT_WIFI_CREDS_VALID = false;
+static constexpr int8_t DEFAULT_RINGING_ALARM_ID = -1;
+static constexpr uint32_t DEFAULT_RINGING_ALARM_TIMESTAMP = 0;
+static constexpr bool DEFAULT_AUTO_BRIGHTNESS = true;
+static constexpr uint8_t DEFAULT_BRIGHTNESS = 128;
+static constexpr uint8_t DEFAULT_AUTO_BRIGHTNESS_START_HOUR = 7;
+static constexpr uint8_t DEFAULT_AUTO_BRIGHTNESS_END_HOUR = 21;
+static constexpr uint8_t DEFAULT_DAY_BRIGHTNESS = 255;
+static constexpr uint8_t DEFAULT_NIGHT_BRIGHTNESS = 10;
+static constexpr bool DEFAULT_USE_24_HOUR_FORMAT = false;
+static constexpr bool DEFAULT_USE_CELSIUS = false;
+static constexpr bool DEFAULT_SCREEN_FLIPPED = false;
+static constexpr bool DEFAULT_INVERT_COLORS = false;
+static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
+static constexpr bool DEFAULT_TEMP_CORRECTION_ENABLED = true;
+static constexpr float DEFAULT_TEMP_CORRECTION = 0.0;
+static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
+static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
+
 /**
  * @class ConfigManager
  * @brief Manages the application's configuration settings using a singleton pattern.
  *
  * This class is responsible for loading, saving, and providing access to
  * configuration settings such as WiFi credentials, display preferences, and
- * other system options. Settings are stored in a JSON file on the LittleFS filesystem.
+ * other system options. Settings are stored in a preferences object.
  */
 class ConfigManager
 {
 public:
-  // Default Colors
-  static constexpr const char *DEFAULT_BACKGROUND_COLOR = "#000000";
-  static constexpr const char *DEFAULT_TIME_COLOR = "#079ae4";
-  static constexpr const char *DEFAULT_TOD_COLOR = "#FFFFFF";
-  static constexpr const char *DEFAULT_SECONDS_COLOR = "#02e3ab";
-  static constexpr const char *DEFAULT_DAY_OF_WEEK_COLOR = "#FFFFFF";
-  static constexpr const char *DEFAULT_DATE_COLOR = "#FFFFFF";
-  static constexpr const char *DEFAULT_TEMP_COLOR = "#02e3ab";
-  static constexpr const char *DEFAULT_HUMIDITY_COLOR = "#079ae4";
-  static constexpr const char *DEFAULT_ALARM_ICON_COLOR = "#FFFF00";
-  static constexpr const char *DEFAULT_SNOOZE_ICON_COLOR = "#0000FF";
-  static constexpr const char *DEFAULT_ALARM_TEXT_COLOR = "#FF0000";
-  static constexpr const char *DEFAULT_ERROR_TEXT_COLOR = "#FF0000";
-
-  // Default System Settings
-  static constexpr const char *DEFAULT_WIFI_SSID = "";
-  static constexpr const char *DEFAULT_WIFI_PASSWORD = "";
-  static constexpr const char *DEFAULT_HOSTNAME = "";
-  static constexpr bool DEFAULT_WIFI_CREDS_VALID = false;
-  static constexpr int8_t DEFAULT_RINGING_ALARM_ID = -1;
-  static constexpr uint32_t DEFAULT_RINGING_ALARM_TIMESTAMP = 0;
-  static constexpr bool DEFAULT_AUTO_BRIGHTNESS = true;
-  static constexpr uint8_t DEFAULT_BRIGHTNESS = 128;
-  static constexpr uint8_t DEFAULT_AUTO_BRIGHTNESS_START_HOUR = 7;
-  static constexpr uint8_t DEFAULT_AUTO_BRIGHTNESS_END_HOUR = 21;
-  static constexpr uint8_t DEFAULT_DAY_BRIGHTNESS = 255;
-  static constexpr uint8_t DEFAULT_NIGHT_BRIGHTNESS = 10;
-  static constexpr bool DEFAULT_USE_24_HOUR_FORMAT = false;
-  static constexpr bool DEFAULT_USE_CELSIUS = false;
-  static constexpr bool DEFAULT_SCREEN_FLIPPED = false;
-  static constexpr bool DEFAULT_INVERT_COLORS = false;
-  static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
-  static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
-  static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
-
   /**
    * @brief Gets the singleton instance of the ConfigManager.
    * @return A reference to the singleton ConfigManager instance.
@@ -207,6 +209,18 @@ public:
    */
   uint8_t getDismissDuration() const { return dismissDuration; }
 
+  /**
+   * @brief Gets the temperature correction value.
+   * @return The correction value.
+   */
+  float getTempCorrection() const { return tempCorrection; }
+
+  /**
+   * @brief Checks if temperature correction is enabled.
+   * @return True if enabled, false otherwise.
+   */
+  bool isTempCorrectionEnabled() const { return tempCorrectionEnabled; }
+
   // Display Colors
 
   /**
@@ -344,6 +358,34 @@ public:
     if (wifiCredsValid != valid)
     {
       wifiCredsValid = valid;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Enables or disables temperature correction.
+   * @param enabled True to enable, false to disable.
+   */
+  void setTempCorrectionEnabled(bool enabled)
+  {
+    if (tempCorrectionEnabled != enabled)
+    {
+      tempCorrectionEnabled = enabled;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Sets the temperature correction value.
+   * @param value The new correction value.
+   */
+  void setTempCorrection(float value)
+  {
+    if (tempCorrection != value)
+    {
+      tempCorrection = value;
       _isDirty = true;
       scheduleSave();
     }
@@ -795,6 +837,8 @@ private:
   bool screenFlipped = DEFAULT_SCREEN_FLIPPED;
   bool invertColors = DEFAULT_INVERT_COLORS;
   String timezone = DEFAULT_TIMEZONE;
+  bool tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
+  float tempCorrection = DEFAULT_TEMP_CORRECTION;
   uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
   uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;
 
