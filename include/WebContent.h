@@ -724,7 +724,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                     <label class="form-check-label" for="auto-brightness" title="Enable or disable automatic brightness adjustment.">Auto Brightness</label>
                     <input class="form-check-input" type="checkbox" role="switch" id="auto-brightness" name="autoBrightness" %AUTO_BRIGHTNESS_CHECKED% />
                   </div>
-                  <div id="auto-brightness-controls" class="mt-3">
+                  <div id="auto-brightness-controls" class="mt-3 %AUTO_BRIGHTNESS_CONTROLS_CLASS%">
                     <hr>
                     <label for="auto-brightness-start-hour" class="form-label d-flex justify-content-between">
                       <span>Start Hour</span>
@@ -777,6 +777,18 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                       <small class="form-text text-muted d-block">Needed for some IPS displays</small>
                     </div>
                     <input class="form-check-input" type="checkbox" role="switch" id="invert-colors" name="invertColors" %INVERT_COLORS_CHECKED% />
+                  </div>
+                </div>
+                <div class="mb-3 p-3 border rounded">
+                  <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
+                    <label class="form-check-label" for="temp-correction-enabled">Enable Temperature Correction</label>
+                    <input class="form-check-input" type="checkbox" role="switch" id="temp-correction-enabled" name="tempCorrectionEnabled" %TEMP_CORRECTION_ENABLED_CHECKED%>
+                  </div>
+                  <div id="temp-correction-controls" class="%TEMP_CORRECTION_CONTROLS_CLASS%">
+                    <hr>
+                    <label for="temp-correction" class="form-label">Temperature Correction (&deg;%TEMP_CORRECTION_UNIT%)</label>
+                    <input type="number" class="form-control" id="temp-correction" name="tempCorrection" step="0.1" value="%TEMP_CORRECTION_VALUE%">
+                    <small class="form-text text-muted">If the clock's temperature is 2 degrees too high, enter -2.0 here.</small>
                   </div>
                 </div>
                 <div class="mb-3 p-3 border rounded">
@@ -874,6 +886,15 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       let saveGeneralTimeout;
       let saveDisplayTimeout;
 
+      function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+          const context = this;
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(context, args), delay);
+        };
+      }
+
       const BRIGHTNESS_MIN = 10;
       const BRIGHTNESS_MAX = 255;
 
@@ -896,6 +917,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const nightBrightnessValueEl = document.getElementById("night-brightness-value");
       const twentyFourHourEl = document.getElementById("24hour");
       const celsiusEl = document.getElementById("celsius");
+      const tempCorrectionEnabledEl = document.getElementById("temp-correction-enabled");
+      const tempCorrectionEl = document.getElementById("temp-correction");
+      const tempCorrectionControlsEl = document.getElementById("temp-correction-controls");
       const screenFlippedEl = document.getElementById("screen-flipped");
       const invertColorsEl = document.getElementById("invert-colors");
       const timezoneEl = document.getElementById("timezone-select");
@@ -972,16 +996,13 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       function toggleBrightnessSlider() {
         const isAuto = autoBrightnessEl.checked;
-        brightnessEl.disabled = isAuto;
-        // We now toggle the class, but also set the style for instant feedback
         if (isAuto) {
           manualBrightnessSectionEl.classList.add('d-none');
-          manualBrightnessSectionEl.style.display = 'none';
+          autoBrightnessControlsEl.classList.remove('d-none');
         } else {
           manualBrightnessSectionEl.classList.remove('d-none');
-          manualBrightnessSectionEl.style.display = 'block';
+          autoBrightnessControlsEl.classList.add('d-none');
         }
-        autoBrightnessControlsEl.style.display = isAuto ? 'block' : 'none';
       }
 
       function updateBrightnessUI(settings) {
@@ -1014,6 +1035,19 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
         document.getElementById('snooze-duration').value = settings.snoozeDuration || 9;
         document.getElementById('dismiss-duration').value = settings.dismissDuration || 3;
+        
+        let tempCorrection = settings.tempCorrection || 0.0;
+        if (!settings.useCelsius) {
+          tempCorrection = tempCorrection * 9.0 / 5.0;
+        }
+        tempCorrectionEl.value = tempCorrection.toFixed(1);
+        tempCorrectionEnabledEl.checked = settings.tempCorrectionEnabled || false;
+        
+        if (tempCorrectionEnabledEl.checked) {
+          tempCorrectionControlsEl.classList.remove('d-none');
+        } else {
+          tempCorrectionControlsEl.classList.add('d-none');
+        }
 
         // Manually trigger UI updates that depend on these values
         updateBrightnessUI(settings);
@@ -1072,12 +1106,18 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           nightBrightness: parseInt(nightBrightnessEl.value),
           use24HourFormat: twentyFourHourEl.checked,
           useCelsius: celsiusEl.checked,
+          tempCorrectionEnabled: tempCorrectionEnabledEl.checked,
           screenFlipped: screenFlippedEl.checked,
           invertColors: invertColorsEl.checked,
           timezone: timezoneEl.value,
           snoozeDuration: parseInt(document.getElementById('snooze-duration').value),
-          dismissDuration: parseInt(document.getElementById('dismiss-duration').value)
+          dismissDuration: parseInt(document.getElementById('dismiss-duration').value),
+          tempCorrection: parseFloat(document.getElementById('temp-correction').value)
         };
+
+        if (!settings.useCelsius) {
+          settings.tempCorrection = settings.tempCorrection * 5.0 / 9.0;
+        }
 
         try {
           // Save general settings
@@ -1155,15 +1195,58 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
          autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, twentyFourHourEl.checked);
       });
 
+      celsiusEl.addEventListener('change', () => {
+        const tempCorrectionEl = document.getElementById('temp-correction');
+        const tempCorrectionLabel = document.querySelector('label[for="temp-correction"]');
+        let currentValue = parseFloat(tempCorrectionEl.value);
+
+        if (celsiusEl.checked) {
+          // We are switching TO Celsius, so the current value is in Fahrenheit
+          currentValue = currentValue * 5.0 / 9.0;
+          tempCorrectionLabel.innerHTML = `Temperature Correction (&deg;C)`;
+        } else {
+          // We are switching TO Fahrenheit, so the current value is in Celsius
+          currentValue = currentValue * 9.0 / 5.0;
+          tempCorrectionLabel.innerHTML = `Temperature Correction (&deg;F)`;
+        }
+        tempCorrectionEl.value = currentValue.toFixed(1);
+      });
+
+      tempCorrectionEnabledEl.addEventListener('change', () => {
+        if (tempCorrectionEnabledEl.checked) {
+          tempCorrectionControlsEl.classList.remove('d-none');
+        } else {
+          tempCorrectionControlsEl.classList.add('d-none');
+        }
+      });
+
+      tempCorrectionEl.addEventListener('input', () => {
+        let value = tempCorrectionEl.value;
+        let decimalIndex = value.indexOf('.');
+        if (decimalIndex !== -1 && value.length - decimalIndex > 2) {
+          tempCorrectionEl.value = parseFloat(value).toFixed(1);
+        }
+      });
+
       autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
       
-      // Trigger save only when user *finishes* making a change
+      const debouncedSave = debounce(handleGeneralInputChange, 1000);
+
+      // Use 'input' for sliders for real-time feedback, and 'change' for other inputs
+      settingsForm.addEventListener('input', (e) => {
+        // For sliders and the temp correction, save with a debounce
+        if (e.target.type === 'range' || e.target.id === 'temp-correction') {
+          debouncedSave();
+        }
+      });
       settingsForm.addEventListener('change', handleGeneralInputChange);
       displaySettingsForm.addEventListener('change', handleDisplayInputChange);
       
       document.addEventListener("DOMContentLoaded", () => {
         setStatus(STATUS_INDICATORS.SAVED);
         toggleBrightnessSlider(); // Set initial UI state for brightness sections
+        fetchGeneralSettings();
+        fetchDisplaySettings();
       });
 
       resetColorsBtn.addEventListener('click', async () => {

@@ -126,6 +126,23 @@ void WiFiManager::handleConnection()
     return;
   }
 
+  // First, ensure our internal state `_isConnected` matches the actual WiFi status.
+  // This is a robust way to handle missed events or state inconsistencies.
+  // A true connection requires both a connected status and a valid IP address.
+  bool isReallyConnected = (WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0));
+  if (isReallyConnected != _isConnected)
+  {
+    _isConnected = isReallyConnected;
+    if (_isConnected)
+    {
+      SerialLog::getInstance().print("WiFi connection state corrected to CONNECTED by polling.\n");
+    }
+    else
+    {
+      SerialLog::getInstance().print("WiFi connection state corrected to DISCONNECTED by polling.\n");
+    }
+  }
+
   if (_isConnected)
   {
     if (_isReconnecting)

@@ -196,6 +196,8 @@ void ClockWebServer::begin()
       doc["timezone"] = config.getTimezone();
       doc["snoozeDuration"] = config.getSnoozeDuration();
       doc["dismissDuration"] = config.getDismissDuration();
+      doc["tempCorrectionEnabled"] = config.isTempCorrectionEnabled();
+      doc["tempCorrection"] = config.getTempCorrection();
       
       String response;
       serializeJson(doc, response);
@@ -230,6 +232,8 @@ void ClockWebServer::begin()
               String oldTimezone = config.getTimezone();
               bool oldScreenFlipped = config.isScreenFlipped();
               bool oldInvertColors = config.isInvertColors();
+              float oldTempCorrection = config.getTempCorrection();
+              bool oldTempCorrectionEnabled = config.isTempCorrectionEnabled();
               config.setAutoBrightness(doc["autoBrightness"]);
               config.setBrightness(doc["brightness"]);
               config.setAutoBrightnessStartHour(doc["autoBrightnessStartHour"]);
@@ -243,6 +247,8 @@ void ClockWebServer::begin()
               config.setTimezone(doc["timezone"]);
               config.setSnoozeDuration(doc["snoozeDuration"]);
               config.setDismissDuration(doc["dismissDuration"]);
+              config.setTempCorrectionEnabled(doc["tempCorrectionEnabled"]);
+              config.setTempCorrection(doc["tempCorrection"]);
 
               if (oldScreenFlipped != config.isScreenFlipped())
               {
@@ -259,6 +265,11 @@ void ClockWebServer::begin()
               if (oldTimezone != config.getTimezone())
               {
                 startNtpSync();
+              }
+
+              if (oldTempCorrection != config.getTempCorrection() || oldTempCorrectionEnabled != config.isTempCorrectionEnabled())
+              {
+                handleSensorUpdates(true);
               }
 
               request->send(200, "text/plain", "Settings saved!");
@@ -837,6 +848,8 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.is24HourFormat() ? "checked" : "";
   if (var == "USE_CELSIUS_CHECKED")
     return config.isCelsius() ? "checked" : "";
+  if (var == "AUTO_BRIGHTNESS_CONTROLS_CLASS")
+    return config.isAutoBrightness() ? "" : "d-none";
   if (var == "MANUAL_BRIGHTNESS_CLASS")
     return config.isAutoBrightness() ? "d-none" : "";
   if (var == "SCREEN_FLIPPED_CHECKED")
@@ -863,6 +876,21 @@ String ClockWebServer::settingsProcessor(const String &var)
     return String(config.getSnoozeDuration());
   if (var == "DISMISS_DURATION")
     return String(config.getDismissDuration());
+  if (var == "TEMP_CORRECTION_VALUE")
+  {
+    float offset = config.getTempCorrection();
+    if (!config.isCelsius())
+    {
+      offset = offset * 9.0 / 5.0;
+    }
+    return String(offset, 1);
+  }
+  if (var == "TEMP_CORRECTION_UNIT")
+    return config.isCelsius() ? "C" : "F";
+  if (var == "TEMP_CORRECTION_ENABLED_CHECKED")
+    return config.isTempCorrectionEnabled() ? "checked" : "";
+  if (var == "TEMP_CORRECTION_CONTROLS_CLASS")
+    return config.isTempCorrectionEnabled() ? "" : "d-none";
 
   // Timezone selections
   String timezone = config.getTimezone();
