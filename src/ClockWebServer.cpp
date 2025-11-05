@@ -804,6 +804,21 @@ String ClockWebServer::processor(const String &var)
   return String();
 }
 
+struct TimezoneInfo
+{
+  const char *posixString;
+  const char *placeholder;
+};
+
+static const TimezoneInfo timezones[] = {
+    {"EST5EDT,M3.2.0/2:00,M11.1.0/2:00", "TIMEZONE_SELECTED_EST"},
+    {"CST6CDT,M3.2.0/2:00,M11.1.0/2:00", "TIMEZONE_SELECTED_CST"},
+    {"MST7MDT,M3.2.0/2:00,M11.1.0/2:00", "TIMEZONE_SELECTED_MST"},
+    {"PST8PDT,M3.2.0/2:00,M11.1.0/2:00", "TIMEZONE_SELECTED_PST"},
+    {"MST7", "TIMEZONE_SELECTED_AZ"},
+    {"AKST9AKDT,M3.2.0/2:00,M11.1.0/2:00", "TIMEZONE_SELECTED_AK"},
+    {"HST10", "TIMEZONE_SELECTED_HI"}};
+
 /**
  * @brief A specialized template processor for the settings page.
  *
@@ -894,19 +909,12 @@ String ClockWebServer::settingsProcessor(const String &var)
 
   // Timezone selections
   String timezone = config.getTimezone();
-  if (var == "TIMEZONE_SELECTED_EST")
-    return timezone == "EST5EDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
-  if (var == "TIMEZONE_SELECTED_CST")
-    return timezone == "CST6CDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
-  if (var == "TIMEZONE_SELECTED_MST")
-    return timezone == "MST7MDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
-  if (var == "TIMEZONE_SELECTED_PST")
-    return timezone == "PST8PDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
-  if (var == "TIMEZONE_SELECTED_AZ")
-    return timezone == "MST7" ? "selected" : "";
-  if (var == "TIMEZONE_SELECTED_AK")
-    return timezone == "AKST9AKDT,M3.2.0/2:00,M11.1.0/2:00" ? "selected" : "";
-  if (var == "TIMEZONE_SELECTED_HI")
-    return timezone == "HST10" ? "selected" : "";
+  for (const auto &tz : timezones)
+  {
+    if (var == tz.placeholder)
+    {
+      return timezone == tz.posixString ? "selected" : "";
+    }
+  }
   return String();
 }
