@@ -886,15 +886,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       let saveGeneralTimeout;
       let saveDisplayTimeout;
 
-      function debounce(func, delay) {
-        let timeout;
-        return function(...args) {
-          const context = this;
-          clearTimeout(timeout);
-          timeout = setTimeout(() => func.apply(context, args), delay);
-        };
-      }
-
       const BRIGHTNESS_MIN = 10;
       const BRIGHTNESS_MAX = 255;
 
@@ -934,27 +925,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         ERROR: '<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">Error</span>',
       };
 
-      /**
-       * Disables or enables all interactive elements on the page to prevent
-       * race conditions during save or reset operations.
-       * @param {boolean} isBusy - True to disable inputs, false to enable.
-       */
-      function setUIBusy(isBusy) {
-        // Disable/enable all inputs in the general settings form
-        settingsForm.querySelectorAll('input, button, select').forEach(el => {
-          el.disabled = isBusy;
-        });
-
-        // Disable/enable all inputs in the display settings form
-        displaySettingsForm.querySelectorAll('input, button, select').forEach(el => {
-          el.disabled = isBusy;
-        });
-
-        // Disable/enable the reset buttons
-        resetGeneralBtn.disabled = isBusy;
-        resetColorsBtn.disabled = isBusy;
-      }
-
       function setStatus(status) {
         statusEl.innerHTML = status;
       }
@@ -982,10 +952,10 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         return `${h - 12} PM`;
       }
 
-      function handleGeneralInputChange() {
+      function handleGeneralInputChange(event) {
         clearTimeout(saveGeneralTimeout);
         setStatus(STATUS_INDICATORS.UNSAVED);
-        saveGeneralTimeout = setTimeout(saveGeneralSettings, 50);
+        saveGeneralTimeout = setTimeout(() => saveGeneralSettings(event), 100);
       }
 
       function handleDisplayInputChange() {
@@ -1090,11 +1060,10 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         }
       }
 
-      async function saveGeneralSettings() {
+      async function saveGeneralSettings(event) {
         clearTimeout(saveGeneralTimeout); // Clear pending saves
         clearTimeout(saveDisplayTimeout);
         setStatus(STATUS_INDICATORS.SAVING);
-        setUIBusy(true); // Disable UI
 
         const settings = {
           autoBrightness: autoBrightnessEl.checked,
@@ -1128,15 +1097,16 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           });
           if (!saveSettingsResponse.ok) throw new Error('Failed to save general settings');
 
-          await fetchGeneralSettings(); // Re-fetch to get new state (like actualBrightness)
+          const target = event ? event.target : null;
+          if (!target || (target.id !== 'temp-correction' && target.type !== 'range')) {
+            await fetchGeneralSettings(); // Re-fetch to get new state (like actualBrightness)
+          }
           setStatus(STATUS_INDICATORS.SAVED);
           
         } catch (e) {
           console.error(e);
           setStatus(STATUS_INDICATORS.ERROR);
           // Removed setTimeout that reverted to UNSAVED
-        } finally {
-          setUIBusy(false); // Re-enable UI
         }
       }
 
@@ -1144,7 +1114,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         clearTimeout(saveGeneralTimeout); // Clear pending saves
         clearTimeout(saveDisplayTimeout);
         setStatus(STATUS_INDICATORS.SAVING);
-        setUIBusy(true); // Disable UI
 
         const displaySettings = {};
         colorPickers.forEach(picker => {
@@ -1167,8 +1136,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           console.error(e);
           setStatus(STATUS_INDICATORS.ERROR);
           // Removed setTimeout that reverted to UNSAVED
-        } finally {
-          setUIBusy(false); // Re-enable UI
         }
       }
       
@@ -1230,16 +1197,14 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
       
-      const debouncedSave = debounce(handleGeneralInputChange, 1000);
-
       // Use 'input' for sliders for real-time feedback, and 'change' for other inputs
       settingsForm.addEventListener('input', (e) => {
         // For sliders and the temp correction, save with a debounce
         if (e.target.type === 'range' || e.target.id === 'temp-correction') {
-          debouncedSave();
+          handleGeneralInputChange(e);
         }
       });
-      settingsForm.addEventListener('change', handleGeneralInputChange);
+      settingsForm.addEventListener('change', (e) => handleGeneralInputChange(e));
       displaySettingsForm.addEventListener('change', handleDisplayInputChange);
       
       document.addEventListener("DOMContentLoaded", () => {
@@ -1254,7 +1219,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           clearTimeout(saveGeneralTimeout); // Clear pending saves
           clearTimeout(saveDisplayTimeout);
           setStatus(STATUS_INDICATORS.SAVING);
-          setUIBusy(true); // Disable UI
 
           try {
             const response = await fetch('/api/display/reset', { method: 'POST' });
@@ -1267,8 +1231,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           } catch (e) {
             console.error(e);
             setStatus(STATUS_INDICATORS.ERROR);
-          } finally {
-            setUIBusy(false); // Re-enable UI
           }
         }
       });
@@ -1278,7 +1240,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           clearTimeout(saveGeneralTimeout); // Clear pending saves
           clearTimeout(saveDisplayTimeout);
           setStatus(STATUS_INDICATORS.SAVING);
-          setUIBusy(true); // Disable UI
 
           try {
             const response = await fetch('/api/settings/reset', { method: 'POST' });
@@ -1291,8 +1252,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           } catch (e) {
             console.error(e);
             setStatus(STATUS_INDICATORS.ERROR);
-          } finally {
-            setUIBusy(false); // Re-enable UI
           }
         }
       });
