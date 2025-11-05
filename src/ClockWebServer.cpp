@@ -21,6 +21,7 @@
 #include "UpdateManager.h"
 #include "SerialLog.h"
 #include "NtpSync.h"
+#include "AlarmManager.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -166,7 +167,14 @@ void ClockWebServer::begin()
             if (id >= 0 && id < config.getNumAlarms()) {
               // Get the existing alarm to preserve its snooze state
               Alarm alarm = config.getAlarm(id);
-              alarm.setEnabled(alarmObj["enabled"] | false);
+              bool isEnabled = alarmObj["enabled"] | false;
+              
+              // If the alarm is being disabled and it's the one currently ringing, stop it.
+              if (!isEnabled && alarm.isEnabled() && AlarmManager::getInstance().isRinging() && AlarmManager::getInstance().getActiveAlarmId() == id) {
+                AlarmManager::getInstance().stop();
+              }
+
+              alarm.setEnabled(isEnabled);
               alarm.setHour(alarmObj["hour"] | 6);
               alarm.setMinute(alarmObj["minute"] | 0);
               alarm.setDays(alarmObj["days"] | 0);
