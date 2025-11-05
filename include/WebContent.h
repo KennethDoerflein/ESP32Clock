@@ -740,12 +740,12 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                       <span>Day Brightness</span>
                       <span id="day-brightness-value">%DAY_BRIGHTNESS_VALUE%</span>
                     </label>
-                    <input type="range" class="form-range" id="day-brightness" name="dayBrightness" min="10" max="255" value="%DAY_BRIGHTNESS%" />
+                    <input type="range" class="form-range" id="day-brightness" name="dayBrightness" min="%BRIGHTNESS_MIN%" max="%BRIGHTNESS_MAX%" value="%DAY_BRIGHTNESS%" />
                     <label for="night-brightness" class="form-label d-flex justify-content-between mt-2">
                       <span>Night Brightness</span>
                       <span id="night-brightness-value">%NIGHT_BRIGHTNESS_VALUE%</span>
                     </label>
-                    <input type="range" class="form-range" id="night-brightness" name="nightBrightness" min="10" max="255" value="%NIGHT_BRIGHTNESS%" />
+                    <input type="range" class="form-range" id="night-brightness" name="nightBrightness" min="%BRIGHTNESS_MIN%" max="%BRIGHTNESS_MAX%" value="%NIGHT_BRIGHTNESS%" />
                   </div>
                 </div>
                 <div id="manual-brightness-section" class="mb-3 p-3 border rounded %MANUAL_BRIGHTNESS_CLASS%">
@@ -753,7 +753,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                     <span title="Set the display brightness manually.">Manual Brightness</span>
                     <span id="brightness-value">%BRIGHTNESS_VALUE%</span>
                   </label>
-                  <input type="range" class="form-range" id="brightness" name="brightness" min="10" max="255" title="Adjust the manual brightness level." value="%BRIGHTNESS%" />
+                  <input type="range" class="form-range" id="brightness" name="brightness" min="%BRIGHTNESS_MIN%" max="%BRIGHTNESS_MAX%" title="Adjust the manual brightness level." value="%BRIGHTNESS%" />
                 </div>
                 <div class="mb-3 p-3 border rounded">
                   <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
@@ -886,8 +886,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       let saveGeneralTimeout;
       let saveDisplayTimeout;
 
-      const BRIGHTNESS_MIN = 10;
-      const BRIGHTNESS_MAX = 255;
+      const BRIGHTNESS_MIN = %BRIGHTNESS_MIN%;
+      const BRIGHTNESS_MAX = %BRIGHTNESS_MAX%;
 
       const statusEl = document.querySelector(".status-indicator");
       const settingsForm = document.getElementById("settings-form");
@@ -972,6 +972,13 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         } else {
           manualBrightnessSectionEl.classList.remove('d-none');
           autoBrightnessControlsEl.classList.add('d-none');
+          fetch('/api/settings')
+            .then(response => response.json())
+            .then(settings => {
+              brightnessEl.value = settings.actualBrightness;
+              brightnessValueEl.textContent = toPercent(settings.actualBrightness);
+            })
+            .catch(e => console.error('Failed to sync brightness slider:', e));
         }
       }
 

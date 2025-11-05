@@ -56,4 +56,8 @@
 #define ALARM_ICON_WIDTH 18           ///< Width of the alarm indicator icon's bounding box.
 #define ALARM_ICON_HEIGHT 18          ///< Height of the alarm indicator icon's bounding box.
 
+// --- Brightness Constants ---
+const int BRIGHTNESS_MIN = 10;
+const int BRIGHTNESS_MAX = 255;
+
 #endif // CONSTANTS_H
