@@ -22,6 +22,7 @@
 #include "SerialLog.h"
 #include "NtpSync.h"
 #include "AlarmManager.h"
+#include "Constants.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -702,8 +703,6 @@ void ClockWebServer::onCaptivePortalRedirect(AsyncWebServerRequest *request)
  */
 String brightnessToPercent(int brightness)
 {
-  const int BRIGHTNESS_MIN = 10;
-  const int BRIGHTNESS_MAX = 255;
   // Clamp the value to the allowed range
   brightness = max(BRIGHTNESS_MIN, min(BRIGHTNESS_MAX, brightness));
   // Map the value to a percentage
@@ -845,6 +844,10 @@ String ClockWebServer::settingsProcessor(const String &var)
     return value;
   }
 
+  if (var == "BRIGHTNESS_MIN")
+    return String(BRIGHTNESS_MIN);
+  if (var == "BRIGHTNESS_MAX")
+    return String(BRIGHTNESS_MAX);
   if (var == "AUTO_BRIGHTNESS_CHECKED")
     return config.isAutoBrightness() ? "checked" : "";
   if (var == "AUTO_BRIGHTNESS_START_HOUR")
