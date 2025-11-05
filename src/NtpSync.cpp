@@ -44,8 +44,10 @@ static unsigned long currentRetryDelay = 0;
  * @details This helper function converts the tm struct, compensates for delay,
  * adjusts the RTC, and prints a success message.
  * @param timeinfo The tm struct populated by a successful NTP call.
+ * @param rtt The round-trip time of the NTP request in milliseconds.
+ * @param reception_time The value of `millis()` when the NTP response was received.
  */
-static void _processSuccessfulNtpSync(const struct tm &timeinfo)
+static void _processSuccessfulNtpSync(const struct tm &timeinfo, uint32_t rtt, uint32_t reception_time)
 {
   // Convert the C `tm` struct to an `RTClib::DateTime` object.
   DateTime receivedTime(
@@ -56,21 +58,40 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
       timeinfo.tm_min,
       timeinfo.tm_sec);
 
-  // Compensate for potential network and processing delays.
-  TimeSpan compensation(1); // 1 second
-  DateTime adjustedTime = receivedTime + compensation;
+  // Compensate for 1/2 RTT
+  uint32_t compensation_ms = rtt / 2;
+  SerialLog::getInstance().printf("NTP RTT: %u ms, compensation: %u ms\n", rtt, compensation_ms);
+
+  // Calculate future time to set
+  // We add +2 seconds: +1 to round up to the next second, and another +1
+  // to compensate for the fact that the NTP library seems to return the time
+  // for the *previous* second.
+  uint16_t ms_into_second = compensation_ms % 1000;
+  uint16_t seconds_to_add = (compensation_ms / 1000) + 2;
+  DateTime time_to_set = receivedTime + TimeSpan(seconds_to_add);
+
+  // Calculate how long to wait to align with the start of the next second
+  uint16_t delay_until_next_second_ms = 1000 - ms_into_second;
+  uint32_t target_millis = reception_time + delay_until_next_second_ms;
+
+  // Busy-wait for the precise moment
+  while (millis() < target_millis)
+  {
+    // Actively wait
+  }
+
   // Update the hardware RTC with the adjusted time.
-  RTC.adjust(adjustedTime);
+  RTC.adjust(time_to_set);
 
   SerialLog::getInstance().print("RTC synchronized with NTP time (compensated): ");
   char timeStr[20];
   sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
-          adjustedTime.year(),
-          adjustedTime.month(),
-          adjustedTime.day(),
-          adjustedTime.hour(),
-          adjustedTime.minute(),
-          adjustedTime.second());
+          time_to_set.year(),
+          time_to_set.month(),
+          time_to_set.day(),
+          time_to_set.hour(),
+          time_to_set.minute(),
+          time_to_set.second());
   SerialLog::getInstance().printf("%s\n", timeStr);
 }
 
@@ -127,9 +148,11 @@ NtpSyncState updateNtpSync()
 
   struct tm timeinfo;
   // Pass the struct directly as the function expects a reference
+  uint32_t start = millis();
   if (getNTPData(timeinfo))
   {
-    _processSuccessfulNtpSync(timeinfo);
+    uint32_t end = millis();
+    _processSuccessfulNtpSync(timeinfo, end - start, end);
     ntpState = NTP_SYNC_SUCCESS; // Update state to success
     return ntpState;
   }
@@ -170,9 +193,11 @@ bool syncTime()
   {
     SerialLog::getInstance().printf("Fetching NTP time (Attempt %d/%d)...\n", i, maxRetries);
 
+    uint32_t start = millis();
     if (getNTPData(timeinfo))
     {
-      _processSuccessfulNtpSync(timeinfo);
+      uint32_t end = millis();
+      _processSuccessfulNtpSync(timeinfo, end - start, end);
       return true;
     }
 
