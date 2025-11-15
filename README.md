@@ -1,11 +1,12 @@
 # ESP32-S3 WiFi Clock
 
-This repository contains the firmware for a feature-rich, Wi-Fi connected smart clock powered by an ESP32-S3 microcontroller. It features a large 3.5" color TFT display, a web-based interface for easy configuration, automatic time synchronization, and environmental sensing.
+This repository contains the firmware for a feature-rich, Wi-Fi connected smart clock powered by an ESP32-S3 microcontroller. It features a large 4" color IPS display, a web-based interface for easy configuration, automatic time synchronization, and environmental sensing.
 
 ## Table of Contents
 
 - [Features](#features)
 - [Hardware Requirements](#hardware-requirements)
+- [Assembly](#assembly)
 - [Wiring](#wiring)
 - [Software Setup](#software-setup)
 - [Software Architecture](#software-architecture)
@@ -19,7 +20,7 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 
 ## Features (V1.0.0)
 
-- **Large Color Display**: A 3.5" 480x320 color TFT display provides a clear and vibrant user interface, showing time, date, day of the week, temperature, and humidity.
+- **Large Color Display**: A 4" 480x320 color IPS display provides a clear and vibrant user interface, showing time, date, day of the week, temperature, and humidity.
 - **Web-Based Configuration**: A mobile-friendly web UI allows for easy setup and configuration without needing to re-flash the firmware.
 - **Customizable UI**: Change display colors, flip the screen orientation, and toggle between 12/24-hour format and Celsius/Fahrenheit from the web interface.
 - **WiFi & AP Mode**: Connects to your local WiFi network or starts its own Access Point (`Clock-Setup`) if credentials are not set.
@@ -40,39 +41,109 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 | Component           | Description                                                          |
 | ------------------- | -------------------------------------------------------------------- |
 | **Microcontroller** | **ESP32-S3-WROOM-1 N16R8** Development Board (16MB Flash, 8MB PSRAM) |
-| **Display**         | **3.5" ILI9488 TFT LCD** Display Module (480x320) with SPI interface |
+| **Display**         | **4" ILI9488 IPS LCD** Display Module (480x320) with SPI interface   |
 | **Real-Time Clock** | **DS3231** RTC Module with a LIR2032 battery for backup              |
 | **Sensor**          | **BME280** Temperature, Humidity, and Pressure Sensor Module (I2C)   |
 | **Power Supply**    | A reliable 5V USB-C power supply                                     |
 
-## 3D Models and Assembly
+## Case 3D Model
 
-A parts list, 3D models for the case, and assembly instructions are coming soon.
+[Download](./case%20model/ESP32%20Clock%20Case%204%20inch%20v18.step)
+
+## Parts List
+
+Here is a list of all the components required to build the ESP32-S3 WiFi Clock, along with purchase links:
+
+| Component                                                           | Description                          | Link                                                 |
+| ------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
+| **ESP32-S3-WROOM-1 Development Board**                              | 16MB Flash, 8MB PSRAM                | [AliExpress Link](https://a.aliexpress.com/_mMm2jWD) |
+| **4" ILI9488 IPS LCD Display**                                      | 480×320 SPI interface                | [AliExpress Link](https://a.aliexpress.com/_mt2vtEh) |
+| **DS3231 RTC Module**                                               | With LIR2032 battery backup          | [AliExpress Link](https://a.aliexpress.com/_mPeDmLR) |
+| **BME280 Sensor Module**                                            | Temperature, Humidity, Pressure, I2C | [AliExpress Link](https://a.aliexpress.com/_mtACD9f) |
+| **Active Buzzer**                                                   | Any small 5V buzzer                  | [AliExpress Link](https://a.aliexpress.com/_mKjibtR) |
+| **6x6x7.2mm Micro Switch**                                          | For Snooze/Stop functionality        | can source locally                                   |
+| **USB-C Inlet**                                                     | For powering the clock               | [AliExpress Link](https://a.aliexpress.com/_msBRQoD) |
+| **5V USB-C Power Supply**                                           | Reliable 5V power source             | can source locally                                   |
+| **Male Machine Pin Headers**                                        | For connecting modules to boards     | [AliExpress Link](https://a.aliexpress.com/_mPmIdmp) |
+| **DuPont Wires (Male-to-Male / Female-to-Male / Female-to-Female)** | For connections between headers      | [AliExpress Link](https://a.aliexpress.com/_mLxGsFP) |
+| **DuPont Wire Kit (Headers + Housing)**                             | 310 pcs set for custom connections   | [AliExpress Link](https://a.aliexpress.com/_msXyJap) |
+| **Prototype Boards / Perfboards**                                   | For mounting modules                 | can source locally                                   |
+| **Heat-Set Inserts**                                                | For case assembly                    | can source locally                                   |
+| **Screws (M2)**                                                     | For case and module mounting         | [AliExpress Link](https://a.aliexpress.com/_mtl7Jwt) |
+
+## Assembly
+
+Follow these steps to assemble the ESP32-S3 WiFi Clock:
+
+1. **Flash Firmware**  
+   Flash the initial firmware to the ESP32-S3 before starting physical assembly.
+
+2. **Prepare Headers**
+
+   - Replace the existing headers on the display and RTC modules with male machine pin headers.
+   - Solder a male dupont header onto the BME280 sensor.
+
+3. **Connect Display**
+
+   - Solder the display header to the prototype board.
+   - Route the wires carefully to the opposite side for easy access.  
+     ![](./images/IMG_7754.JPG) ![](./images/IMG_7755.JPG)
+
+4. **Solder Remaining Headers**
+
+   - Connect all other headers and wires.
+   - Keep wires slightly longer in case adjustments are needed.  
+     ![](./images/IMG_7760.JPG) ![](./images/IMG_7761.JPG)
+
+5. **Fit Components**
+
+   - Ensure the modules fit inside the case.
+   - Sand the sides of the RTC if space is tight.  
+     ![](./images/IMG_7762.JPG)
+
+6. **Install Heat-Set Inserts**
+
+   - Insert into the back panel of the case for M2 screws (sizes: 3×3.2mm and 2×4mm).  
+     ![](./images/IMG_7769.JPG) ![](./images/IMG_7770.JPG) ![](./images/IMG_7771.JPG)
+
+7. **Install Front Panel Inserts**
+
+   - Install inserts for the display (M2) and posts (M3).
+
+8. **Assemble Components**
+
+   - Plug in all connectors.
+   - Secure the display, RTC, and sensors with the appropriate screws.  
+     ![](./images/IMG_7775.JPG) ![](./images/IMG_7772.JPG) ![](./images/IMG_7774.JPG) ![](./images/IMG_7776.JPG)
+
+9. **Close Case and Power On**
+   - Screw the case together and connect power.  
+     ![](./images/IMG_7778.JPG)
 
 ## Wiring
 
 The components are connected using the I2C and SPI buses.
 
-| Component                  | Pin       | ESP32-S3 GPIO | Notes                 |
-| -------------------------- | --------- | ------------- | --------------------- |
-| **3.5" ILI9488 TFT (SPI)** | VCC       | 3.3V          | Connect to 3.3V pin   |
-|                            | GND       | GND           | Common ground         |
-|                            | CS        | GPIO 10       | Chip Select           |
-|                            | RST       | GPIO 11       | Reset                 |
-|                            | DC        | GPIO 12       | Data/Command          |
-|                            | MOSI      | GPIO 13       | Data In               |
-|                            | SCK       | GPIO 14       | Clock                 |
-|                            | LED       | GPIO 6        | Backlight (PWM)       |
-|                            | MISO      | UNUSED        | Data Out              |
-| **DS3231 & BME280 (I2C)**  | VCC       | 3.3V          | Shared 3.3V           |
-|                            | GND       | GND           | Shared ground         |
-|                            | SDA       | GPIO 8        | Shared data line      |
-|                            | SCL       | GPIO 9        | Shared clock line     |
-| DS3231                     | SQW       | GPIO 2        | Interrupt for alarms  |
-| **Active Buzzer**          | +         | GPIO 4        | Any free GPIO         |
-|                            | -         | GND           | Common ground         |
-| **Stop/Snooze Button**     | One leg   | GPIO 5        | Use INPUT_PULLUP mode |
-|                            | Other leg | GND           | Common ground         |
+| Component                 | Pin       | ESP32-S3 GPIO | Notes                 |
+| ------------------------- | --------- | ------------- | --------------------- |
+| **4" ILI9488 IPS (SPI)**  | VCC       | 3.3V          | Connect to 3.3V pin   |
+|                           | GND       | GND           | Common ground         |
+|                           | CS        | GPIO 10       | Chip Select           |
+|                           | RST       | GPIO 11       | Reset                 |
+|                           | DC        | GPIO 12       | Data/Command          |
+|                           | MOSI      | GPIO 13       | Data In               |
+|                           | SCK       | GPIO 14       | Clock                 |
+|                           | LED       | GPIO 6        | Backlight (PWM)       |
+|                           | MISO      | UNUSED        | Data Out              |
+| **DS3231 & BME280 (I2C)** | VCC       | 3.3V          | Shared 3.3V           |
+|                           | GND       | GND           | Shared ground         |
+|                           | SDA       | GPIO 8        | Shared data line      |
+|                           | SCL       | GPIO 9        | Shared clock line     |
+| DS3231                    | SQW       | GPIO 2        | Interrupt for alarms  |
+| **Active Buzzer**         | +         | GPIO 4        | Any free GPIO         |
+|                           | -         | GND           | Common ground         |
+| **Stop/Snooze Button**    | One leg   | GPIO 5        | Use INPUT_PULLUP mode |
+|                           | Other leg | GND           | Common ground         |
 
 ## Software Setup
 
