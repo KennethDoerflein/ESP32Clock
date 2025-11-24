@@ -42,6 +42,7 @@ static constexpr bool DEFAULT_INVERT_COLORS = false;
 static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
 static constexpr bool DEFAULT_TEMP_CORRECTION_ENABLED = true;
 static constexpr float DEFAULT_TEMP_CORRECTION = 0.0;
+static constexpr bool DEFAULT_IS_DST = false;
 static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
 static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
 
@@ -221,6 +222,12 @@ public:
    */
   bool isTempCorrectionEnabled() const { return tempCorrectionEnabled; }
 
+  /**
+   * @brief Checks if Daylight Saving Time is currently active.
+   * @return True if DST is active, false otherwise.
+   */
+  bool isDST() const { return isDst; }
+
   // Display Colors
 
   /**
@@ -386,6 +393,20 @@ public:
     if (tempCorrection != value)
     {
       tempCorrection = value;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Sets the Daylight Saving Time status.
+   * @param active True if DST is active, false otherwise.
+   */
+  void setDST(bool active)
+  {
+    if (isDst != active)
+    {
+      isDst = active;
       _isDirty = true;
       scheduleSave();
     }
@@ -839,6 +860,7 @@ private:
   String timezone = DEFAULT_TIMEZONE;
   bool tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
   float tempCorrection = DEFAULT_TEMP_CORRECTION;
+  bool isDst = DEFAULT_IS_DST;
   uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
   uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;
 

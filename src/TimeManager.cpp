@@ -107,6 +107,8 @@ bool TimeManager::update()
   SerialLog::getInstance().print("TimeManager: Tick\n");
 #endif
   // Perform routine checks, like the daily time sync.
+  checkDST();
+
 #ifdef USE_RTC_ALARMS
   if (!_rtc_alarms_initialized)
   {
@@ -432,6 +434,47 @@ void TimeManager::checkDriftAndResync()
   {
     SerialLog::getInstance().print("Drift exceeds threshold. Triggering NTP resync...\n");
     startNtpSync();
+  }
+}
+
+void TimeManager::checkDST()
+{
+  // Get current DST state from config
+  bool currentDstState = ConfigManager::getInstance().isDST();
+
+  DateTime now = RTC.now();
+  struct tm t;
+  t.tm_year = now.year() - 1900;
+  t.tm_mon = now.month() - 1;
+  t.tm_mday = now.day();
+  t.tm_hour = now.hour();
+  t.tm_min = now.minute();
+  t.tm_sec = now.second();
+
+  // Force mktime to use the LAST KNOWN DST state.
+  // This allows it to detect invalid times (Spring Forward gap)
+  // or ambiguous times (Fall Back overlap) correctly based on where we came from.
+  t.tm_isdst = currentDstState ? 1 : 0;
+
+  mktime(&t); // This normalizes 't' and updates tm_isdst
+
+  bool newDstState = t.tm_isdst > 0;
+
+  if (newDstState != currentDstState)
+  {
+    SerialLog::getInstance().printf("DST Transition Detected: %d -> %d\n", currentDstState, newDstState);
+    ConfigManager::getInstance().setDST(newDstState);
+
+    // Check if the time has shifted (which it should have)
+    // We compare the normalized 't' with the original 'now'.
+    // Note: t contains the corrected time.
+    DateTime correctedTime(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+
+    if (correctedTime.hour() != now.hour() || correctedTime.minute() != now.minute())
+    {
+      SerialLog::getInstance().print("Adjusting RTC for DST...\n");
+      RTC.adjust(correctedTime);
+    }
   }
 }
 

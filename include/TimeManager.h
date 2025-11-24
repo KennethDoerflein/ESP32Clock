@@ -141,6 +141,11 @@ public:
    */
   void checkDriftAndResync();
 
+  /**
+   * @brief Checks for DST transitions and updates the RTC if needed.
+   */
+  void checkDST();
+
 #ifdef USE_RTC_ALARMS
   /**
    * @brief Processes the alarm event outside of the ISR.
