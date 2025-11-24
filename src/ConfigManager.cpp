@@ -84,6 +84,7 @@ void ConfigManager::setDefaults()
   timezone = DEFAULT_TIMEZONE;
   setenv("TZ", timezone.c_str(), 1);
   tzset();
+  isDst = DEFAULT_IS_DST;
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
   tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
@@ -153,6 +154,7 @@ void ConfigManager::load()
   timezone = _preferences.getString("timezone", DEFAULT_TIMEZONE);
   setenv("TZ", timezone.c_str(), 1);
   tzset();
+  isDst = _preferences.getBool("isDst", DEFAULT_IS_DST);
   snoozeDuration = _preferences.getUChar("snoozeDur", DEFAULT_SNOOZE_DURATION);
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
   tempCorrectionEnabled = _preferences.getBool("tempCorrEn", DEFAULT_TEMP_CORRECTION_ENABLED);
@@ -243,6 +245,7 @@ bool ConfigManager::save()
   _preferences.putBool("screenFlip", screenFlipped);
   _preferences.putBool("invertColors", invertColors);
   _preferences.putString("timezone", timezone);
+  _preferences.putBool("isDst", isDst);
   _preferences.putUChar("snoozeDur", snoozeDuration);
   _preferences.putUChar("dismissDur", dismissDuration);
   _preferences.putBool("tempCorrEn", tempCorrectionEnabled);
@@ -457,6 +460,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
   invertColors = DEFAULT_INVERT_COLORS;
   timezone = DEFAULT_TIMEZONE;
+  isDst = DEFAULT_IS_DST;
   tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
   tempCorrection = DEFAULT_TEMP_CORRECTION;
 

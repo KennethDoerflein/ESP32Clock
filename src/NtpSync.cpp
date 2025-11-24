@@ -83,6 +83,9 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo, uint32_t rtt, u
   // Update the hardware RTC with the adjusted time.
   RTC.adjust(time_to_set);
 
+  // Update DST status in configuration
+  ConfigManager::getInstance().setDST(timeinfo.tm_isdst > 0);
+
   SerialLog::getInstance().print("RTC synchronized with NTP time (compensated): ");
   char timeStr[20];
   sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
