@@ -141,7 +141,7 @@ void TimeManager::syncWithNTP()
  * This should be called in the main loop. It checks the status of the
  * ongoing NTP sync and, upon success, updates the last sync date.
  */
-void TimeManager::updateNtp()
+bool TimeManager::updateNtp()
 {
   NtpSyncState state = updateNtpSync();
   if (state == NTP_SYNC_SUCCESS)
@@ -152,12 +152,14 @@ void TimeManager::updateNtp()
     lastSyncDate = ymd;
     SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
     resetNtpSync();
+    return true;
   }
   else if (state == NTP_SYNC_FAILED)
   {
     SerialLog::getInstance().print("TimeManager: NTP sync failed.\n");
     resetNtpSync();
   }
+  return false;
 }
 
 /**
