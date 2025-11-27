@@ -60,8 +60,9 @@ public:
    * @brief Drives the non-blocking NTP state machine.
    * @details This should be called in the main application loop to handle
    * ongoing asynchronous NTP synchronization attempts.
+   * @return true if the time was updated during this call.
    */
-  void updateNtp();
+  bool updateNtp();
 
   /**
    * @brief Gets the current time, formatted for display.

@@ -569,7 +569,10 @@ void loop()
   if (WiFiManager::getInstance().isConnected())
   {
     // Only attempt to sync time with the internet if connected.
-    timeManager.updateNtp();
+    if (timeManager.updateNtp())
+    {
+      displayManager.update();
+    }
     timeManager.checkDailySync();
     timeManager.checkDriftAndResync();
   }
