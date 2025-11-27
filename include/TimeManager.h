@@ -44,13 +44,6 @@ public:
   bool update();
 
   /**
-   * @brief Checks all active alarms to see if any should be triggered.
-   *
-   * This should be called frequently from the main loop.
-   */
-  void checkAlarms();
-
-  /**
    * @brief Checks all alarms to see if any snoozed alarms should be re-triggered.
    */
   void updateSnoozeStates();
@@ -146,7 +139,6 @@ public:
    */
   void checkDST();
 
-#ifdef USE_RTC_ALARMS
   /**
    * @brief Processes the alarm event outside of the ISR.
    */
@@ -162,7 +154,6 @@ public:
    * @note This is intended to be called once at boot.
    */
   void checkMissedAlarms();
-#endif
 
 private:
   /**
@@ -182,9 +173,6 @@ private:
   /// @brief Timestamp of the last drift check.
   unsigned long lastDriftCheck = 0;
 
-  uint32_t _lastTimeChecked = 0; ///< Stores the Unix timestamp of the last alarm check.
-
-#ifdef USE_RTC_ALARMS
   bool _rtc_alarms_initialized = false;
   int8_t _rtcAlarm1Id = -1; ///< The ID of the alarm associated with RTC alarm 1.
   int8_t _rtcAlarm2Id = -1; ///< The ID of the alarm associated with RTC alarm 2.
@@ -193,5 +181,4 @@ private:
    * @brief Clears both hardware alarms on the RTC.
    */
   void clearRtcAlarms();
-#endif
 };
