@@ -35,9 +35,7 @@
 #include "version.h.default"
 #endif
 
-#ifdef USE_RTC_ALARMS
 volatile bool g_alarm_triggered = false;
-#endif
 
 // --- Global Variables for Timers & Button Handling ---
 unsigned long g_lastLoopTime = 0;
@@ -111,13 +109,11 @@ void updateAlarmState()
   }
 }
 
-#ifdef USE_RTC_ALARMS
 // --- RTC Alarm ISR ---
 void IRAM_ATTR onAlarm()
 {
   g_alarm_triggered = true;
 }
-#endif
 
 /**
  * @brief Triggers a factory reset, logs the source, and reboots the device.
@@ -234,12 +230,10 @@ void setup()
   logger.print("Initializing Snooze Button...\n");
   snoozeButton.begin();
 
-#ifdef USE_RTC_ALARMS
   // Initialize the RTC alarm interrupt
   logger.print("Initializing RTC Interrupt...\n");
   pinMode(RTC_INT_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(RTC_INT_PIN), onAlarm, FALLING);
-#endif
 
   // Initialize the Alarm Manager
   logger.print("Initializing AlarmManager...\n");
@@ -367,15 +361,11 @@ void loop()
   config.loop();
   alarmManager.update();
   bool timeUpdated = timeManager.update(); // Updates time from the RTC
-#ifdef USE_RTC_ALARMS
   if (g_alarm_triggered)
   {
     g_alarm_triggered = false;
     timeManager.handleAlarm();
   }
-#else
-  timeManager.checkAlarms();
-#endif
   timeManager.updateSnoozeStates();
   display.updateBrightness();
   handleSensorUpdates();
@@ -390,9 +380,7 @@ void loop()
   if (config.isDirty())
   {
     displayManager.refresh();
-#ifdef USE_RTC_ALARMS
     timeManager.setNextAlarms();
-#endif
     config.clearDirtyFlag();
     SerialLog::getInstance().print("Settings changed, refreshing display.\n");
     // Re-evaluate snooze state and update display

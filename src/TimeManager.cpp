@@ -16,7 +16,6 @@
 #include "AlarmManager.h"
 #include "SerialLog.h"
 
-#ifdef USE_RTC_ALARMS
 #include <vector>
 #include <algorithm>
 
@@ -67,7 +66,6 @@ DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
 
   return DateTime(); // No valid ring time found
 }
-#endif
 
 /**
  * @brief Initializes the TimeManager.
@@ -109,7 +107,6 @@ bool TimeManager::update()
   // Perform routine checks, like the daily time sync.
   checkDST();
 
-#ifdef USE_RTC_ALARMS
   if (!_rtc_alarms_initialized)
   {
     // On the first run, check if any alarms were missed while the device was off.
@@ -118,7 +115,6 @@ bool TimeManager::update()
     setNextAlarms();
     _rtc_alarms_initialized = true;
   }
-#endif
   return true; // An update occurred.
 }
 
@@ -300,97 +296,6 @@ void TimeManager::checkDailySync()
   }
 }
 
-#ifndef USE_RTC_ALARMS
-/**
- * @brief Software-based alarm checking.
- *
- * This function iterates through all enabled alarms and checks if they should
- * have rung between the last check and the current time. This is a robust
- * way to catch alarms that might have been missed if the main loop was delayed.
- */
-void TimeManager::checkAlarms()
-{
-  // If an alarm is already ringing, there's no need to check for others.
-  if (AlarmManager::getInstance().isRinging())
-  {
-    return;
-  }
-
-  DateTime now = RTC.now();
-  uint32_t nowSeconds = now.unixtime();
-
-  // If this is the first run, we want to check for past alarms, but not
-  // so far in the past that we trigger alarms from days ago. We'll start
-  // our check from the current time, and the logic below will cap the
-  // look-behind period at half an hour.
-  uint32_t lastCheckSeconds = _lastTimeChecked;
-
-  // If time has not advanced or went backwards, do nothing.
-  if (nowSeconds <= lastCheckSeconds)
-  {
-    _lastTimeChecked = nowSeconds; // Keep track of potential time jumps
-    return;
-  }
-
-  // To prevent a huge loop if the device was off, cap the catch-up time.
-  // 0.5 hour should be more than enough to cover any reasonable NTP sync delay.
-  const uint32_t maxCatchUpSeconds = 30 * 60;
-
-  // On the first run after boot, _lastTimeChecked is 0.
-  // We set our check start point to half an hour ago to find any alarms we missed.
-  if (_lastTimeChecked == 0)
-  {
-    _lastTimeChecked = nowSeconds - maxCatchUpSeconds;
-  }
-
-  if (nowSeconds > lastCheckSeconds + maxCatchUpSeconds)
-  {
-    lastCheckSeconds = nowSeconds - maxCatchUpSeconds;
-  }
-
-  auto &config = ConfigManager::getInstance();
-  bool alarmJustTriggered = false;
-
-  // We iterate through each of the alarms first.
-  for (int i = 0; i < config.getNumAlarms(); ++i)
-  {
-    Alarm &alarm = config.getAlarm(i);
-
-    if (!alarm.isEnabled())
-    {
-      continue;
-    }
-
-    // Now, check every minute between the last check and the current time
-    // to see if this alarm should have rung.
-    // We start from the beginning of the *next* minute after the last check.
-    DateTime t = DateTime(lastCheckSeconds);
-    DateTime startTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute()) + TimeSpan(0, 0, 1, 0);
-
-    for (DateTime checkMinute = startTime; checkMinute <= now; checkMinute = checkMinute + TimeSpan(0, 0, 1, 0))
-    {
-      if (alarm.shouldRing(checkMinute))
-      {
-        AlarmManager::getInstance().trigger(alarm.getId());
-        alarmJustTriggered = true;
-
-        // Note: One-time alarms are dismissed by the user (long press)
-        // in main.cpp, not automatically. This allows them to be snoozed.
-        break; // Stop checking minutes for this alarm
-      }
-    }
-
-    if (alarmJustTriggered)
-    {
-      break; // Exit the main alarm loop
-    }
-  }
-
-  // Always update the last checked time to the current time.
-  _lastTimeChecked = nowSeconds;
-}
-#endif
-
 /**
  * @brief Periodically checks the RTC's drift against an NTP server.
  *
@@ -514,8 +419,6 @@ bool TimeManager::isTimeSet() const
   // the year.
   return !RTC.lostPower();
 }
-
-#ifdef USE_RTC_ALARMS
 
 void TimeManager::checkMissedAlarms()
 {
@@ -645,4 +548,3 @@ void TimeManager::setNextAlarms()
     SerialLog::getInstance().print(buf);
   }
 }
-#endif
