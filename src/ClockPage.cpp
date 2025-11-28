@@ -35,7 +35,7 @@
  */
 ClockPage::ClockPage(TFT_eSPI *tft)
     : _sprClock(tft), _sprDayOfWeek(tft), _sprDate(tft), _sprTemp(tft), _sprHumidity(tft), _sprTOD(tft), _sprSeconds(tft),
-      _alarmSprite(tft), _tft(tft)
+      _alarmSprite(tft), _sprNextAlarm1(tft), _sprNextAlarm2(tft), _tft(tft)
 {
   // Sprites are initialized in the member initializer list
 }
@@ -114,7 +114,6 @@ void ClockPage::render(TFT_eSPI &tft)
   DisplayData currentData;
   updateDisplayData(currentData);
 
-  updateAlarmSprite();
   if (currentData.seconds != _lastData.seconds)
   {
     drawSeconds(tft);
@@ -145,6 +144,31 @@ void ClockPage::render(TFT_eSPI &tft)
   {
     drawDayOfWeek(tft);
     _lastData.dayOfWeek = currentData.dayOfWeek;
+  }
+  if (currentData.nextAlarm1 != _lastData.nextAlarm1 || currentData.nextAlarm2 != _lastData.nextAlarm2)
+  {
+    drawNextAlarms(tft, currentData.nextAlarm1, currentData.nextAlarm2);
+    _lastData.nextAlarm1 = currentData.nextAlarm1;
+    _lastData.nextAlarm2 = currentData.nextAlarm2;
+  }
+
+  // Handle Alarm Sprite visibility
+  auto &alarmManager = AlarmManager::getInstance();
+  auto &config = ConfigManager::getInstance();
+  bool isAlarmActive = alarmManager.isRinging() || config.isAnyAlarmSnoozed();
+
+  if (isAlarmActive)
+  {
+    updateAlarmSprite();
+    _wasAlarmActive = true;
+  }
+  else if (_wasAlarmActive)
+  {
+    // Transitioned from active to inactive.
+    // Clear the alarm sprite area and force a redraw of the elements behind it (Next Alarms).
+    clearAlarmSprite();
+    drawNextAlarms(tft, currentData.nextAlarm1, currentData.nextAlarm2);
+    _wasAlarmActive = false;
   }
 }
 
@@ -202,12 +226,14 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   // --- Bottom Rows Layout (Date and Sensors) ---
   tft.loadFont(DSEG14ModernBold32);
   int fontHeight = tft.fontHeight();
-  _dateY = screenHeight - (fontHeight * 2 + MARGIN + 40);
-  _sensorY = screenHeight - (fontHeight + MARGIN + 10);
+  _alarmRowY = screenHeight - (fontHeight * 3 + MARGIN + 80);
+  _dateY = screenHeight - (fontHeight * 2 + MARGIN + 55);
+  _sensorY = screenHeight - (fontHeight + MARGIN + 20);
 
   // --- Alarm Sprite Layout ---
   _alarmSpriteX = (screenWidth - _alarmSprite.width()) / 2;
-  _alarmSpriteY = (screenHeight / 2) - (_alarmSprite.height() / 2);
+  // Position the alarm sprite in the middle of the sensor row (between Temp and Humidity)
+  _alarmSpriteY = _sensorY + (TEMP_SPRITE_HEIGHT - ALARM_SPRITE_HEIGHT) / 2;
 }
 
 /**
@@ -253,6 +279,14 @@ void ClockPage::setupSprites(TFT_eSPI &tft)
   _sprDate.loadFont(DSEG14ModernBold48);
   _sprDate.setTextDatum(MR_DATUM);
 
+  _sprNextAlarm1.createSprite(tft.width() / 2 - MARGIN, DAY_OF_WEEK_SPRITE_HEIGHT); // Reusing height
+  _sprNextAlarm1.loadFont(DSEG14ModernBold32);
+  _sprNextAlarm1.setTextDatum(ML_DATUM);
+
+  _sprNextAlarm2.createSprite(tft.width() / 2 - MARGIN, DAY_OF_WEEK_SPRITE_HEIGHT); // Reusing height
+  _sprNextAlarm2.loadFont(DSEG14ModernBold32);
+  _sprNextAlarm2.setTextDatum(MR_DATUM);
+
   _sprTemp.createSprite(tft.width() / 2 - MARGIN, TEMP_SPRITE_HEIGHT);
   _sprTemp.loadFont(DSEG14ModernBold48);
   _sprTemp.setTextDatum(ML_DATUM);
@@ -282,6 +316,7 @@ void ClockPage::updateSpriteColors()
   uint16_t dateColor = hexToRGB565(config.getDateColor());
   uint16_t tempColor = hexToRGB565(config.getTempColor());
   uint16_t humidityColor = hexToRGB565(config.getHumidityColor());
+  uint16_t alarmColor = hexToRGB565(config.getAlarmTextColor());
 
   _sprClock.setTextColor(timeColor, _bgColor);
   _sprTOD.setTextColor(todColor, _bgColor);
@@ -290,6 +325,8 @@ void ClockPage::updateSpriteColors()
   _sprDate.setTextColor(dateColor, _bgColor);
   _sprTemp.setTextColor(tempColor, _bgColor);
   _sprHumidity.setTextColor(humidityColor, _bgColor);
+  _sprNextAlarm1.setTextColor(alarmColor, _bgColor);
+  _sprNextAlarm2.setTextColor(alarmColor, _bgColor);
 }
 
 /**
@@ -370,6 +407,23 @@ void ClockPage::drawDate(TFT_eSPI &tft)
   _sprDate.drawRect(0, 0, _sprDate.width(), _sprDate.height(), TFT_YELLOW);
 #endif
   _sprDate.pushSprite(tft.width() / 2, _dateY);
+}
+
+void ClockPage::drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String &alarm2)
+{
+  _sprNextAlarm1.fillSprite(_bgColor);
+  if (alarm1.length() > 0)
+  {
+    _sprNextAlarm1.drawString(alarm1.c_str(), 0, _sprNextAlarm1.height() / 2);
+  }
+  _sprNextAlarm1.pushSprite(MARGIN, _alarmRowY);
+
+  _sprNextAlarm2.fillSprite(_bgColor);
+  if (alarm2.length() > 0)
+  {
+    _sprNextAlarm2.drawString(alarm2.c_str(), _sprNextAlarm2.width(), _sprNextAlarm2.height() / 2);
+  }
+  _sprNextAlarm2.pushSprite(tft.width() / 2, _alarmRowY);
 }
 
 /**
@@ -463,6 +517,53 @@ void ClockPage::updateDisplayData(DisplayData &data)
   data.humidity = getHumidity();
   data.tod = timeManager.getTOD();
   data.seconds = timeManager.getFormattedSeconds();
+
+  std::vector<NextAlarmTime> alarms = timeManager.getNextAlarms(2);
+  bool is24Hour = timeManager.is24HourFormat();
+
+  if (alarms.size() > 0)
+  {
+    char timeStr[16];
+    if (is24Hour)
+    {
+      sprintf(timeStr, "%02d:%02d", alarms[0].time.hour(), alarms[0].time.minute());
+    }
+    else
+    {
+      int hour12 = alarms[0].time.hour() % 12;
+      if (hour12 == 0)
+        hour12 = 12;
+      const char *suffix = (alarms[0].time.hour() < 12) ? "AM" : "PM";
+      sprintf(timeStr, "%d:%02d%s", hour12, alarms[0].time.minute(), suffix);
+    }
+    data.nextAlarm1 = String(timeStr);
+  }
+  else
+  {
+    data.nextAlarm1 = "";
+  }
+
+  if (alarms.size() > 1)
+  {
+    char timeStr[16];
+    if (is24Hour)
+    {
+      sprintf(timeStr, "%02d:%02d", alarms[1].time.hour(), alarms[1].time.minute());
+    }
+    else
+    {
+      int hour12 = alarms[1].time.hour() % 12;
+      if (hour12 == 0)
+        hour12 = 12;
+      const char *suffix = (alarms[1].time.hour() < 12) ? "AM" : "PM";
+      sprintf(timeStr, "%d:%02d%s", hour12, alarms[1].time.minute(), suffix);
+    }
+    data.nextAlarm2 = String(timeStr);
+  }
+  else
+  {
+    data.nextAlarm2 = "";
+  }
 }
 
 /**
@@ -505,8 +606,17 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
     _sprTOD.pushSprite(_todX, _todY);
   }
 
-  // Force a redraw of all elements by resetting their last known values
-  _lastData = {};
+  // Force a redraw of all elements by setting their last known values to something invalid.
+  // We use a space for strings to ensure they differ from empty strings (which might be the new state).
+  _lastData.time = " ";
+  _lastData.date = " ";
+  _lastData.dayOfWeek = " ";
+  _lastData.temp = -999.0;
+  _lastData.humidity = -999.0;
+  _lastData.tod = " ";
+  _lastData.seconds = " ";
+  _lastData.nextAlarm1 = " ";
+  _lastData.nextAlarm2 = " ";
 }
 
 /**
@@ -541,33 +651,24 @@ void ClockPage::initAlarmSprite(TFT_eSPI &tft)
  */
 void ClockPage::updateAlarmSprite()
 {
+  auto &config = ConfigManager::getInstance();
+  uint16_t alarmColor = hexToRGB565(config.getAlarmTextColor().c_str());
+
+  // Clear the sprite with the background color (transparent corners relative to the button)
   _alarmSprite.fillSprite(_bgColor);
 
   auto &alarmManager = AlarmManager::getInstance();
-  auto &config = ConfigManager::getInstance();
-
-  bool anySnoozed = false;
-  for (int i = 0; i < config.getNumAlarms(); ++i)
-  {
-    if (config.getAlarm(i).isSnoozed())
-    {
-      anySnoozed = true;
-      break;
-    }
-  }
+  bool showButton = false;
+  String text = "";
 
   if (alarmManager.isRinging())
   {
-    _alarmSprite.drawString("ALARM", _alarmSprite.width() / 2, _alarmSprite.height() / 2);
-    if (_dismissProgress > 0.0f)
-    {
-      int barWidth = _alarmSprite.width() * _dismissProgress;
-      _alarmSprite.fillRect(0, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT, barWidth, ALARM_PROGRESS_BAR_HEIGHT, hexToRGB565(config.getAlarmTextColor().c_str()));
-    }
+    showButton = true;
+    text = "ALARM";
   }
-  else if (anySnoozed)
+  else
   {
-    bool foundSnoozed = false;
+    // Check for snoozed alarms
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
       const auto &alarm = config.getAlarm(i);
@@ -583,23 +684,29 @@ void ClockPage::updateAlarmSprite()
 
         char buf[10];
         snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
-        _alarmSprite.drawString(buf, _alarmSprite.width() / 2, _alarmSprite.height() / 2);
-        foundSnoozed = true;
+        text = String(buf);
+        showButton = true;
         break;
       }
     }
-    if (!foundSnoozed)
-    {
-      // This case is reached if the snooze was just cancelled.
-      // The sprite is explicitly cleared to ensure no stale countdown is shown.
-      _alarmSprite.fillSprite(_bgColor);
-    }
+  }
 
-    // Also draw the progress bar if the button is being held
+  if (showButton)
+  {
+    // Draw the rounded button body
+    _alarmSprite.fillRoundRect(0, 0, _alarmSprite.width(), _alarmSprite.height(), 10, alarmColor);
+
+    // Set text color to background color (inverted)
+    _alarmSprite.setTextColor(_bgColor);
+    _alarmSprite.drawString(text.c_str(), _alarmSprite.width() / 2, _alarmSprite.height() / 2);
+
+    // Draw the progress bar if the button is being held
     if (_dismissProgress > 0.0f)
     {
-      int barWidth = _alarmSprite.width() * _dismissProgress;
-      _alarmSprite.fillRect(0, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT, barWidth, ALARM_PROGRESS_BAR_HEIGHT, hexToRGB565(config.getAlarmTextColor().c_str()));
+      int margin = 5;
+      int availableWidth = _alarmSprite.width() - (2 * margin);
+      int barWidth = availableWidth * _dismissProgress;
+      _alarmSprite.fillRoundRect(margin, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT - margin, barWidth, ALARM_PROGRESS_BAR_HEIGHT, 3, TFT_WHITE);
     }
   }
   else

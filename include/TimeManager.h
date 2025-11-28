@@ -4,6 +4,19 @@
 
 #include <Arduino.h>
 #include <RTClib.h>
+#include <vector>
+
+// Structure to hold an alarm's next occurrence time and its ID
+struct NextAlarmTime
+{
+  DateTime time;
+  uint8_t id;
+
+  bool operator<(const NextAlarmTime &other) const
+  {
+    return time < other.time;
+  }
+};
 
 /**
  * @class TimeManager
@@ -156,6 +169,24 @@ public:
    */
   void checkMissedAlarms();
 
+  /**
+   * @brief Gets the next upcoming alarms.
+   * @param count The number of upcoming alarms to retrieve.
+   * @return A vector of NextAlarmTime structures.
+   */
+  std::vector<NextAlarmTime> getNextAlarms(int count) const;
+
+  /**
+   * @brief Re-calculates and caches the next upcoming alarms.
+   * @param now The current time, used to avoid re-reading from RTC if available.
+   */
+  void updateNextAlarmsCache(const DateTime &now);
+
+  /**
+   * @brief Overload that fetches the current time from RTC.
+   */
+  void updateNextAlarmsCache();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
@@ -177,6 +208,9 @@ private:
   bool _rtc_alarms_initialized = false;
   int8_t _rtcAlarm1Id = -1; ///< The ID of the alarm associated with RTC alarm 1.
   int8_t _rtcAlarm2Id = -1; ///< The ID of the alarm associated with RTC alarm 2.
+
+  std::vector<NextAlarmTime> _cachedNextAlarms;
+  uint8_t _lastCacheUpdateMinute = 255;
 
   /**
    * @brief Clears both hardware alarms on the RTC.

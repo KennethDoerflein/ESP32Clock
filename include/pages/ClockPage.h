@@ -13,6 +13,8 @@ struct DisplayData
   float humidity;
   String tod;
   String seconds;
+  String nextAlarm1;
+  String nextAlarm2;
 };
 
 /**
@@ -46,6 +48,7 @@ private:
   void drawTemperature(TFT_eSPI &tft);
   void drawHumidity(TFT_eSPI &tft);
   void drawSeconds(TFT_eSPI &tft);
+  void drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String &alarm2);
   void updateSpriteColors();
   void initAlarmSprite(TFT_eSPI &tft);
   void updateDisplayData(DisplayData &data);
@@ -62,6 +65,8 @@ private:
   TFT_eSprite _sprTOD;
   TFT_eSprite _sprSeconds;
   TFT_eSprite _alarmSprite;
+  TFT_eSprite _sprNextAlarm1;
+  TFT_eSprite _sprNextAlarm2;
 
   // Cached values to prevent unnecessary redraws
   DisplayData _lastData;
@@ -76,8 +81,11 @@ private:
   int _secondsY;
   int _dateY;
   int _sensorY;
+  int _alarmRowY;
   int _alarmSpriteX;
   int _alarmSpriteY;
+
+  bool _wasAlarmActive = false;
 
   // Cached background color
   uint16_t _bgColor;

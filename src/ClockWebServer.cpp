@@ -183,6 +183,10 @@ void ClockWebServer::begin()
               config.setAlarm(id, alarm);
             }
           }
+          
+          // Force an immediate update of the alarm cache and RTC hardware alarms
+          TimeManager::getInstance().setNextAlarms();
+
           request->send(200, "text/plain", "Alarms saved successfully!");
         } });
 

@@ -10,6 +10,7 @@
 
 #include "SensorModule.h"
 #include "ConfigManager.h"
+#include "SerialLog.h"
 #include "driver/temp_sensor.h"
 #include <math.h>
 
@@ -24,6 +25,9 @@ static float cached_core_temp_c = 0.0;
 static float cached_humidity = 0.0;
 static float cached_offset_c = 0.0;
 static bool bme280_found = false; // Track BME280 sensor status
+static unsigned long lastBmeRetry = 0;
+const unsigned long BME_RETRY_INTERVAL = 5000;
+const uint8_t BME280_I2C_ADDRESS = 0x76;
 
 /**
  * @brief Calculates the corrected relative humidity based on a temperature offset.
@@ -91,7 +95,7 @@ void setupSensors()
 {
   for (int i = 0; i < SENSOR_RETRY_COUNT; ++i)
   {
-    bme280_found = BME.begin(0x76);
+    bme280_found = BME.begin(BME280_I2C_ADDRESS);
     if (bme280_found)
       break;
     delay(SENSOR_RETRY_DELAY);
@@ -99,7 +103,7 @@ void setupSensors()
 
   if (!bme280_found)
   {
-    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    SerialLog::getInstance().print("Could not find a valid BME280 sensor, check wiring!");
     // The device will now rely on the RTC for temperature.
   }
 
@@ -113,7 +117,7 @@ void setupSensors()
 
   if (!rtc_found)
   {
-    Serial.println("Couldn't find RTC");
+    SerialLog::getInstance().print("Couldn't find RTC");
     // The main loop will now handle the error message.
     return; // Exit early, no point in continuing
   }
@@ -245,25 +249,46 @@ void handleSensorUpdates(bool force)
       float raw_bme_temp_c = BME.readTemperature();
       float raw_humidity = BME.readHumidity();
 
-      if (rtc_found && ConfigManager::getInstance().isTempCorrectionEnabled())
+      // Check for sensor failure
+      if (isnan(raw_bme_temp_c) || isnan(raw_humidity))
       {
-        float raw_rtc_temp_c = RTC.getTemperature();
-        float correction = ConfigManager::getInstance().getTempCorrection();
-        cached_offset_c = -((raw_rtc_temp_c - raw_bme_temp_c)) + correction;
-        cached_bme_temp_c = raw_bme_temp_c + cached_offset_c;
-        cached_humidity = calculateCorrectedHumidity(raw_bme_temp_c, raw_humidity, cached_offset_c);
+        SerialLog::getInstance().print("BME280 read failed (NAN). Attempting to recover...");
+        bme280_found = false;
+        cached_humidity = -1;
       }
       else
       {
-        // Correction is disabled or RTC is not found, use raw values
-        cached_bme_temp_c = raw_bme_temp_c;
-        cached_humidity = raw_humidity;
-        cached_offset_c = 0.0;
+        if (rtc_found && ConfigManager::getInstance().isTempCorrectionEnabled())
+        {
+          float raw_rtc_temp_c = RTC.getTemperature();
+          float correction = ConfigManager::getInstance().getTempCorrection();
+          cached_offset_c = -((raw_rtc_temp_c - raw_bme_temp_c)) + correction;
+          cached_bme_temp_c = raw_bme_temp_c + cached_offset_c;
+          cached_humidity = calculateCorrectedHumidity(raw_bme_temp_c, raw_humidity, cached_offset_c);
+        }
+        else
+        {
+          // Correction is disabled or RTC is not found, use raw values
+          cached_bme_temp_c = raw_bme_temp_c;
+          cached_humidity = raw_humidity;
+          cached_offset_c = 0.0;
+        }
       }
     }
-    else
+
+    if (!bme280_found)
     {
       cached_humidity = -1; // Indicate that humidity is not available
+      if (now - lastBmeRetry >= BME_RETRY_INTERVAL)
+      {
+        lastBmeRetry = now;
+        SerialLog::getInstance().print("Attempting to reconnect BME280...");
+        if (BME.begin(BME280_I2C_ADDRESS))
+        {
+          SerialLog::getInstance().print("BME280 recovered!");
+          bme280_found = true;
+        }
+      }
     }
 
     if (rtc_found)

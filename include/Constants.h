@@ -48,9 +48,9 @@
 #define DATE_SPRITE_HEIGHT 50         ///< Height of the date sprite.
 #define TEMP_SPRITE_HEIGHT 50         ///< Height of the temperature sprite.
 #define HUMIDITY_SPRITE_HEIGHT 50     ///< Height of the humidity sprite.
-#define ALARM_SPRITE_WIDTH_PADDING 20 ///< Padding for the alarm text sprite.
+#define ALARM_SPRITE_WIDTH_PADDING 10 ///< Padding for the alarm text sprite.
 #define ALARM_SPRITE_HEIGHT 50        ///< Height of the alarm text sprite.
-#define ALARM_PROGRESS_BAR_HEIGHT 10  ///< Height of the dismiss progress bar.
+#define ALARM_PROGRESS_BAR_HEIGHT 6   ///< Height of the dismiss progress bar.
 #define ALARM_ICON_X 462              ///< X-coordinate of the alarm indicator icon.
 #define ALARM_ICON_Y 5                ///< Y-coordinate of the alarm indicator icon.
 #define ALARM_ICON_WIDTH 18           ///< Width of the alarm indicator icon's bounding box.
@@ -60,4 +60,4 @@
 const int BRIGHTNESS_MIN = 10;
 const int BRIGHTNESS_MAX = 255;
 
-#endif // CONSTANTS_H
+#endif

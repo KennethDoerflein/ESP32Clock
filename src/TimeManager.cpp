@@ -19,18 +19,6 @@
 #include <vector>
 #include <algorithm>
 
-// Structure to hold an alarm's next occurrence time and its ID
-struct NextAlarmTime
-{
-  DateTime time;
-  uint8_t id;
-
-  bool operator<(const NextAlarmTime &other) const
-  {
-    return time < other.time;
-  }
-};
-
 DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
 {
   if (!alarm.isEnabled())
@@ -115,6 +103,14 @@ bool TimeManager::update()
     setNextAlarms();
     _rtc_alarms_initialized = true;
   }
+
+  // Update alarm cache if the minute has changed
+  DateTime now = RTC.now();
+  if (now.minute() != _lastCacheUpdateMinute)
+  {
+    updateNextAlarmsCache(now);
+  }
+
   return true; // An update occurred.
 }
 
@@ -505,13 +501,16 @@ void TimeManager::clearRtcAlarms()
   RTC.writeSqwPinMode(DS3231_OFF);
 }
 
-void TimeManager::setNextAlarms()
+void TimeManager::updateNextAlarmsCache()
 {
-  clearRtcAlarms();
+  updateNextAlarmsCache(RTC.now());
+}
 
+void TimeManager::updateNextAlarmsCache(const DateTime &now)
+{
   auto &config = ConfigManager::getInstance();
   std::vector<NextAlarmTime> nextAlarms;
-  DateTime now = RTC.now();
+  _lastCacheUpdateMinute = now.minute();
 
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
@@ -527,6 +526,28 @@ void TimeManager::setNextAlarms()
   }
 
   std::sort(nextAlarms.begin(), nextAlarms.end());
+  _cachedNextAlarms = nextAlarms;
+}
+
+std::vector<NextAlarmTime> TimeManager::getNextAlarms(int count) const
+{
+  std::vector<NextAlarmTime> result = _cachedNextAlarms;
+  if (result.size() > count)
+  {
+    result.resize(count);
+  }
+  return result;
+}
+
+void TimeManager::setNextAlarms()
+{
+  clearRtcAlarms();
+
+  // Update cache first to ensure we have latest
+  updateNextAlarmsCache();
+
+  // We need at least 2 alarms for RTC setting
+  std::vector<NextAlarmTime> nextAlarms = getNextAlarms(2);
 
   if (!nextAlarms.empty())
   {
