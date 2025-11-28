@@ -603,8 +603,17 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
     _sprTOD.pushSprite(_todX, _todY);
   }
 
-  // Force a redraw of all elements by resetting their last known values
-  _lastData = {};
+  // Force a redraw of all elements by setting their last known values to something invalid.
+  // We use a space for strings to ensure they differ from empty strings (which might be the new state).
+  _lastData.time = " ";
+  _lastData.date = " ";
+  _lastData.dayOfWeek = " ";
+  _lastData.temp = -999.0;
+  _lastData.humidity = -999.0;
+  _lastData.tod = " ";
+  _lastData.seconds = " ";
+  _lastData.nextAlarm1 = " ";
+  _lastData.nextAlarm2 = " ";
 }
 
 /**
