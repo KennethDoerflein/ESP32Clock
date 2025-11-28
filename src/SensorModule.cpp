@@ -26,7 +26,7 @@ static float cached_humidity = 0.0;
 static float cached_offset_c = 0.0;
 static bool bme280_found = false; // Track BME280 sensor status
 static unsigned long lastBmeRetry = 0;
-const unsigned long BME_RETRY_INTERVAL = 5000;
+const unsigned long BME_RETRY_INTERVAL = 10000; // Retry every 10 seconds if not found
 const uint8_t BME280_I2C_ADDRESS = 0x76;
 
 /**
