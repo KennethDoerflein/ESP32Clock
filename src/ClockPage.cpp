@@ -279,11 +279,11 @@ void ClockPage::setupSprites(TFT_eSPI &tft)
   _sprDate.setTextDatum(MR_DATUM);
 
   _sprNextAlarm1.createSprite(tft.width() / 2 - MARGIN, DAY_OF_WEEK_SPRITE_HEIGHT); // Reusing height
-  _sprNextAlarm1.loadFont(DSEG14ModernBold48);
+  _sprNextAlarm1.loadFont(DSEG14ModernBold32);
   _sprNextAlarm1.setTextDatum(ML_DATUM);
 
   _sprNextAlarm2.createSprite(tft.width() / 2 - MARGIN, DAY_OF_WEEK_SPRITE_HEIGHT); // Reusing height
-  _sprNextAlarm2.loadFont(DSEG14ModernBold48);
+  _sprNextAlarm2.loadFont(DSEG14ModernBold32);
   _sprNextAlarm2.setTextDatum(MR_DATUM);
 
   _sprTemp.createSprite(tft.width() / 2 - MARGIN, TEMP_SPRITE_HEIGHT);
@@ -522,7 +522,7 @@ void ClockPage::updateDisplayData(DisplayData &data)
 
   if (alarms.size() > 0)
   {
-    char timeStr[8];
+    char timeStr[16];
     if (is24Hour)
     {
       sprintf(timeStr, "%02d:%02d", alarms[0].time.hour(), alarms[0].time.minute());
@@ -532,7 +532,8 @@ void ClockPage::updateDisplayData(DisplayData &data)
       int hour12 = alarms[0].time.hour() % 12;
       if (hour12 == 0)
         hour12 = 12;
-      sprintf(timeStr, "%d:%02d", hour12, alarms[0].time.minute());
+      const char *suffix = (alarms[0].time.hour() < 12) ? "AM" : "PM";
+      sprintf(timeStr, "%d:%02d%s", hour12, alarms[0].time.minute(), suffix);
     }
     data.nextAlarm1 = String(timeStr);
   }
@@ -543,7 +544,7 @@ void ClockPage::updateDisplayData(DisplayData &data)
 
   if (alarms.size() > 1)
   {
-    char timeStr[8];
+    char timeStr[16];
     if (is24Hour)
     {
       sprintf(timeStr, "%02d:%02d", alarms[1].time.hour(), alarms[1].time.minute());
@@ -553,7 +554,8 @@ void ClockPage::updateDisplayData(DisplayData &data)
       int hour12 = alarms[1].time.hour() % 12;
       if (hour12 == 0)
         hour12 = 12;
-      sprintf(timeStr, "%d:%02d", hour12, alarms[1].time.minute());
+      const char *suffix = (alarms[1].time.hour() < 12) ? "AM" : "PM";
+      sprintf(timeStr, "%d:%02d%s", hour12, alarms[1].time.minute(), suffix);
     }
     data.nextAlarm2 = String(timeStr);
   }
