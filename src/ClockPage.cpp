@@ -227,12 +227,13 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   tft.loadFont(DSEG14ModernBold32);
   int fontHeight = tft.fontHeight();
   _alarmRowY = screenHeight - (fontHeight * 3 + MARGIN + 80);
-  _dateY = screenHeight - (fontHeight * 2 + MARGIN + 40);
-  _sensorY = screenHeight - (fontHeight + MARGIN + 10);
+  _dateY = screenHeight - (fontHeight * 2 + MARGIN + 55);
+  _sensorY = screenHeight - (fontHeight + MARGIN + 20);
 
   // --- Alarm Sprite Layout ---
   _alarmSpriteX = (screenWidth - _alarmSprite.width()) / 2;
-  _alarmSpriteY = (screenHeight / 2) - (_alarmSprite.height() / 2);
+  // Position the alarm sprite in the middle of the sensor row (between Temp and Humidity)
+  _alarmSpriteY = _sensorY + (TEMP_SPRITE_HEIGHT - ALARM_SPRITE_HEIGHT) / 2;
 }
 
 /**
@@ -653,36 +654,21 @@ void ClockPage::updateAlarmSprite()
   auto &config = ConfigManager::getInstance();
   uint16_t alarmColor = hexToRGB565(config.getAlarmTextColor().c_str());
 
-  // Fill the sprite with the alarm color to create a solid box
-  _alarmSprite.fillSprite(alarmColor);
-  // Set text color to background color (inverted)
-  _alarmSprite.setTextColor(_bgColor, alarmColor);
+  // Clear the sprite with the background color (transparent corners relative to the button)
+  _alarmSprite.fillSprite(_bgColor);
 
   auto &alarmManager = AlarmManager::getInstance();
-
-  bool anySnoozed = false;
-  for (int i = 0; i < config.getNumAlarms(); ++i)
-  {
-    if (config.getAlarm(i).isSnoozed())
-    {
-      anySnoozed = true;
-      break;
-    }
-  }
+  bool showButton = false;
+  String text = "";
 
   if (alarmManager.isRinging())
   {
-    _alarmSprite.drawString("ALARM", _alarmSprite.width() / 2, _alarmSprite.height() / 2);
-    if (_dismissProgress > 0.0f)
-    {
-      int barWidth = _alarmSprite.width() * _dismissProgress;
-      // Use background color for progress bar since background is alarmColor
-      _alarmSprite.fillRect(0, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT, barWidth, ALARM_PROGRESS_BAR_HEIGHT, _bgColor);
-    }
+    showButton = true;
+    text = "ALARM";
   }
-  else if (anySnoozed)
+  else
   {
-    bool foundSnoozed = false;
+    // Check for snoozed alarms
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
       const auto &alarm = config.getAlarm(i);
@@ -698,22 +684,29 @@ void ClockPage::updateAlarmSprite()
 
         char buf[10];
         snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
-        _alarmSprite.drawString(buf, _alarmSprite.width() / 2, _alarmSprite.height() / 2);
-        foundSnoozed = true;
+        text = String(buf);
+        showButton = true;
         break;
       }
     }
-    if (!foundSnoozed)
-    {
-      // This case is reached if the snooze was just cancelled.
-      _alarmSprite.fillSprite(_bgColor);
-    }
+  }
 
-    // Also draw the progress bar if the button is being held
+  if (showButton)
+  {
+    // Draw the rounded button body
+    _alarmSprite.fillRoundRect(0, 0, _alarmSprite.width(), _alarmSprite.height(), 10, alarmColor);
+
+    // Set text color to background color (inverted)
+    _alarmSprite.setTextColor(_bgColor);
+    _alarmSprite.drawString(text.c_str(), _alarmSprite.width() / 2, _alarmSprite.height() / 2);
+
+    // Draw the progress bar if the button is being held
     if (_dismissProgress > 0.0f)
     {
-      int barWidth = _alarmSprite.width() * _dismissProgress;
-      _alarmSprite.fillRect(0, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT, barWidth, ALARM_PROGRESS_BAR_HEIGHT, _bgColor);
+      int margin = 5;
+      int availableWidth = _alarmSprite.width() - (2 * margin);
+      int barWidth = availableWidth * _dismissProgress;
+      _alarmSprite.fillRoundRect(margin, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT - margin, barWidth, ALARM_PROGRESS_BAR_HEIGHT, 3, TFT_WHITE);
     }
   }
   else
