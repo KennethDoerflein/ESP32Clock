@@ -1648,6 +1648,15 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
                 <div id="ntp-sync-status" class="mt-2 text-center"></div>
               </div>
             </div>
+            <div class="card mt-4">
+              <div class="card-body">
+                <h5 class="card-title d-flex align-items-center"><i class="bi bi-file-text me-2"></i>System Logs</h5>
+                <p class="card-text text-muted small">Download the system log file for troubleshooting.</p>
+                 <div class="d-grid">
+                  <a href="/api/log/download" class="btn btn-secondary" target="_blank">Download System Log</a>
+                </div>
+              </div>
+            </div>
           </div>
           %SERIAL_LOG_TAB_PANE%
         </div>

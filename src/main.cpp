@@ -26,6 +26,7 @@
 #include "pages/InfoPage.h"
 #include "ClockWebServer.h"
 #include "SerialLog.h"
+#include <LittleFS.h>
 #include "ButtonManager.h"
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -177,6 +178,17 @@ void setup()
   Serial.begin(115200);
   pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP); // Use Snooze button for boot-time reset
   auto &logger = SerialLog::getInstance();
+
+  // Initialize LittleFS
+  if (!LittleFS.begin(true))
+  {
+    Serial.println("LittleFS Mount Failed");
+  }
+  else
+  {
+    Serial.println("LittleFS Mounted Successfully");
+  }
+
   bool displayInitialized = false;
   // Initialize ConfigManager.
   logger.print("Initializing ConfigManager...\n");
@@ -218,10 +230,10 @@ void setup()
   }
   pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP); // BOOT button is used for run-time reset
 
-  // Disable logging if the version string does not contain "dev"
+  // Disable console logging if the version string does not contain "dev"
   if (String(FIRMWARE_VERSION).indexOf("dev") == -1)
   {
-    logger.setLoggingEnabled(false);
+    logger.setConsoleLoggingEnabled(false);
   }
 
   logger.print("\n\n--- ESP32 Clock Booting Up ---\n");
@@ -358,6 +370,7 @@ void loop()
   auto &config = ConfigManager::getInstance();
 
   // Perform periodic tasks that don't require WiFi.
+  SerialLog::getInstance().loop();
   config.loop();
   alarmManager.update();
   bool timeUpdated = timeManager.update(); // Updates time from the RTC

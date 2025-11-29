@@ -512,6 +512,12 @@ void ClockWebServer::begin()
       bool inProgress = UpdateManager::getInstance().isUpdateInProgress();
       request->send(200, "application/json", String("{\"inProgress\":") + (inProgress ? "true" : "false") + "}"); });
 
+    server.on("/api/log/download", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        AsyncWebServerResponse *response = request->beginResponse(LittleFS, SerialLog::getLogFilePath(), "text/plain", true);
+        response->addHeader("Content-Disposition", "attachment; filename=\"system.log\"");
+        request->send(response); });
+
     if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
     {
       SerialLog::getInstance().begin(&server);
