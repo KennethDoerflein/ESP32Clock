@@ -512,10 +512,28 @@ void ClockWebServer::begin()
       bool inProgress = UpdateManager::getInstance().isUpdateInProgress();
       request->send(200, "application/json", String("{\"inProgress\":") + (inProgress ? "true" : "false") + "}"); });
 
-    if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
-    {
-      SerialLog::getInstance().begin(&server);
-    }
+    server.on("/api/log/download", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        if (!LittleFS.exists(SerialLog::getLogFilePath()))
+        {
+          request->send(404, "text/plain", "Log file not found");
+          return;
+        }
+        AsyncWebServerResponse *response = request->beginResponse(LittleFS, SerialLog::getLogFilePath(), "text/plain", true);
+        if (response == nullptr)
+        {
+          request->send(500, "text/plain", "Internal Server Error: Could not open log file");
+          return;
+        }
+        response->addHeader("Content-Disposition", "attachment; filename=\"system.log\"");
+        request->send(response); });
+
+    server.on("/api/log/rotate", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+      SerialLog::getInstance().rotate();
+      request->send(200, "text/plain", "Log rotated successfully."); });
+
+    SerialLog::getInstance().begin(&server);
   }
 
   // This route is shared between normal and captive portal modes.
@@ -789,27 +807,15 @@ String ClockWebServer::processor(const String &var)
     return WiFiManager::getInstance().getHostname();
   if (var == "SERIAL_LOG_TAB")
   {
-    if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
-    {
-      return SERIAL_LOG_TAB_HTML;
-    }
-    return "";
+    return SERIAL_LOG_TAB_HTML;
   }
   if (var == "SERIAL_LOG_TAB_PANE")
   {
-    if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
-    {
-      return SERIAL_LOG_TAB_PANE_HTML;
-    }
-    return "";
+    return SERIAL_LOG_TAB_PANE_HTML;
   }
   if (var == "SERIAL_LOG_SCRIPT")
   {
-    if (String(FIRMWARE_VERSION).indexOf("dev") != -1)
-    {
-      return SERIAL_LOG_SCRIPT_JS;
-    }
-    return "";
+    return SERIAL_LOG_SCRIPT_JS;
   }
 
   return String();

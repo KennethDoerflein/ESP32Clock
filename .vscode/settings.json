@@ -1,5 +1,18 @@
 {
   "files.associations": {
     "*.default": "cpp"
-  }
+  },
+  "cSpell.words": [
+    "AKDT",
+    "AKST",
+    "hotspot",
+    "IRAM",
+    "labelledby",
+    "Neue",
+    "onclick",
+    "onclose",
+    "Roboto",
+    "rssi",
+    "Segoe"
+  ]
 }
