@@ -9,7 +9,7 @@
 
 // Initialize static members
 const char *SerialLog::LOG_FILE_PATH = "/system.log";
-const size_t SerialLog::MAX_LOG_SIZE = 20 * 1024;     // 20KB
+const size_t SerialLog::MAX_LOG_SIZE = 256 * 1024;    // 256KB
 const size_t SerialLog::BUFFER_THRESHOLD = 256;       // 256 Bytes
 const unsigned long SerialLog::FLUSH_INTERVAL = 2000; // 2 Seconds
 
