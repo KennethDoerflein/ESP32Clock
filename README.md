@@ -323,6 +323,14 @@ This project is broken down into phases to prioritize a functional base clock be
 
 ### Future Plans
 
+### V1.1.0
+
+- [ ] **Alarm Management**
+  - [ ] Add/Delete alarms to have more or less than 5.
+- [ ] **Logging**
+  - [ ] Create a log file that is stored in LittleFS.
+  - [ ] The log file should be appended to and automatically roll over.
+
 ### V2.0.0
 
 - [ ] **Add Weather Page**
@@ -332,9 +340,4 @@ This project is broken down into phases to prioritize a functional base clock be
   - [ ] Add a "Good Morning" page that displays the weather after an alarm goes off.
 - [ ] **UI/UX Enhancements**
   - [ ] Allow users to set a default display page.
-- [ ] **Alarm Management**
-  - [ ] Add/Delete alarms to have more or less than 5.
-- [ ] **Logging**
-  - [ ] Create a log file that is stored in LittleFS.
-  - [ ] The log file should be appended to and automatically roll over.
 ---
