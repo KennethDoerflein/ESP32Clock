@@ -119,7 +119,7 @@ void ClockWebServer::begin()
       JsonArray alarmsArray = doc.to<JsonArray>();
 
       for (int i = 0; i < config.getNumAlarms(); ++i) {
-        const Alarm& alarm = config.getAlarm(i);
+        const Alarm& alarm = config.getAlarmByIndex(i);
         JsonObject alarmObj = alarmsArray.add<JsonObject>();
         alarmObj["id"] = alarm.getId();
         alarmObj["enabled"] = alarm.isEnabled();
@@ -162,27 +162,62 @@ void ClockWebServer::begin()
             return;
           }
 
-          auto& config = ConfigManager::getInstance();
-          for (JsonObject alarmObj : alarmsArray) {
-            int id = alarmObj["id"] | -1;
-            if (id >= 0 && id < config.getNumAlarms()) {
-              // Get the existing alarm to preserve its snooze state
-              Alarm alarm = config.getAlarm(id);
-              bool isEnabled = alarmObj["enabled"] | false;
-              
-              // If the alarm is being disabled and it's the one currently ringing, stop it.
-              if (!isEnabled && alarm.isEnabled() && AlarmManager::getInstance().isRinging() && AlarmManager::getInstance().getActiveAlarmId() == id) {
-                AlarmManager::getInstance().stop();
-              }
-
-              alarm.setEnabled(isEnabled);
-              alarm.setHour(alarmObj["hour"] | 6);
-              alarm.setMinute(alarmObj["minute"] | 0);
-              alarm.setDays(alarmObj["days"] | 0);
-
-              config.setAlarm(id, alarm);
-            }
+          if (alarmsArray.size() > MAX_ALLOWED_ALARMS) {
+            request->send(400, "text/plain", "Too many alarms. Max limit is " + String(MAX_ALLOWED_ALARMS));
+            return;
           }
+
+          std::vector<Alarm> newAlarms;
+          auto& config = ConfigManager::getInstance();
+
+          for (JsonObject alarmObj : alarmsArray) {
+            Alarm alarm;
+            int id = alarmObj["id"] | -1;
+            
+            // If the alarm has a valid ID, try to get its existing state (for snooze)
+            Alarm* existingAlarmPtr = nullptr;
+            if (id >= 0) {
+              existingAlarmPtr = config.getAlarmById(id);
+            }
+
+            if (existingAlarmPtr) {
+              alarm = *existingAlarmPtr; // Copy existing state
+            } else {
+              // New alarm (or ID not found, treat as new)
+              alarm.setId(id); // -1 will be assigned a new ID by ConfigManager
+            }
+
+            bool isEnabled = alarmObj["enabled"] | false;
+            
+            // If the alarm is being disabled and it's the one currently ringing, stop it.
+            if (!isEnabled && alarm.isEnabled() && AlarmManager::getInstance().isRinging() && AlarmManager::getInstance().getActiveAlarmId() == alarm.getId()) {
+              AlarmManager::getInstance().stop();
+            }
+
+            alarm.setEnabled(isEnabled);
+            alarm.setHour(alarmObj["hour"] | 6);
+            alarm.setMinute(alarmObj["minute"] | 0);
+            alarm.setDays(alarmObj["days"] | 0);
+            
+            newAlarms.push_back(alarm);
+          }
+
+          // Check if the currently ringing alarm is missing from the new list (deleted)
+          if (AlarmManager::getInstance().isRinging()) {
+             int activeId = AlarmManager::getInstance().getActiveAlarmId();
+             bool found = false;
+             for(const auto& a : newAlarms) {
+                 if (a.getId() == activeId) {
+                     found = true;
+                     break;
+                 }
+             }
+             if (!found) {
+                 AlarmManager::getInstance().stop();
+             }
+          }
+
+          config.replaceAlarms(newAlarms);
           
           // Force an immediate update of the alarm cache and RTC hardware alarms
           TimeManager::getInstance().setNextAlarms();

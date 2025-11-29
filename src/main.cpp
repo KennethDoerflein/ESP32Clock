@@ -81,7 +81,7 @@ void updateAlarmState()
     bool anySnoozed = false;
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
-      if (config.getAlarm(i).isSnoozed())
+      if (config.getAlarmByIndex(i).isSnoozed())
       {
         anySnoozed = true;
         break;
@@ -432,10 +432,14 @@ void loop()
         int alarmId = alarmManager.getActiveAlarmId();
         if (alarmId != -1)
         {
-          Alarm alarm = config.getAlarm(alarmId);
-          alarm.dismiss(timeManager.getRTCTime());
-          config.setAlarm(alarmId, alarm);
-          config.save();
+          Alarm *alarmPtr = config.getAlarmById(alarmId);
+          if (alarmPtr)
+          {
+            Alarm alarm = *alarmPtr;
+            alarm.dismiss(timeManager.getRTCTime());
+            config.setAlarmById(alarmId, alarm);
+            config.save();
+          }
           alarmManager.stop();
           if (displayManager.getCurrentPageIndex() == 0)
           {
@@ -458,10 +462,14 @@ void loop()
         int alarmId = alarmManager.getActiveAlarmId();
         if (alarmId != -1)
         {
-          Alarm alarm = config.getAlarm(alarmId);
-          alarm.snooze(config.getSnoozeDuration());
-          config.setAlarm(alarmId, alarm);
-          config.save();
+          Alarm *alarmPtr = config.getAlarmById(alarmId);
+          if (alarmPtr)
+          {
+            Alarm alarm = *alarmPtr;
+            alarm.snooze(config.getSnoozeDuration());
+            config.setAlarmById(alarmId, alarm);
+            config.save();
+          }
           alarmManager.stop();
           if (displayManager.getCurrentPageIndex() == 0)
           {
@@ -507,11 +515,11 @@ void loop()
         SerialLog::getInstance().print("Snooze active: Button held. Ending snooze.\n");
         for (int i = 0; i < config.getNumAlarms(); ++i)
         {
-          Alarm alarm = config.getAlarm(i);
+          Alarm alarm = config.getAlarmByIndex(i);
           if (alarm.isSnoozed())
           {
             alarm.dismiss(timeManager.getRTCTime());
-            config.setAlarm(i, alarm);
+            config.setAlarmByIndex(i, alarm);
           }
         }
         config.save();
@@ -560,7 +568,7 @@ void loop()
   bool anyAlarmSnoozed = false;
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    const auto &alarm = config.getAlarm(i);
+    const auto &alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled())
     {
       anyAlarmEnabled = true;

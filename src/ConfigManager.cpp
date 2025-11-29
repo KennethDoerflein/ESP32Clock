@@ -103,11 +103,14 @@ void ConfigManager::setDefaults()
   alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
 
-  for (int i = 0; i < MAX_ALARMS; ++i)
+  _alarms.clear();
+  for (int i = 0; i < DEFAULT_ALARMS_COUNT; ++i)
   {
-    _alarms[i] = Alarm(); // Reset to default constructor
-    _alarms[i].setId(i);
+    Alarm alarm;
+    alarm.setId(i);
+    _alarms.push_back(alarm);
   }
+  _nextAlarmId = DEFAULT_ALARMS_COUNT;
 
   SerialLog::getInstance().print("Loaded default configuration.");
 }
@@ -200,18 +203,48 @@ void ConfigManager::load()
     errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
 
   // Load alarms
-  for (int i = 0; i < MAX_ALARMS; ++i)
+  _alarms.clear();
+  int numAlarms = _preferences.getInt("numAlarms", -1);
+
+  if (numAlarms == -1)
   {
-    String prefix = "a_" + String(i) + "_";
-    _alarms[i].setId(i);
-    _alarms[i].setEnabled(_preferences.getBool((prefix + "en").c_str(), false));
-    _alarms[i].setHour(_preferences.getUChar((prefix + "hr").c_str(), 6));
-    _alarms[i].setMinute(_preferences.getUChar((prefix + "min").c_str(), 0));
-    _alarms[i].setDays(_preferences.getUChar((prefix + "days").c_str(), 0));
-    bool snoozed = _preferences.getBool((prefix + "snz").c_str(), false);
-    uint32_t snoozeUntil = _preferences.getUInt((prefix + "snzUntil").c_str(), 0);
-    _alarms[i].setSnoozeState(snoozed, snoozeUntil);
-    _alarms[i].setLastDismissedDay(_preferences.getUChar((prefix + "lastDis").c_str(), 8));
+    // Legacy support: Assume 5 fixed alarms
+    for (int i = 0; i < LEGACY_ALARMS_COUNT; ++i)
+    {
+      Alarm alarm;
+      String prefix = "a_" + String(i) + "_";
+      alarm.setId(i);
+      alarm.setEnabled(_preferences.getBool((prefix + "en").c_str(), false));
+      alarm.setHour(_preferences.getUChar((prefix + "hr").c_str(), 6));
+      alarm.setMinute(_preferences.getUChar((prefix + "min").c_str(), 0));
+      alarm.setDays(_preferences.getUChar((prefix + "days").c_str(), 0));
+      bool snoozed = _preferences.getBool((prefix + "snz").c_str(), false);
+      uint32_t snoozeUntil = _preferences.getUInt((prefix + "snzUntil").c_str(), 0);
+      alarm.setSnoozeState(snoozed, snoozeUntil);
+      alarm.setLastDismissedDay(_preferences.getUChar((prefix + "lastDis").c_str(), 8));
+      _alarms.push_back(alarm);
+    }
+    _nextAlarmId = LEGACY_ALARMS_COUNT;
+  }
+  else
+  {
+    // Dynamic alarms
+    _nextAlarmId = _preferences.getInt("nextAlarmId", 0);
+    for (int i = 0; i < numAlarms; ++i)
+    {
+      Alarm alarm;
+      String prefix = "a_" + String(i) + "_";
+      alarm.setId(_preferences.getUChar((prefix + "id").c_str(), 0));
+      alarm.setEnabled(_preferences.getBool((prefix + "en").c_str(), false));
+      alarm.setHour(_preferences.getUChar((prefix + "hr").c_str(), 6));
+      alarm.setMinute(_preferences.getUChar((prefix + "min").c_str(), 0));
+      alarm.setDays(_preferences.getUChar((prefix + "days").c_str(), 0));
+      bool snoozed = _preferences.getBool((prefix + "snz").c_str(), false);
+      uint32_t snoozeUntil = _preferences.getUInt((prefix + "snzUntil").c_str(), 0);
+      alarm.setSnoozeState(snoozed, snoozeUntil);
+      alarm.setLastDismissedDay(_preferences.getUChar((prefix + "lastDis").c_str(), 8));
+      _alarms.push_back(alarm);
+    }
   }
 
   SerialLog::getInstance().print("Configuration loaded successfully.");
@@ -265,9 +298,13 @@ bool ConfigManager::save()
   _preferences.putString("errorTextClr", errorTextColor);
 
   // Save alarms
-  for (int i = 0; i < MAX_ALARMS; ++i)
+  _preferences.putInt("numAlarms", _alarms.size());
+  _preferences.putInt("nextAlarmId", _nextAlarmId);
+
+  for (size_t i = 0; i < _alarms.size(); ++i)
   {
     String prefix = "a_" + String(i) + "_";
+    _preferences.putUChar((prefix + "id").c_str(), _alarms[i].getId());
     _preferences.putBool((prefix + "en").c_str(), _alarms[i].isEnabled());
     _preferences.putUChar((prefix + "hr").c_str(), _alarms[i].getHour());
     _preferences.putUChar((prefix + "min").c_str(), _alarms[i].getMinute());
@@ -295,59 +332,125 @@ void ConfigManager::saveRingingAlarmState()
 }
 
 /**
- * @brief Gets a constant reference to a specific alarm.
- * @param index The index of the alarm (0 to MAX_ALARMS-1).
+ * @brief Gets a constant reference to a specific alarm by index.
+ * @param index The index of the alarm.
  * @return A constant reference to the Alarm object.
  */
-const Alarm &ConfigManager::getAlarm(int index) const
+const Alarm &ConfigManager::getAlarmByIndex(int index) const
 {
-  if (index < 0 || index >= MAX_ALARMS)
+  if (index < 0 || index >= _alarms.size())
   {
-    // This is an error, restart the system.
     SerialLog::getInstance().print("FATAL: Alarm index out of bounds!");
-    ESP.restart(); // Restart the ESP32 to recover
+    ESP.restart();
   }
   return _alarms[index];
 }
 
 /**
- * @brief Gets a mutable reference to a specific alarm.
- * @param index The index of the alarm (0 to MAX_ALARMS-1).
+ * @brief Gets a mutable reference to a specific alarm by index.
+ * @param index The index of the alarm.
  * @return A mutable reference to the Alarm object.
  */
-Alarm &ConfigManager::getAlarm(int index)
+Alarm &ConfigManager::getAlarmByIndex(int index)
 {
-  if (index < 0 || index >= MAX_ALARMS)
+  if (index < 0 || index >= _alarms.size())
   {
-    // This is an error, restart the system.
     SerialLog::getInstance().print("FATAL: Alarm index out of bounds!");
-    ESP.restart(); // Restart the ESP32 to recover
+    ESP.restart();
   }
   return _alarms[index];
+}
+
+/**
+ * @brief Gets a pointer to a specific alarm by ID.
+ * @param id The unique ID of the alarm.
+ * @return A pointer to the Alarm object, or nullptr if not found.
+ */
+Alarm *ConfigManager::getAlarmById(int id)
+{
+  for (auto &alarm : _alarms)
+  {
+    if (alarm.getId() == id)
+    {
+      return &alarm;
+    }
+  }
+  return nullptr;
+}
+
+const Alarm *ConfigManager::getAlarmById(int id) const
+{
+  for (const auto &alarm : _alarms)
+  {
+    if (alarm.getId() == id)
+    {
+      return &alarm;
+    }
+  }
+  return nullptr;
 }
 
 /**
  * @brief Gets the total number of alarms supported.
- * @return The maximum number of alarms.
+ * @return The number of alarms.
  */
 int ConfigManager::getNumAlarms() const
 {
-  return MAX_ALARMS;
+  return _alarms.size();
 }
 
 /**
- * @brief Updates an alarm's configuration.
+ * @brief Updates an alarm's configuration by index.
  * @param index The index of the alarm to update.
  * @param alarm The new alarm data to set.
  */
-void ConfigManager::setAlarm(int index, const Alarm &alarm)
+void ConfigManager::setAlarmByIndex(int index, const Alarm &alarm)
 {
-  if (index < 0 || index >= MAX_ALARMS)
+  if (index < 0 || index >= _alarms.size())
   {
     SerialLog::getInstance().print("ERROR: Alarm index out of bounds!");
     return;
   }
   _alarms[index] = alarm;
+  _isDirty = true;
+  scheduleSave();
+}
+
+/**
+ * @brief Updates an alarm's configuration by ID.
+ * @param id The ID of the alarm to update.
+ * @param alarm The new alarm data to set.
+ */
+void ConfigManager::setAlarmById(int id, const Alarm &alarm)
+{
+  for (auto &a : _alarms)
+  {
+    if (a.getId() == id)
+    {
+      a = alarm;
+      _isDirty = true;
+      scheduleSave();
+      return;
+    }
+  }
+  SerialLog::getInstance().printf("ERROR: Alarm ID %d not found for update!\n", id);
+}
+
+void ConfigManager::replaceAlarms(const std::vector<Alarm> &newAlarms)
+{
+  _alarms.clear();
+  for (const auto &incomingAlarm : newAlarms)
+  {
+    Alarm alarm = incomingAlarm;
+    // If the ID is invalid (new alarm from frontend), assign a new ID
+    if (alarm.getId() == 255 || alarm.getId() < 0)
+    { // Using uint8_t, 255 might be -1 casted, or we check against known invalid
+      // Assuming frontend sends ID as int, but Alarm stores as uint8_t.
+      // If frontend sends -1, it becomes 255 in uint8_t
+      alarm.setId(_nextAlarmId++);
+    }
+    _alarms.push_back(alarm);
+  }
   _isDirty = true;
   scheduleSave();
 }
@@ -476,9 +579,9 @@ void ConfigManager::resetGeneralSettingsToDefaults()
  */
 bool ConfigManager::isAnyAlarmSnoozed() const
 {
-  for (int i = 0; i < MAX_ALARMS; ++i)
+  for (const auto &alarm : _alarms)
   {
-    if (_alarms[i].isSnoozed())
+    if (alarm.isSnoozed())
     {
       return true;
     }

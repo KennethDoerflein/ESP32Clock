@@ -5,8 +5,11 @@
 #include <Arduino.h>
 #include "Alarm.h"
 #include <Preferences.h>
+#include <vector>
 
-const int MAX_ALARMS = 5; // Maximum number of alarms that can be set
+const int LEGACY_ALARMS_COUNT = 5;  // Default number of alarms for legacy data migration
+const int DEFAULT_ALARMS_COUNT = 2; // Default number of alarms for new installs/resets
+const int MAX_ALLOWED_ALARMS = 20;  // Maximum number of alarms allowed
 
 // Default Colors
 static constexpr const char *DEFAULT_BACKGROUND_COLOR = "#000000";
@@ -111,14 +114,29 @@ public:
    * @param index The index of the alarm.
    * @return A constant reference to the Alarm object.
    */
-  const Alarm &getAlarm(int index) const;
-  Alarm &getAlarm(int index);
+  const Alarm &getAlarmByIndex(int index) const;
+  Alarm &getAlarmByIndex(int index);
+
+  /**
+   * @brief Gets a specific alarm by its unique ID.
+   * @param id The unique ID of the alarm.
+   * @return A pointer to the Alarm object, or nullptr if not found.
+   */
+  Alarm *getAlarmById(int id);
+  const Alarm *getAlarmById(int id) const;
 
   /**
    * @brief Gets the total number of alarms.
    * @return The number of alarms.
    */
   int getNumAlarms() const;
+
+  /**
+   * @brief Replaces the current list of alarms with a new one.
+   * Assigns new IDs to alarms with ID -1.
+   * @param newAlarms The new vector of alarms.
+   */
+  void replaceAlarms(const std::vector<Alarm> &newAlarms);
 
   /**
    * @brief Gets the stored WiFi password.
@@ -624,7 +642,14 @@ public:
    * @param index The index of the alarm to update.
    * @param alarm The new alarm data.
    */
-  void setAlarm(int index, const Alarm &alarm);
+  void setAlarmByIndex(int index, const Alarm &alarm);
+
+  /**
+   * @brief Updates an alarm by its unique ID.
+   * @param id The unique ID of the alarm.
+   * @param alarm The new alarm data.
+   */
+  void setAlarmById(int id, const Alarm &alarm);
 
   /**
    * @brief Sets the background color of the display.
@@ -838,7 +863,7 @@ private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
    */
-  ConfigManager() : _isDirty(false), _savePending(false), _saveDebounceTimer(0) {}
+  ConfigManager() : _isDirty(false), _savePending(false), _saveDebounceTimer(0), _nextAlarmId(0) {}
 
   // Configuration variables with default values
   String wifiSSID = DEFAULT_WIFI_SSID;
@@ -881,7 +906,8 @@ private:
   bool _isDirty;
   bool _savePending;
   unsigned long _saveDebounceTimer;
-  Alarm _alarms[MAX_ALARMS];
+  std::vector<Alarm> _alarms;
+  int _nextAlarmId;
   Preferences _preferences;
 
   /**

@@ -671,7 +671,7 @@ void ClockPage::updateAlarmSprite()
     // Check for snoozed alarms
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
-      const auto &alarm = config.getAlarm(i);
+      const auto &alarm = config.getAlarmByIndex(i);
       if (alarm.isSnoozed())
       {
         time_t snoozeUntil = alarm.getSnoozeUntil();
