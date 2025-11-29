@@ -390,7 +390,7 @@ void TimeManager::updateSnoozeStates()
   auto &config = ConfigManager::getInstance();
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    Alarm &alarm = config.getAlarm(i);
+    Alarm &alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled() && alarm.isSnoozed())
     {
       if (alarm.updateSnooze())
@@ -398,7 +398,7 @@ void TimeManager::updateSnoozeStates()
         // Snooze is over, re-trigger the alarm
         AlarmManager::getInstance().trigger(alarm.getId());
         // Persist the unsnoozed state
-        config.setAlarm(i, alarm);
+        config.setAlarmByIndex(i, alarm);
         config.save();
         break; // Only trigger one alarm at a time
       }
@@ -445,7 +445,7 @@ void TimeManager::checkMissedAlarms()
   {
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
-      Alarm &alarm = config.getAlarm(i);
+      Alarm &alarm = config.getAlarmByIndex(i);
 
       if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkTime))
       {
@@ -514,7 +514,7 @@ void TimeManager::updateNextAlarmsCache(const DateTime &now)
 
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    Alarm &alarm = config.getAlarm(i);
+    Alarm &alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled())
     {
       DateTime next = calculateNextRingTime(alarm, now);

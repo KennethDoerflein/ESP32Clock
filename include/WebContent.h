@@ -1353,6 +1353,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
             <p class="text-center">Loading alarms...</p>
           </div>
           <div class="d-grid gap-2 mt-4">
+            <button class="btn btn-success" id="add-alarm-btn" title="Add a new alarm."><i class="bi bi-plus-lg me-2"></i>Add Alarm</button>
             <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
           </div>
         </div>
@@ -1386,11 +1387,14 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         saveTimeout = setTimeout(saveAllAlarms, 50);
       }
 
-      function createAlarmCard(alarm) {
+      function createAlarmCard(alarm, index) {
         const card = document.createElement("div");
         card.className = "card mb-3";
         card.dataset.id = alarm.id;
-        const collapseId = `collapse-alarm-${alarm.id}`;
+        // Use a random ID suffix for frontend DOM uniqueness if alarm.id is -1 (new)
+        // or just use index to ensure uniqueness in DOM IDs
+        const domId = alarm.id >= 0 ? alarm.id : `new-${index}-${Math.floor(Math.random() * 1000)}`;
+        const collapseId = `collapse-alarm-${domId}`;
 
         let daysHtml = "";
         const dayKeys = [2, 4, 8, 16, 32, 64, 1];
@@ -1402,17 +1406,20 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
           } day-btn" data-value="${value}" title="Toggle ${label}">${label}</button>`;
         });
 
+        const displayTitle = `Alarm ${index + 1}`;
+
         card.innerHTML = `
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center alarm-header" data-bs-target="#${collapseId}" title="Expand or collapse alarm settings.">
-            <h5 class="card-title mb-0">Alarm ${alarm.id + 1}</h5>
+          <div class="d-flex justify-content-between align-items-center alarm-header">
+            <h5 class="card-title mb-0 flex-grow-1" data-bs-target="#${collapseId}" data-bs-toggle="collapse">${displayTitle}</h5>
             <div class="d-flex align-items-center">
-                 <i class="bi bi-chevron-down collapse-icon me-3"></i>
-                 <div class="form-check form-switch">
+                 <div class="form-check form-switch me-3">
                    <input class="form-check-input" type="checkbox" role="switch" ${
                      alarm.enabled ? "checked" : ""
                    } title="Enable or disable this alarm.">
                  </div>
+                 <button class="btn btn-outline-danger btn-sm delete-btn" title="Delete this alarm"><i class="bi bi-trash"></i></button>
+                 <i class="bi bi-chevron-down collapse-icon ms-3" data-bs-target="#${collapseId}" data-bs-toggle="collapse"></i>
             </div>
           </div>
           <div class="collapse" id="${collapseId}">
@@ -1435,15 +1442,6 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
       `;
 
         const collapseElement = card.querySelector(`#${collapseId}`);
-        const collapseInstance = new bootstrap.Collapse(collapseElement, {
-          toggle: false,
-        });
-
-        card.querySelector(".alarm-header").addEventListener("click", (event) => {
-          if (!event.target.classList.contains("form-check-input")) {
-            collapseInstance.toggle();
-          }
-        });
         const collapseIcon = card.querySelector(".collapse-icon");
         collapseElement.addEventListener("show.bs.collapse", () =>
           collapseIcon.classList.remove("collapsed")
@@ -1453,6 +1451,15 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         );
         if (!collapseElement.classList.contains("show"))
           collapseIcon.classList.add("collapsed");
+        
+        // Delete button handler
+        card.querySelector(".delete-btn").addEventListener("click", (e) => {
+             e.stopPropagation(); // Prevent collapse toggle
+             if (confirm("Delete this alarm?")) {
+                 card.remove();
+                 handleInputChange();
+             }
+        });
 
         card.querySelectorAll(".day-btn").forEach((btn) => {
           btn.addEventListener("click", () => {
@@ -1471,6 +1478,34 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
         return card;
       }
+      
+      document.getElementById('add-alarm-btn').addEventListener('click', () => {
+          // Count current cards to determine index and check limit
+          const count = alarmsContainer.querySelectorAll('.card').length;
+          const MAX_ALLOWED_ALARMS = 20; // Must match backend limit
+          
+          if (count >= MAX_ALLOWED_ALARMS) {
+              alert(`Maximum number of alarms (${MAX_ALLOWED_ALARMS}) reached.`);
+              return;
+          }
+
+          const newAlarm = {
+              id: -1, // Indicates new alarm
+              enabled: true,
+              hour: 7,
+              minute: 0,
+              days: 0
+          };
+          
+          const card = createAlarmCard(newAlarm, count);
+          alarmsContainer.appendChild(card);
+          // Auto-expand the new alarm
+          const collapseEl = card.querySelector('.collapse');
+          if (collapseEl) {
+              const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: true });
+          }
+          handleInputChange();
+      });
 
       async function loadAlarms() {
         alarmsContainer.innerHTML =
@@ -1487,17 +1522,11 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       function renderAlarms(alarms) {
         alarmsContainer.innerHTML = "";
-        if (!alarms || alarms.length === 0) {
-          alarms = Array.from({ length: 5 }, (_, i) => ({
-            id: i,
-            enabled: false,
-            hour: 6,
-            minute: 0,
-            days: 0,
-          }));
-        }
-        alarms.forEach((alarm) => {
-          const cardElement = createAlarmCard(alarm);
+        // If empty, show nothing (or we could show one default one, but empty is valid now)
+        if (!alarms) alarms = [];
+        
+        alarms.forEach((alarm, index) => {
+          const cardElement = createAlarmCard(alarm, index);
           alarmsContainer.appendChild(cardElement);
         });
         statusEl.innerHTML = STATUS_INDICATORS.SAVED;
