@@ -230,12 +230,6 @@ void setup()
   }
   pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP); // BOOT button is used for run-time reset
 
-  // Disable console logging if the version string does not contain "dev"
-  if (String(FIRMWARE_VERSION).indexOf("dev") == -1)
-  {
-    logger.setConsoleLoggingEnabled(false);
-  }
-
   logger.print("\n\n--- ESP32 Clock Booting Up ---\n");
 
   // Initialize the snooze button interrupt

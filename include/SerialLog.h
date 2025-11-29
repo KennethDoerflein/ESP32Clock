@@ -68,6 +68,12 @@ public:
   void setLoggingEnabled(bool enabled);
 
   /**
+   * @brief Manually rotates the log file.
+   * Thread-safe.
+   */
+  void rotate();
+
+  /**
    * @brief Gets the log file path.
    * @return The path to the log file.
    */

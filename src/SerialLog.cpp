@@ -224,6 +224,19 @@ void SerialLog::flush()
 }
 
 /**
+ * @brief Manually rotates the log file.
+ * Thread-safe.
+ */
+void SerialLog::rotate()
+{
+  if (xSemaphoreTake(_mutex, portMAX_DELAY) == pdTRUE)
+  {
+    rotateLogFile();
+    xSemaphoreGive(_mutex);
+  }
+}
+
+/**
  * @brief Rotates the log file when it exceeds the maximum size.
  */
 void SerialLog::rotateLogFile()
@@ -240,5 +253,12 @@ void SerialLog::rotateLogFile()
   if (LittleFS.exists(LOG_FILE_PATH))
   {
     LittleFS.rename(LOG_FILE_PATH, oldLogPath);
+  }
+
+  // Immediately create a new empty log file to minimize the window where it doesn't exist
+  File logFile = LittleFS.open(LOG_FILE_PATH, "w");
+  if (logFile)
+  {
+    logFile.close();
   }
 }

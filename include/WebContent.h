@@ -29,16 +29,26 @@ const char BOOTSTRAP_HEAD[] PROGMEM = R"rawliteral(
 
 const char SERIAL_LOG_TAB_HTML[] PROGMEM = R"rawliteral(
 <li class="nav-item" role="presentation">
-  <button class="nav-link" id="serial-log-tab" data-bs-toggle="tab" data-bs-target="#serial-log" type="button" role="tab" aria-controls="serial-log" aria-selected="false">Serial Log</button>
+  <button class="nav-link" id="serial-log-tab" data-bs-toggle="tab" data-bs-target="#serial-log" type="button" role="tab" aria-controls="serial-log" aria-selected="false">Logs</button>
 </li>
 )rawliteral";
 
 const char SERIAL_LOG_TAB_PANE_HTML[] PROGMEM = R"rawliteral(
 <div class="tab-pane fade" id="serial-log" role="tabpanel" aria-labelledby="serial-log-tab">
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="card-title d-flex align-items-center"><i class="bi bi-file-text me-2"></i>System Log File</h5>
+      <p class="card-text text-muted small">Manage the persistent system log file stored on the device.</p>
+      <div class="d-grid gap-2">
+        <a href="/api/log/download" id="download-system-log-btn" class="btn btn-secondary" target="_blank">Download System Log</a>
+        <button id="rollover-btn" class="btn btn-outline-danger" title="Rollover the log file manually.">Rollover Log</button>
+      </div>
+    </div>
+  </div>
   <div class="log-container">
     <div class="log-header">
       <h5>Live Log</h5>
-      <button id="download-btn" class="btn btn-sm btn-outline-secondary" title="Download the current log as a text file.">Download Log</button>
+      <button id="download-btn" class="btn btn-sm btn-outline-secondary" title="Download the current log as a text file.">Download Live Log</button>
     </div>
     <div id="log">Waiting for logs...</div>
   </div>
@@ -104,6 +114,7 @@ const char SERIAL_LOG_SCRIPT_JS[] PROGMEM = R"rawliteral(
         document.body.removeChild(link);
     });
   }
+
 </script>
 )rawliteral";
 
@@ -1648,15 +1659,6 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
                 <div id="ntp-sync-status" class="mt-2 text-center"></div>
               </div>
             </div>
-            <div class="card mt-4">
-              <div class="card-body">
-                <h5 class="card-title d-flex align-items-center"><i class="bi bi-file-text me-2"></i>System Logs</h5>
-                <p class="card-text text-muted small">Download the system log file for troubleshooting.</p>
-                 <div class="d-grid">
-                  <a href="/api/log/download" class="btn btn-secondary" target="_blank">Download System Log</a>
-                </div>
-              </div>
-            </div>
           </div>
           %SERIAL_LOG_TAB_PANE%
         </div>
@@ -1707,6 +1709,9 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     const uploadForm = document.getElementById('upload-form');
     const onlineButton = document.getElementById('online-button');
     const ntpSyncButton = document.getElementById('ntp-sync-button');
+    const rolloverBtn = document.getElementById('rollover-btn');
+    const downloadSystemLogBtn = document.getElementById('download-system-log-btn');
+    const logsTab = document.getElementById('serial-log-tab');
     const ntpSyncStatusDiv = document.getElementById('ntp-sync-status');
     const statusDiv = document.getElementById('status');
     const fileInput = document.getElementById('firmware');
@@ -1811,6 +1816,21 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
       if (rebootBtn) rebootBtn.disabled = disabled;
       if (resetBtn) resetBtn.disabled = disabled;
       if (resetKeepWifiBtn) resetKeepWifiBtn.disabled = disabled;
+      if (rolloverBtn) rolloverBtn.disabled = disabled;
+      if (downloadSystemLogBtn) {
+        if (disabled) {
+          downloadSystemLogBtn.classList.add('disabled');
+        } else {
+          downloadSystemLogBtn.classList.remove('disabled');
+        }
+      }
+      if (logsTab) {
+        if (disabled) {
+          logsTab.classList.add('disabled');
+        } else {
+          logsTab.classList.remove('disabled');
+        }
+      }
     }
 
     function setButtonsDisabled(disabled) {
@@ -1928,6 +1948,28 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
           }
         });
     });
+
+    if (rolloverBtn) {
+      rolloverBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to manually rollover the log file? The current backup will be overwritten.')) {
+          setButtonsDisabled(true);
+          fetch('/api/log/rotate', { method: 'POST' })
+          .then(response => {
+            if (response.ok) {
+              alert("Log rotated successfully.");
+            } else {
+              alert("Failed to rotate log.");
+            }
+          })
+          .catch(e => alert("Error: " + e))
+          .finally(() => {
+            if (!isUpdating) {
+              setButtonsDisabled(false);
+            }
+          });
+        }
+      });
+    }
 
     function rebootDevice() {
       if (confirm("Are you sure you want to reboot the device?")) {
