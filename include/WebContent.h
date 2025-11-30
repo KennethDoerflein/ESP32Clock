@@ -60,6 +60,9 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
             <button id="sync-btn" class="btn btn-primary btn-lg"><i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now</button>
             <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
         </div>
+        <div class="mt-3 text-center">
+            <small class="text-muted">Weather data provided by <a href="https://open-meteo.com/" target="_blank" class="link-secondary">open-meteo.com</a></small>
+        </div>
       </div>
     </div>
   </div>
