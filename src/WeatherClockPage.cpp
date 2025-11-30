@@ -37,7 +37,6 @@ void WeatherClockPage::onEnter(TFT_eSPI &tft)
   if (!_spritesCreated)
   {
     setupSprites(tft);
-    initAlarmSprite(tft);
     _spritesCreated = true;
   }
 
@@ -115,26 +114,6 @@ void WeatherClockPage::render(TFT_eSPI &tft)
     drawDayOfWeek(tft);
     _lastData.dayOfWeek = currentData.dayOfWeek;
   }
-
-  // Handle Alarm Sprite visibility
-  auto &alarmManager = AlarmManager::getInstance();
-  auto &config = ConfigManager::getInstance();
-  bool isAlarmActive = alarmManager.isRinging() || config.isAnyAlarmSnoozed();
-
-  if (isAlarmActive)
-  {
-    updateAlarmSprite();
-    _wasAlarmActive = true;
-  }
-  else if (_wasAlarmActive)
-  {
-    clearAlarmSprite();
-    drawWeather(tft); // Redraw elements that might be covered
-    drawBottomAlarm(tft);
-    _lastData.indoorTemp = -999.0; // Force full redraw of row
-    _lastData.indoorHumidity = -999.0;
-    _wasAlarmActive = false;
-  }
 }
 
 void WeatherClockPage::setupLayout(TFT_eSPI &tft)
@@ -153,10 +132,6 @@ void WeatherClockPage::setupLayout(TFT_eSPI &tft)
   _dateY = screenHeight - (fontHeight * 2 + MARGIN + 55);
   _sensorY = screenHeight - (fontHeight + MARGIN + 20);
 
-  // Position the alarm sprite in the middle of the sensor row
-  // Note: WeatherClockPage calculates this differently if needed, but here it seems consistent with ClockPage's row
-  _alarmSpriteY = _sensorY + (TEMP_SPRITE_HEIGHT - ALARM_SPRITE_HEIGHT) / 2;
-
   // Calculate width distribution for bottom row
   int availableWidth = screenWidth - 2 * MARGIN;
   _alarmWidth = availableWidth * 0.40;               // 40% for alarm to prevent overflow
@@ -173,16 +148,6 @@ void WeatherClockPage::setupSprites(TFT_eSPI &tft)
   _sprWeather.setTextDatum(MC_DATUM);
 
   // Bottom Row Sprites
-  // Re-calculate widths as layout might not have run yet if this is called from onEnter -> setupSprites
-  // But setupLayout depends on sprites? No, setupLayout is called after.
-  // Wait, setupLayout sets _sensorWidth.
-  // We need _sensorWidth to create sprites.
-  // In `onEnter`:
-  // if (!_spritesCreated) { setupSprites(tft); ... }
-  // setupLayout(tft);
-  // So _sensorWidth is NOT calculated when setupSprites is called for the first time!
-  // This is a pre-existing issue or logic.
-  // Let's calculate it here locally.
   int screenWidth = tft.width();
   int availableWidth = screenWidth - 2 * MARGIN;
   int alarmWidth = availableWidth * 0.40;

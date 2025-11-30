@@ -428,11 +428,8 @@ void loop()
         // Update the progress bar while the button is held
         unsigned long dismissDurationMs = config.getDismissDuration() * 1000;
         float progress = (float)(currentMillis - s_alarmButtonPressTime) / dismissDurationMs;
-        if (displayManager.getCurrentPageIndex() == 0)
-        {
-          static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(progress);
-          displayManager.update();
-        }
+        displayManager.setDismissProgress(progress);
+        displayManager.update();
       }
 
       if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > (config.getDismissDuration() * 1000))
@@ -451,13 +448,11 @@ void loop()
             config.save();
           }
           alarmManager.stop();
-          if (displayManager.getCurrentPageIndex() == 0)
-          {
-            // Reset the progress bar to 0 and then force a full render update
-            // to show the new snooze state and ensure the progress bar is cleared.
-            static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(0.0f);
-            displayManager.update();
-          }
+
+          // Reset the progress bar to 0 and then force a full render update
+          // to show the new snooze state and ensure the progress bar is cleared.
+          displayManager.setDismissProgress(0.0f);
+          displayManager.update();
         }
         s_actionTaken = true; // Ensure dismiss is only called once
       }
@@ -481,13 +476,11 @@ void loop()
             config.save();
           }
           alarmManager.stop();
-          if (displayManager.getCurrentPageIndex() == 0)
-          {
-            // Reset the progress bar and then force a full render update
-            // to show the new snooze state and ensure the progress bar is cleared.
-            static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(0.0f);
-            displayManager.update();
-          }
+
+          // Reset the progress bar and then force a full render update
+          // to show the new snooze state and ensure the progress bar is cleared.
+          displayManager.setDismissProgress(0.0f);
+          displayManager.update();
         }
       }
       // Always reset the button timer and action flag on release.
@@ -512,11 +505,8 @@ void loop()
       {
         // Update the progress bar while the button is held
         float progress = (float)(currentMillis - s_alarmButtonPressTime) / 3000.0f;
-        if (displayManager.getCurrentPageIndex() == 0)
-        {
-          static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(progress);
-          displayManager.update();
-        }
+        displayManager.setDismissProgress(progress);
+        displayManager.update();
       }
 
       // If the button is held long enough, end the snooze for all snoozed alarms
@@ -533,11 +523,10 @@ void loop()
           }
         }
         config.save();
-        if (displayManager.getCurrentPageIndex() == 0)
-        {
-          // Force the alarm sprite to re-render, which will now be empty
-          static_cast<ClockPage *>(displayManager.getCurrentPage())->updateAlarmSprite();
-        }
+
+        // Force the alarm sprite to re-render, which will now be empty
+        displayManager.update();
+
         s_actionTaken = true; // Ensure action is only called once
       }
     }
@@ -547,11 +536,8 @@ void loop()
       if (s_alarmButtonPressTime > 0)
       {
         // If the button was being held, reset the progress bar and timer.
-        if (displayManager.getCurrentPageIndex() == 0)
-        {
-          static_cast<ClockPage *>(displayManager.getCurrentPage())->setDismissProgress(0.0f);
-          displayManager.update();
-        }
+        displayManager.setDismissProgress(0.0f);
+        displayManager.update();
         s_alarmButtonPressTime = 0;
       }
     }

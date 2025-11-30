@@ -35,7 +35,7 @@
  */
 ClockPage::ClockPage(TFT_eSPI *tft)
     : _sprClock(tft), _sprDayOfWeek(tft), _sprDate(tft), _sprTemp(tft), _sprHumidity(tft), _sprTOD(tft), _sprSeconds(tft),
-      _alarmSprite(tft), _sprNextAlarm1(tft), _sprNextAlarm2(tft), _tft(tft)
+      _sprNextAlarm1(tft), _sprNextAlarm2(tft), _tft(tft)
 {
   // Sprites are initialized in the member initializer list
 }
@@ -68,7 +68,6 @@ void ClockPage::onEnter(TFT_eSPI &tft)
   if (!_spritesCreated)
   {
     setupSprites(tft);
-    initAlarmSprite(tft);
     _spritesCreated = true;
   }
   setupLayout(tft);
@@ -151,25 +150,6 @@ void ClockPage::render(TFT_eSPI &tft)
     _lastData.nextAlarm1 = currentData.nextAlarm1;
     _lastData.nextAlarm2 = currentData.nextAlarm2;
   }
-
-  // Handle Alarm Sprite visibility
-  auto &alarmManager = AlarmManager::getInstance();
-  auto &config = ConfigManager::getInstance();
-  bool isAlarmActive = alarmManager.isRinging() || config.isAnyAlarmSnoozed();
-
-  if (isAlarmActive)
-  {
-    updateAlarmSprite();
-    _wasAlarmActive = true;
-  }
-  else if (_wasAlarmActive)
-  {
-    // Transitioned from active to inactive.
-    // Clear the alarm sprite area and force a redraw of the elements behind it (Next Alarms).
-    clearAlarmSprite();
-    drawNextAlarms(tft, currentData.nextAlarm1, currentData.nextAlarm2);
-    _wasAlarmActive = false;
-  }
 }
 
 /**
@@ -195,10 +175,6 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   _alarmRowY = screenHeight - (fontHeight * 3 + MARGIN + 80);
   _dateY = screenHeight - (fontHeight * 2 + MARGIN + 55);
   _sensorY = screenHeight - (fontHeight + MARGIN + 20);
-
-  // --- Alarm Sprite Layout ---
-  // Position the alarm sprite in the middle of the sensor row (between Temp and Humidity)
-  _alarmSpriteY = _sensorY + (TEMP_SPRITE_HEIGHT - ALARM_SPRITE_HEIGHT) / 2;
 }
 
 void ClockPage::setupClockLayout(TFT_eSPI &tft)
@@ -240,20 +216,6 @@ void ClockPage::setupClockLayout(TFT_eSPI &tft)
   _todY = sideStartY;
   _secondsX = _todX + (TOD_SPRITE_WIDTH - SECONDS_SPRITE_WIDTH) / 2;
   _secondsY = _todY + TOD_SPRITE_HEIGHT + sideElementsVGap + 3;
-
-  // Alarm Sprite X is always centered
-  _alarmSpriteX = (screenWidth - _alarmSprite.width()) / 2;
-}
-
-/**
- * @brief Clears the area of the screen where the alarm sprite is displayed.
- *
- * This is a helper function to manually clear the alarm sprite's footprint
- * on the screen, which can be useful when transitioning between alarm states.
- */
-void ClockPage::clearAlarmSprite()
-{
-  _tft->fillRect(_alarmSpriteX, _alarmSpriteY, _alarmSprite.width(), _alarmSprite.height(), _bgColor);
 }
 
 /**
@@ -583,19 +545,6 @@ void ClockPage::updateDisplayData(DisplayData &data)
 }
 
 /**
- * @brief Sets the progress of the alarm dismiss action.
- *
- * This is called from the main loop to update the visual progress bar when
- * the user is holding down the button to dismiss an alarm.
- *
- * @param progress The progress, from 0.0 (empty) to 1.0 (full).
- */
-void ClockPage::setDismissProgress(float progress)
-{
-  _dismissProgress = progress;
-}
-
-/**
  * @brief Refreshes the display after settings have changed.
  *
  * This method is called when the configuration has been updated. It reapplies
@@ -633,102 +582,4 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   _lastData.seconds = " ";
   _lastData.nextAlarm1 = " ";
   _lastData.nextAlarm2 = " ";
-}
-
-/**
- * @brief Initializes the alarm sprite.
- *
- * Creates the sprite used for displaying "ALARM" or the snooze countdown.
- * It's sized based on the text width to be efficient.
- *
- * @param tft A reference to the TFT_eSPI driver instance.
- */
-void ClockPage::initAlarmSprite(TFT_eSPI &tft)
-{
-  tft.loadFont(CenturyGothicBold48);
-  int textWidth = tft.textWidth("ALARM");
-  _alarmSprite.createSprite(textWidth + ALARM_SPRITE_WIDTH_PADDING, ALARM_SPRITE_HEIGHT);
-  _alarmSprite.loadFont(CenturyGothicBold48);
-  _alarmSprite.setTextDatum(MC_DATUM);
-  _alarmSprite.setTextColor(hexToRGB565(ConfigManager::getInstance().getAlarmTextColor().c_str()));
-  tft.unloadFont();
-}
-
-/**
- * @brief Updates and renders the alarm sprite.
- *
- * This function contains the logic to display the correct alarm state:
- * - "ALARM" when an alarm is ringing.
- * - A snooze countdown when an alarm is snoozed.
- * - A progress bar when the user is holding the dismiss button.
- * - Nothing when no alarm is active.
- *
- * The updated sprite is then pushed to the screen.
- */
-void ClockPage::updateAlarmSprite()
-{
-  auto &config = ConfigManager::getInstance();
-  uint16_t alarmColor = hexToRGB565(config.getAlarmTextColor().c_str());
-
-  // Clear the sprite with the background color (transparent corners relative to the button)
-  _alarmSprite.fillSprite(_bgColor);
-
-  auto &alarmManager = AlarmManager::getInstance();
-  bool showButton = false;
-  String text = "";
-
-  if (alarmManager.isRinging())
-  {
-    showButton = true;
-    text = "ALARM";
-  }
-  else
-  {
-    // Check for snoozed alarms
-    for (int i = 0; i < config.getNumAlarms(); ++i)
-    {
-      const auto &alarm = config.getAlarmByIndex(i);
-      if (alarm.isSnoozed())
-      {
-        time_t snoozeUntil = alarm.getSnoozeUntil();
-        time_t now = TimeManager::getInstance().getRTCTime().unixtime();
-        long remaining = snoozeUntil - now;
-        if (remaining < 0)
-        {
-          remaining = 0;
-        }
-
-        char buf[10];
-        snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
-        text = String(buf);
-        showButton = true;
-        break;
-      }
-    }
-  }
-
-  if (showButton)
-  {
-    // Draw the rounded button body
-    _alarmSprite.fillRoundRect(0, 0, _alarmSprite.width(), _alarmSprite.height(), 10, alarmColor);
-
-    // Set text color to background color (inverted)
-    _alarmSprite.setTextColor(_bgColor);
-    _alarmSprite.drawString(text.c_str(), _alarmSprite.width() / 2, _alarmSprite.height() / 2);
-
-    // Draw the progress bar if the button is being held
-    if (_dismissProgress > 0.0f)
-    {
-      int margin = 5;
-      int availableWidth = _alarmSprite.width() - (2 * margin);
-      int barWidth = availableWidth * _dismissProgress;
-      _alarmSprite.fillRoundRect(margin, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT - margin, barWidth, ALARM_PROGRESS_BAR_HEIGHT, 3, TFT_WHITE);
-    }
-  }
-  else
-  {
-    _dismissProgress = 0.0f;
-  }
-
-  _alarmSprite.pushSprite(_alarmSpriteX, _alarmSpriteY);
 }

@@ -35,9 +35,6 @@ public:
   virtual void update() override;
   virtual void render(TFT_eSPI &tft) override;
   virtual void refresh(TFT_eSPI &tft, bool fullRefresh) override;
-  void setDismissProgress(float progress);
-  void clearAlarmSprite();
-  void updateAlarmSprite();
 
 protected:
   virtual void setupSprites(TFT_eSPI &tft);
@@ -58,7 +55,6 @@ protected:
   virtual void drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String &alarm2);
 
   virtual void updateSpriteColors();
-  void initAlarmSprite(TFT_eSPI &tft);
   void updateDisplayData(DisplayData &data);
 
   // Flag to track sprite creation
@@ -72,7 +68,6 @@ protected:
   TFT_eSprite _sprHumidity;
   TFT_eSprite _sprTOD;
   TFT_eSprite _sprSeconds;
-  TFT_eSprite _alarmSprite;
   TFT_eSprite _sprNextAlarm1;
   TFT_eSprite _sprNextAlarm2;
 
@@ -90,13 +85,8 @@ protected:
   int _dateY;
   int _sensorY;
   int _alarmRowY;
-  int _alarmSpriteX;
-  int _alarmSpriteY;
-
-  bool _wasAlarmActive = false;
 
   // Cached background color
   uint16_t _bgColor;
-  float _dismissProgress = 0.0f;
   TFT_eSPI *_tft;
 };
