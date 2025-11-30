@@ -20,9 +20,8 @@
 #include <Arduino.h>
 
 WeatherClockPage::WeatherClockPage(TFT_eSPI *tft)
-    : _sprClock(tft), _sprDayOfWeek(tft), _sprDate(tft),
-      _sprWeather(tft), _sprIndoorTemp(tft), _sprBottomAlarm(tft), _sprIndoorHumidity(tft),
-      _sprTOD(tft), _sprSeconds(tft), _alarmSprite(tft), _tft(tft)
+    : ClockPage(tft), // Base constructor
+      _sprWeather(tft), _sprIndoorTemp(tft), _sprBottomAlarm(tft), _sprIndoorHumidity(tft)
 {
 }
 
@@ -130,7 +129,7 @@ void WeatherClockPage::render(TFT_eSPI &tft)
   else if (_wasAlarmActive)
   {
     clearAlarmSprite();
-    drawWeather(tft);
+    drawWeather(tft); // Redraw elements that might be covered
     drawBottomAlarm(tft);
     _lastData.indoorTemp = -999.0; // Force full redraw of row
     _lastData.indoorHumidity = -999.0;
@@ -140,30 +139,11 @@ void WeatherClockPage::render(TFT_eSPI &tft)
 
 void WeatherClockPage::setupLayout(TFT_eSPI &tft)
 {
+  // Call base class to setup Clock Header Layout
+  setupClockLayout(tft);
+
   int screenWidth = tft.width();
   int screenHeight = tft.height();
-
-  _clockY = MARGIN;
-  int sideWidth = max(_sprTOD.width(), _sprSeconds.width());
-  int timeSideGap = 15;
-  int totalWidth = CLOCK_SPRITE_WIDTH + timeSideGap + sideWidth;
-  int startX = (screenWidth - totalWidth) / 2;
-  if (startX < 0)
-    startX = 0;
-
-  _clockX = startX - 15;
-  _sideX = _clockX + CLOCK_SPRITE_WIDTH + timeSideGap;
-
-  int sideElementsVGap = 15;
-  int sideElementsHeight = TOD_SPRITE_HEIGHT + sideElementsVGap + SECONDS_SPRITE_HEIGHT;
-  int sideStartY = _clockY + (CLOCK_SPRITE_HEIGHT - sideElementsHeight) / 2;
-  if (sideStartY < _clockY)
-    sideStartY = _clockY;
-
-  _todX = _sideX + sideElementsVGap;
-  _todY = sideStartY;
-  _secondsX = _todX + (TOD_SPRITE_WIDTH - SECONDS_SPRITE_WIDTH) / 2;
-  _secondsY = _todY + TOD_SPRITE_HEIGHT + sideElementsVGap + 3;
 
   tft.loadFont(DSEG14ModernBold32);
   int fontHeight = tft.fontHeight();
@@ -173,7 +153,8 @@ void WeatherClockPage::setupLayout(TFT_eSPI &tft)
   _dateY = screenHeight - (fontHeight * 2 + MARGIN + 55);
   _sensorY = screenHeight - (fontHeight + MARGIN + 20);
 
-  _alarmSpriteX = (screenWidth - _alarmSprite.width()) / 2;
+  // Position the alarm sprite in the middle of the sensor row
+  // Note: WeatherClockPage calculates this differently if needed, but here it seems consistent with ClockPage's row
   _alarmSpriteY = _sensorY + (TEMP_SPRITE_HEIGHT - ALARM_SPRITE_HEIGHT) / 2;
 
   // Calculate width distribution for bottom row
@@ -182,47 +163,40 @@ void WeatherClockPage::setupLayout(TFT_eSPI &tft)
   _sensorWidth = (availableWidth - _alarmWidth) / 2; // ~30% each for sensors
 }
 
-void WeatherClockPage::clearAlarmSprite()
-{
-  _tft->fillRect(_alarmSpriteX, _alarmSpriteY, _alarmSprite.width(), _alarmSprite.height(), _bgColor);
-}
-
 void WeatherClockPage::setupSprites(TFT_eSPI &tft)
 {
-  _sprClock.createSprite(CLOCK_SPRITE_WIDTH, CLOCK_SPRITE_HEIGHT);
-  _sprClock.loadFont(DSEG7ModernBold104);
-  _sprClock.setTextDatum(MR_DATUM);
-
-  _sprTOD.createSprite(TOD_SPRITE_WIDTH, TOD_SPRITE_HEIGHT);
-  _sprTOD.loadFont(DSEG14ModernBold32);
-  _sprTOD.setTextDatum(TR_DATUM);
-
-  _sprSeconds.createSprite(SECONDS_SPRITE_WIDTH, SECONDS_SPRITE_HEIGHT);
-  _sprSeconds.loadFont(DSEG7ModernBold48);
-  _sprSeconds.setTextDatum(TR_DATUM);
-
-  _sprDayOfWeek.createSprite(tft.width() / 2 - MARGIN, DAY_OF_WEEK_SPRITE_HEIGHT);
-  _sprDayOfWeek.loadFont(DSEG14ModernBold48);
-  _sprDayOfWeek.setTextDatum(ML_DATUM);
-
-  _sprDate.createSprite(tft.width() / 2 - MARGIN, DATE_SPRITE_HEIGHT);
-  _sprDate.loadFont(DSEG14ModernBold48);
-  _sprDate.setTextDatum(MR_DATUM);
+  // Setup common sprites (Clock, Date, Day)
+  setupClockSprites(tft);
 
   _sprWeather.createSprite(tft.width() - 2 * MARGIN, DAY_OF_WEEK_SPRITE_HEIGHT);
   _sprWeather.loadFont(CenturyGothicBold48);
   _sprWeather.setTextDatum(MC_DATUM);
 
   // Bottom Row Sprites
-  _sprIndoorTemp.createSprite(_sensorWidth, TEMP_SPRITE_HEIGHT);
+  // Re-calculate widths as layout might not have run yet if this is called from onEnter -> setupSprites
+  // But setupLayout depends on sprites? No, setupLayout is called after.
+  // Wait, setupLayout sets _sensorWidth.
+  // We need _sensorWidth to create sprites.
+  // In `onEnter`:
+  // if (!_spritesCreated) { setupSprites(tft); ... }
+  // setupLayout(tft);
+  // So _sensorWidth is NOT calculated when setupSprites is called for the first time!
+  // This is a pre-existing issue or logic.
+  // Let's calculate it here locally.
+  int screenWidth = tft.width();
+  int availableWidth = screenWidth - 2 * MARGIN;
+  int alarmWidth = availableWidth * 0.40;
+  int sensorWidth = (availableWidth - alarmWidth) / 2;
+
+  _sprIndoorTemp.createSprite(sensorWidth, TEMP_SPRITE_HEIGHT);
   _sprIndoorTemp.loadFont(DSEG14ModernBold48);
   _sprIndoorTemp.setTextDatum(ML_DATUM);
 
-  _sprBottomAlarm.createSprite(_alarmWidth, TEMP_SPRITE_HEIGHT);
+  _sprBottomAlarm.createSprite(alarmWidth, TEMP_SPRITE_HEIGHT);
   _sprBottomAlarm.loadFont(DSEG14ModernBold32);
   _sprBottomAlarm.setTextDatum(MC_DATUM);
 
-  _sprIndoorHumidity.createSprite(_sensorWidth, TEMP_SPRITE_HEIGHT);
+  _sprIndoorHumidity.createSprite(sensorWidth, TEMP_SPRITE_HEIGHT);
   _sprIndoorHumidity.loadFont(DSEG14ModernBold48);
   _sprIndoorHumidity.setTextDatum(MR_DATUM);
 
@@ -231,70 +205,19 @@ void WeatherClockPage::setupSprites(TFT_eSPI &tft)
 
 void WeatherClockPage::updateSpriteColors()
 {
+  // Update base colors
+  ClockPage::updateSpriteColors();
+
   auto &config = ConfigManager::getInstance();
-  _bgColor = hexToRGB565(config.getBackgroundColor());
-  uint16_t timeColor = hexToRGB565(config.getTimeColor());
   uint16_t todColor = hexToRGB565(config.getTodColor());
-  uint16_t secondsColor = hexToRGB565(config.getSecondsColor());
-  uint16_t dayOfWeekColor = hexToRGB565(config.getDayOfWeekColor());
-  uint16_t dateColor = hexToRGB565(config.getDateColor());
   uint16_t tempColor = hexToRGB565(config.getTempColor());
   uint16_t humidityColor = hexToRGB565(config.getHumidityColor());
   uint16_t alarmColor = hexToRGB565(config.getAlarmTextColor());
-
-  _sprClock.setTextColor(timeColor, _bgColor);
-  _sprTOD.setTextColor(todColor, _bgColor);
-  _sprSeconds.setTextColor(secondsColor, _bgColor);
-  _sprDayOfWeek.setTextColor(dayOfWeekColor, _bgColor);
-  _sprDate.setTextColor(dateColor, _bgColor);
 
   _sprWeather.setTextColor(todColor, _bgColor);
   _sprIndoorTemp.setTextColor(tempColor, _bgColor);
   _sprBottomAlarm.setTextColor(alarmColor, _bgColor);
   _sprIndoorHumidity.setTextColor(humidityColor, _bgColor);
-}
-
-void WeatherClockPage::drawClock(TFT_eSPI &tft)
-{
-  auto &timeManager = TimeManager::getInstance();
-  bool is24Hour = timeManager.is24HourFormat();
-  String timeStr = timeManager.getFormattedTime();
-  String todStr = timeManager.getTOD();
-
-  _sprClock.fillSprite(_bgColor);
-  _sprClock.drawString(timeStr.c_str(), _sprClock.width(), _sprClock.height() / 2);
-  _sprClock.pushSprite(_clockX, _clockY);
-
-  if (!is24Hour)
-  {
-    _sprTOD.fillSprite(_bgColor);
-    _sprTOD.drawString(todStr.c_str(), _sprTOD.width(), 0);
-    _sprTOD.pushSprite(_todX, _todY);
-  }
-}
-
-void WeatherClockPage::drawSeconds(TFT_eSPI &tft)
-{
-  String secondsStr = TimeManager::getInstance().getFormattedSeconds();
-  _sprSeconds.fillSprite(_bgColor);
-  _sprSeconds.drawString(secondsStr.c_str(), _sprSeconds.width(), 0);
-  _sprSeconds.pushSprite(_secondsX, _secondsY);
-}
-
-void WeatherClockPage::drawDayOfWeek(TFT_eSPI &tft)
-{
-  String dayStr = TimeManager::getInstance().getDayOfWeek();
-  _sprDayOfWeek.fillSprite(_bgColor);
-  _sprDayOfWeek.drawString(dayStr.c_str(), 0, _sprDayOfWeek.height() / 2);
-  _sprDayOfWeek.pushSprite(MARGIN, _dateY);
-}
-
-void WeatherClockPage::drawDate(TFT_eSPI &tft)
-{
-  String dateStr = TimeManager::getInstance().getFormattedDate();
-  _sprDate.fillSprite(_bgColor);
-  _sprDate.drawString(dateStr.c_str(), _sprDate.width(), _sprDate.height() / 2);
-  _sprDate.pushSprite(_tft->width() / 2, _dateY);
 }
 
 void WeatherClockPage::drawWeather(TFT_eSPI &tft)
@@ -482,11 +405,6 @@ void WeatherClockPage::updateDisplayData(WeatherClockDisplayData &data)
   }
 }
 
-void WeatherClockPage::setDismissProgress(float progress)
-{
-  _dismissProgress = progress;
-}
-
 void WeatherClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
 {
   auto &config = ConfigManager::getInstance();
@@ -514,73 +432,4 @@ void WeatherClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   _lastData.tod = " ";
   _lastData.seconds = " ";
   _lastData.nextAlarm = "REFRESH";
-}
-
-void WeatherClockPage::initAlarmSprite(TFT_eSPI &tft)
-{
-  tft.loadFont(CenturyGothicBold48);
-  int textWidth = tft.textWidth("ALARM");
-  _alarmSprite.createSprite(textWidth + ALARM_SPRITE_WIDTH_PADDING, ALARM_SPRITE_HEIGHT);
-  _alarmSprite.loadFont(CenturyGothicBold48);
-  _alarmSprite.setTextDatum(MC_DATUM);
-  _alarmSprite.setTextColor(hexToRGB565(ConfigManager::getInstance().getAlarmTextColor().c_str()));
-  tft.unloadFont();
-}
-
-void WeatherClockPage::updateAlarmSprite()
-{
-  auto &config = ConfigManager::getInstance();
-  uint16_t alarmColor = hexToRGB565(config.getAlarmTextColor().c_str());
-  _alarmSprite.fillSprite(_bgColor);
-
-  auto &alarmManager = AlarmManager::getInstance();
-  bool showButton = false;
-  String text = "";
-
-  if (alarmManager.isRinging())
-  {
-    showButton = true;
-    text = "ALARM";
-  }
-  else
-  {
-    for (int i = 0; i < config.getNumAlarms(); ++i)
-    {
-      const auto &alarm = config.getAlarmByIndex(i);
-      if (alarm.isSnoozed())
-      {
-        time_t snoozeUntil = alarm.getSnoozeUntil();
-        time_t now = TimeManager::getInstance().getRTCTime().unixtime();
-        long remaining = snoozeUntil - now;
-        if (remaining < 0)
-          remaining = 0;
-        char buf[10];
-        snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
-        text = String(buf);
-        showButton = true;
-        break;
-      }
-    }
-  }
-
-  if (showButton)
-  {
-    _alarmSprite.fillRoundRect(0, 0, _alarmSprite.width(), _alarmSprite.height(), 10, alarmColor);
-    _alarmSprite.setTextColor(_bgColor);
-    _alarmSprite.drawString(text.c_str(), _alarmSprite.width() / 2, _alarmSprite.height() / 2);
-
-    if (_dismissProgress > 0.0f)
-    {
-      int margin = 5;
-      int availableWidth = _alarmSprite.width() - (2 * margin);
-      int barWidth = availableWidth * _dismissProgress;
-      _alarmSprite.fillRoundRect(margin, _alarmSprite.height() - ALARM_PROGRESS_BAR_HEIGHT - margin, barWidth, ALARM_PROGRESS_BAR_HEIGHT, 3, TFT_WHITE);
-    }
-  }
-  else
-  {
-    _dismissProgress = 0.0f;
-  }
-
-  _alarmSprite.pushSprite(_alarmSpriteX, _alarmSpriteY);
 }

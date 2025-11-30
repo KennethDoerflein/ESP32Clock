@@ -30,26 +30,34 @@ public:
   explicit ClockPage(TFT_eSPI *tft);
   virtual ~ClockPage();
 
-  void onEnter(TFT_eSPI &tft) override;
-  void onExit() override;
-  void update() override;
-  void render(TFT_eSPI &tft) override;
-  void refresh(TFT_eSPI &tft, bool fullRefresh) override;
+  virtual void onEnter(TFT_eSPI &tft) override;
+  virtual void onExit() override;
+  virtual void update() override;
+  virtual void render(TFT_eSPI &tft) override;
+  virtual void refresh(TFT_eSPI &tft, bool fullRefresh) override;
   void setDismissProgress(float progress);
   void clearAlarmSprite();
   void updateAlarmSprite();
 
-private:
-  void setupSprites(TFT_eSPI &tft);
-  void setupLayout(TFT_eSPI &tft);
-  void drawClock(TFT_eSPI &tft);
-  void drawDate(TFT_eSPI &tft);
-  void drawDayOfWeek(TFT_eSPI &tft);
-  void drawTemperature(TFT_eSPI &tft);
-  void drawHumidity(TFT_eSPI &tft);
-  void drawSeconds(TFT_eSPI &tft);
-  void drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String &alarm2);
-  void updateSpriteColors();
+protected:
+  virtual void setupSprites(TFT_eSPI &tft);
+  virtual void setupLayout(TFT_eSPI &tft);
+
+  // Helper for partial setup
+  void setupClockSprites(TFT_eSPI &tft);
+  void setupSensorSprites(TFT_eSPI &tft);
+  void setupClockLayout(TFT_eSPI &tft);
+
+  // Drawing methods
+  virtual void drawClock(TFT_eSPI &tft);
+  virtual void drawDate(TFT_eSPI &tft);
+  virtual void drawDayOfWeek(TFT_eSPI &tft);
+  virtual void drawTemperature(TFT_eSPI &tft);
+  virtual void drawHumidity(TFT_eSPI &tft);
+  virtual void drawSeconds(TFT_eSPI &tft);
+  virtual void drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String &alarm2);
+
+  virtual void updateSpriteColors();
   void initAlarmSprite(TFT_eSPI &tft);
   void updateDisplayData(DisplayData &data);
 

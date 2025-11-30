@@ -184,8 +184,26 @@ void ClockPage::render(TFT_eSPI &tft)
  */
 void ClockPage::setupLayout(TFT_eSPI &tft)
 {
-  int screenWidth = tft.width();
+  setupClockLayout(tft);
+
   int screenHeight = tft.height();
+
+  // --- Bottom Rows Layout (Date and Sensors) ---
+  tft.loadFont(DSEG14ModernBold32);
+  int fontHeight = tft.fontHeight();
+  tft.unloadFont(); // Unload to prevent bleeding into other pages
+  _alarmRowY = screenHeight - (fontHeight * 3 + MARGIN + 80);
+  _dateY = screenHeight - (fontHeight * 2 + MARGIN + 55);
+  _sensorY = screenHeight - (fontHeight + MARGIN + 20);
+
+  // --- Alarm Sprite Layout ---
+  // Position the alarm sprite in the middle of the sensor row (between Temp and Humidity)
+  _alarmSpriteY = _sensorY + (TEMP_SPRITE_HEIGHT - ALARM_SPRITE_HEIGHT) / 2;
+}
+
+void ClockPage::setupClockLayout(TFT_eSPI &tft)
+{
+  int screenWidth = tft.width();
 
   // --- Clock Block Layout ---
   _clockY = MARGIN;
@@ -223,18 +241,8 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   _secondsX = _todX + (TOD_SPRITE_WIDTH - SECONDS_SPRITE_WIDTH) / 2;
   _secondsY = _todY + TOD_SPRITE_HEIGHT + sideElementsVGap + 3;
 
-  // --- Bottom Rows Layout (Date and Sensors) ---
-  tft.loadFont(DSEG14ModernBold32);
-  int fontHeight = tft.fontHeight();
-  tft.unloadFont(); // Unload to prevent bleeding into other pages
-  _alarmRowY = screenHeight - (fontHeight * 3 + MARGIN + 80);
-  _dateY = screenHeight - (fontHeight * 2 + MARGIN + 55);
-  _sensorY = screenHeight - (fontHeight + MARGIN + 20);
-
-  // --- Alarm Sprite Layout ---
+  // Alarm Sprite X is always centered
   _alarmSpriteX = (screenWidth - _alarmSprite.width()) / 2;
-  // Position the alarm sprite in the middle of the sensor row (between Temp and Humidity)
-  _alarmSpriteY = _sensorY + (TEMP_SPRITE_HEIGHT - ALARM_SPRITE_HEIGHT) / 2;
 }
 
 /**
@@ -259,7 +267,13 @@ void ClockPage::clearAlarmSprite()
  */
 void ClockPage::setupSprites(TFT_eSPI &tft)
 {
-  // Create the sprites and configure them
+  setupClockSprites(tft);
+  setupSensorSprites(tft);
+  updateSpriteColors();
+}
+
+void ClockPage::setupClockSprites(TFT_eSPI &tft)
+{
   _sprClock.createSprite(CLOCK_SPRITE_WIDTH, CLOCK_SPRITE_HEIGHT);
   _sprClock.loadFont(DSEG7ModernBold104);
   _sprClock.setTextDatum(MR_DATUM);
@@ -279,7 +293,10 @@ void ClockPage::setupSprites(TFT_eSPI &tft)
   _sprDate.createSprite(tft.width() / 2 - MARGIN, DATE_SPRITE_HEIGHT);
   _sprDate.loadFont(DSEG14ModernBold48);
   _sprDate.setTextDatum(MR_DATUM);
+}
 
+void ClockPage::setupSensorSprites(TFT_eSPI &tft)
+{
   _sprNextAlarm1.createSprite(tft.width() / 2 - MARGIN, DAY_OF_WEEK_SPRITE_HEIGHT); // Reusing height
   _sprNextAlarm1.loadFont(DSEG14ModernBold32);
   _sprNextAlarm1.setTextDatum(ML_DATUM);
@@ -295,8 +312,6 @@ void ClockPage::setupSprites(TFT_eSPI &tft)
   _sprHumidity.createSprite(tft.width() / 2 - MARGIN, HUMIDITY_SPRITE_HEIGHT);
   _sprHumidity.loadFont(DSEG14ModernBold48);
   _sprHumidity.setTextDatum(MR_DATUM);
-
-  updateSpriteColors();
 }
 
 /**
