@@ -52,6 +52,9 @@ static constexpr const char *DEFAULT_ZIP_CODE = "";
 static constexpr int DEFAULT_DEFAULT_PAGE = 0;
 static constexpr float DEFAULT_LAT = 0.0;
 static constexpr float DEFAULT_LON = 0.0;
+// 0: Clock, 1: Weather, 2: Info, 3: Weather+Clock
+// Using a C-style array for default initializer which can be easily converted to vector
+static constexpr int DEFAULT_ENABLED_PAGES[] = {0, 1, 3, 2};
 
 /**
  * @class ConfigManager
@@ -438,6 +441,23 @@ public:
       _isDirty = true;
       scheduleSave();
     }
+  }
+
+  /**
+   * @brief Gets the enabled pages and their order.
+   * @return A vector of page IDs.
+   */
+  std::vector<int> getEnabledPages() const { return enabledPages; }
+
+  /**
+   * @brief Sets the enabled pages and their order.
+   * @param pages The new vector of page IDs.
+   */
+  void setEnabledPages(const std::vector<int> &pages)
+  {
+    enabledPages = pages;
+    _isDirty = true;
+    scheduleSave();
   }
 
   /**
@@ -973,6 +993,7 @@ private:
   uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
   uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;
   String zipCode = DEFAULT_ZIP_CODE;
+  std::vector<int> enabledPages;
   int defaultPage = DEFAULT_DEFAULT_PAGE;
   float lat = DEFAULT_LAT;
   float lon = DEFAULT_LON;

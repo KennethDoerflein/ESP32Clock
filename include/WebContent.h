@@ -962,10 +962,19 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   <input type="text" class="form-control" id="zip-code" name="zipCode" placeholder="e.g. 10001" value="%ZIP_CODE%">
                 </div>
                 <div class="mb-3 p-3 border rounded">
+                  <label class="form-label">Page Cycle Order</label>
+                  <div class="text-muted small mb-2">
+                    Check to enable. Use arrows to reorder.
+                  </div>
+                  <div id="page-order-list" class="list-group mb-3">
+                    <!-- Items injected by JS -->
+                  </div>
+
                   <label for="default-page" class="form-label">Default Display Page</label>
                   <select class="form-select" id="default-page" name="defaultPage">
                     <option value="0" %DEFAULT_PAGE_SELECTED_0%>Clock</option>
                     <option value="1" %DEFAULT_PAGE_SELECTED_1%>Weather</option>
+                    <option value="2">System Info</option>
                     <option value="3" %DEFAULT_PAGE_SELECTED_3%>Clock + Weather</option>
                   </select>
                 </div>
@@ -1082,9 +1091,21 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const timezoneEl = document.getElementById("timezone-select");
       const zipCodeEl = document.getElementById("zip-code");
       const defaultPageEl = document.getElementById("default-page");
+      const pageOrderListEl = document.getElementById("page-order-list");
       const colorPickers = displaySettingsForm.querySelectorAll('input[type="color"]');
       const resetGeneralBtn = document.getElementById('reset-general-btn');
       const resetColorsBtn = document.getElementById('reset-colors-btn');
+
+      // Map of Page IDs to friendly names
+      const PAGE_NAMES = {
+        0: "Clock",
+        1: "Weather",
+        2: "System Info",
+        3: "Clock + Weather"
+      };
+
+      // All available pages in the system (could be dynamic, but hardcoded for now based on main.cpp)
+      const ALL_PAGE_IDS = [0, 1, 3, 2]; // Default preferred order
 
       const STATUS_INDICATORS = {
         SAVED: '<i class="bi bi-check-circle-fill text-success"></i> <span class="text-muted">Saved</span>',
@@ -1172,6 +1193,86 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, is24Hour);
       }
       
+      function renderPageOrderList(enabledPages) {
+        pageOrderListEl.innerHTML = '';
+        
+        // Combine enabled pages with disabled ones (at the end)
+        // Make a copy of enabledPages to work with
+        let currentOrder = [...(enabledPages || [])];
+        
+        // Add any missing pages to the end
+        ALL_PAGE_IDS.forEach(id => {
+          if (!currentOrder.includes(id)) {
+            currentOrder.push(id);
+          }
+        });
+
+        currentOrder.forEach((id, index) => {
+           const isEnabled = enabledPages ? enabledPages.includes(id) : ALL_PAGE_IDS.includes(id); // Default to all if null, but usually loaded
+           
+           const item = document.createElement('div');
+           item.className = 'list-group-item d-flex align-items-center justify-content-between p-2';
+           item.dataset.id = id;
+           
+           item.innerHTML = `
+             <div class="form-check m-0 d-flex align-items-center gap-2">
+               <input class="form-check-input page-enable-check" type="checkbox" ${isEnabled ? 'checked' : ''} id="page-check-${id}">
+               <label class="form-check-label user-select-none" for="page-check-${id}">${PAGE_NAMES[id] || 'Unknown Page ' + id}</label>
+             </div>
+             <div class="btn-group" role="group">
+               <button type="button" class="btn btn-sm btn-outline-secondary move-up-btn" title="Move Up"><i class="bi bi-arrow-up"></i></button>
+               <button type="button" class="btn btn-sm btn-outline-secondary move-down-btn" title="Move Down"><i class="bi bi-arrow-down"></i></button>
+             </div>
+           `;
+           
+           // Event listeners
+           item.querySelector('.page-enable-check').addEventListener('change', () => handleGeneralInputChange());
+           item.querySelector('.move-up-btn').addEventListener('click', (e) => {
+               e.preventDefault();
+               moveItem(item, -1);
+           });
+           item.querySelector('.move-down-btn').addEventListener('click', (e) => {
+               e.preventDefault();
+               moveItem(item, 1);
+           });
+
+           pageOrderListEl.appendChild(item);
+        });
+        
+        updateMoveButtons();
+      }
+
+      function moveItem(item, direction) {
+          if (direction === -1 && item.previousElementSibling) {
+              item.parentNode.insertBefore(item, item.previousElementSibling);
+          } else if (direction === 1 && item.nextElementSibling) {
+              item.parentNode.insertBefore(item.nextElementSibling, item);
+          }
+          updateMoveButtons();
+          handleGeneralInputChange();
+      }
+
+      function updateMoveButtons() {
+          const items = pageOrderListEl.querySelectorAll('.list-group-item');
+          items.forEach((item, index) => {
+              const upBtn = item.querySelector('.move-up-btn');
+              const downBtn = item.querySelector('.move-down-btn');
+              upBtn.disabled = index === 0;
+              downBtn.disabled = index === items.length - 1;
+          });
+      }
+
+      function getEnabledPagesFromUI() {
+          const enabled = [];
+          pageOrderListEl.querySelectorAll('.list-group-item').forEach(item => {
+              const checkbox = item.querySelector('.page-enable-check');
+              if (checkbox.checked) {
+                  enabled.push(parseInt(item.dataset.id));
+              }
+          });
+          return enabled;
+      }
+
       function updateGeneralSettingsUI(settings) {
         autoBrightnessEl.checked = settings.autoBrightness || false;
         celsiusEl.checked = settings.useCelsius || false;
@@ -1195,6 +1296,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         } else {
           tempCorrectionControlsEl.classList.add('d-none');
         }
+        
+        renderPageOrderList(settings.enabledPages);
 
         // Manually trigger UI updates that depend on these values
         updateBrightnessUI(settings);
@@ -1258,6 +1361,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           timezone: timezoneEl.value,
           zipCode: zipCodeEl.value,
           defaultPage: parseInt(defaultPageEl.value),
+          enabledPages: getEnabledPagesFromUI(),
           snoozeDuration: parseInt(document.getElementById('snooze-duration').value),
           dismissDuration: parseInt(document.getElementById('dismiss-duration').value),
           tempCorrection: parseFloat(document.getElementById('temp-correction').value)

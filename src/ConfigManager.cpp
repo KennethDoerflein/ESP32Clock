@@ -90,6 +90,7 @@ void ConfigManager::setDefaults()
   tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
   tempCorrection = DEFAULT_TEMP_CORRECTION;
   zipCode = DEFAULT_ZIP_CODE;
+  enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
   defaultPage = DEFAULT_DEFAULT_PAGE;
   lat = DEFAULT_LAT;
   lon = DEFAULT_LON;
@@ -167,6 +168,26 @@ void ConfigManager::load()
   tempCorrectionEnabled = _preferences.getBool("tempCorrEn", DEFAULT_TEMP_CORRECTION_ENABLED);
   tempCorrection = _preferences.getFloat("tempCorr", DEFAULT_TEMP_CORRECTION);
   zipCode = _preferences.getString("zipCode", DEFAULT_ZIP_CODE);
+
+  String pagesStr = _preferences.getString("pageOrder", "");
+  enabledPages.clear();
+  if (pagesStr.length() > 0)
+  {
+    int start = 0;
+    int end = pagesStr.indexOf(',');
+    while (end != -1)
+    {
+      enabledPages.push_back(pagesStr.substring(start, end).toInt());
+      start = end + 1;
+      end = pagesStr.indexOf(',', start);
+    }
+    enabledPages.push_back(pagesStr.substring(start).toInt());
+  }
+  else
+  {
+    enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
+  }
+
   defaultPage = _preferences.getInt("defaultPage", DEFAULT_DEFAULT_PAGE);
   lat = _preferences.getFloat("lat", DEFAULT_LAT);
   lon = _preferences.getFloat("lon", DEFAULT_LON);
@@ -292,6 +313,16 @@ bool ConfigManager::save()
   _preferences.putBool("tempCorrEn", tempCorrectionEnabled);
   _preferences.putFloat("tempCorr", tempCorrection);
   _preferences.putString("zipCode", zipCode);
+
+  String pagesStr = "";
+  for (size_t i = 0; i < enabledPages.size(); ++i)
+  {
+    pagesStr += String(enabledPages[i]);
+    if (i < enabledPages.size() - 1)
+      pagesStr += ",";
+  }
+  _preferences.putString("pageOrder", pagesStr);
+
   _preferences.putInt("defaultPage", defaultPage);
   _preferences.putFloat("lat", lat);
   _preferences.putFloat("lon", lon);
@@ -582,6 +613,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
   zipCode = DEFAULT_ZIP_CODE;
+  enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
   defaultPage = DEFAULT_DEFAULT_PAGE;
   lat = DEFAULT_LAT;
   lon = DEFAULT_LON;

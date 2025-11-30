@@ -286,6 +286,12 @@ void ClockWebServer::begin()
       doc["invertColors"] = config.isInvertColors();
       doc["timezone"] = config.getTimezone();
       doc["zipCode"] = config.getZipCode();
+      
+      JsonArray pagesArray = doc["enabledPages"].to<JsonArray>();
+      for (int pageId : config.getEnabledPages()) {
+        pagesArray.add(pageId);
+      }
+
       doc["defaultPage"] = config.getDefaultPage();
       doc["snoozeDuration"] = config.getSnoozeDuration();
       doc["dismissDuration"] = config.getDismissDuration();
@@ -340,6 +346,17 @@ void ClockWebServer::begin()
               config.setInvertColors(doc["invertColors"]);
               config.setTimezone(doc["timezone"]);
               config.setZipCode(doc["zipCode"]);
+
+              if (doc["enabledPages"].is<JsonArray>())
+              {
+                std::vector<int> pages;
+                for (int id : doc["enabledPages"].as<JsonArray>())
+                {
+                  pages.push_back(id);
+                }
+                config.setEnabledPages(pages);
+              }
+
               config.setDefaultPage(doc["defaultPage"]);
               config.setSnoozeDuration(doc["snoozeDuration"]);
               config.setDismissDuration(doc["dismissDuration"]);

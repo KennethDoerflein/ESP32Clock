@@ -15,6 +15,7 @@
 #include "AlarmManager.h"
 #include "TimeManager.h"
 #include "fonts/CenturyGothicBold48.h"
+#include "SerialLog.h"
 
 /**
  * @brief Private constructor to enforce the singleton pattern.
@@ -87,6 +88,45 @@ void DisplayManager::setPage(int index, bool forceRedraw)
   {
     _wasAlarmActive = false; // Will trigger redraw in next update
   }
+}
+
+/**
+ * @brief Cycles to the next page in the configured sequence.
+ */
+void DisplayManager::cyclePage()
+{
+  auto &config = ConfigManager::getInstance();
+  std::vector<int> enabled = config.getEnabledPages();
+
+  if (enabled.empty())
+  {
+    // Fallback if nothing enabled
+    setPage(0);
+    return;
+  }
+
+  int currentIndex = _currentPageIndex;
+  int nextIndex = -1;
+
+  // Find current index in the enabled list
+  for (size_t i = 0; i < enabled.size(); ++i)
+  {
+    if (enabled[i] == currentIndex)
+    {
+      // Found it, go to next
+      nextIndex = enabled[(i + 1) % enabled.size()];
+      break;
+    }
+  }
+
+  if (nextIndex == -1)
+  {
+    // Current page not in list, go to first enabled
+    nextIndex = enabled[0];
+  }
+
+  SerialLog::getInstance().printf("Cycling to page index: %d\n", nextIndex);
+  setPage(nextIndex);
 }
 
 /**

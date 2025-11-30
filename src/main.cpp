@@ -552,9 +552,7 @@ void loop()
 
       SerialLog::getInstance().printf("Button press detected. Duration: %lu ms\n", duration);
       // A short press cycles pages.
-      int newIndex = (displayManager.getCurrentPageIndex() + 1) % displayManager.getPagesSize();
-      SerialLog::getInstance().printf("Cycling to page index: %d\n", newIndex);
-      displayManager.setPage(newIndex);
+      displayManager.cyclePage();
     }
     break;
   }

@@ -46,6 +46,11 @@ public:
   void setPage(int index, bool forceRedraw = false);
 
   /**
+   * @brief Cycles to the next page in the configured sequence.
+   */
+  void cyclePage();
+
+  /**
    * @brief Gets the number of pages managed.
    * @return The total number of pages.
    */
