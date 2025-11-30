@@ -103,7 +103,7 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
   tft.setTextDatum(MC_DATUM);
   tft.setTextFont(7);
 
-  int yPos = tft.height() / 2 - 20;
+  int yPos = tft.height() / 2 - 75;
   tft.drawString(tempStr, tft.width() / 2, yPos, 7);
 
   int tempWidth = tft.textWidth(tempStr, 7);
@@ -118,12 +118,49 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
   tft.setTextDatum(MC_DATUM); // Reset datum to center
   tft.setTextColor(hexToRGB565(ConfigManager::getInstance().getTimeColor()), bg);
 
-  // Word wrap condition text?
   String condition = data.condition;
-  tft.drawString(condition, tft.width() / 2, tft.height() / 2 + 50, 4);
+  tft.drawString(condition, tft.width() / 2, yPos + 55, 4);
+
+  // Extended Data Grid
+  tft.setTextColor(hexToRGB565(ConfigManager::getInstance().getDateColor()), bg);
+
+  int gridY = yPos + 95;
+  int leftColX = tft.width() / 4;
+  int rightColX = tft.width() * 3 / 4;
+  int rowSpacing = 55;
+
+  float feelsLike = data.feelsLike;
+  float windSpeed = data.windSpeed;
+  String windUnit = "mph";
+  if (ConfigManager::getInstance().isCelsius())
+  {
+    feelsLike = (feelsLike - 32.0) * 5.0 / 9.0;
+    windSpeed = windSpeed * 1.60934;
+    windUnit = "km/h";
+  }
+
+  // Row 1: Feels Like & Humidity
+  tft.setTextDatum(MC_DATUM);
+  tft.drawString("Feels Like", leftColX, gridY, 4);
+  tft.drawString(String(feelsLike, 1) + unit, leftColX, gridY + 25, 4);
+
+  tft.drawString("Humidity", rightColX, gridY, 4);
+  tft.drawString(String(data.humidity, 0) + "%", rightColX, gridY + 25, 4);
+
+  // Row 2: Wind & Pressure
+  gridY += rowSpacing;
+
+  tft.drawString("Wind", leftColX, gridY, 4);
+  tft.drawString(String(windSpeed, 1) + " " + windUnit, leftColX, gridY + 25, 4);
+
+  tft.drawString("Pressure", rightColX, gridY, 4);
+  tft.drawString(String(data.pressure, 0) + " hPa", rightColX, gridY + 25, 4);
 
   // Location
-  tft.setTextFont(2);
-  tft.setTextColor(hexToRGB565(ConfigManager::getInstance().getDateColor()), bg);
+  tft.setTextDatum(MC_DATUM);
   tft.drawString(ConfigManager::getInstance().getZipCode(), tft.width() / 2, 20, 2);
+
+  // Attribution
+  tft.setTextColor(tft.color565(100, 100, 100), bg); // Dim gray
+  tft.drawString("Weather data provided by open-meteo.com", tft.width() / 2, tft.height() - 15, 2);
 }
