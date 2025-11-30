@@ -33,6 +33,104 @@ const char SERIAL_LOG_TAB_HTML[] PROGMEM = R"rawliteral(
 </li>
 )rawliteral";
 
+const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html data-bs-theme="dark">
+<head>
+  <title>Weather</title>
+  %HEAD%
+</head>
+<body>
+  <div class="container my-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="card-title text-center mb-4">Weather</h1>
+        
+        <div class="text-center mb-4">
+            <div id="weather-display" class="d-none">
+                <h2 class="display-1"><span id="temp">--</span>&deg;<span id="unit"></span></h2>
+                <h3 id="condition" class="text-muted">--</h3>
+            </div>
+            <div id="weather-error" class="d-none alert alert-warning">
+                Weather data unavailable.
+            </div>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button id="sync-btn" class="btn btn-primary btn-lg"><i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now</button>
+            <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tempEl = document.getElementById('temp');
+    const unitEl = document.getElementById('unit');
+    const conditionEl = document.getElementById('condition');
+    const weatherDisplay = document.getElementById('weather-display');
+    const weatherError = document.getElementById('weather-error');
+    const syncBtn = document.getElementById('sync-btn');
+
+    function fetchWeather() {
+        fetch('/api/weather')
+            .then(response => response.json())
+            .then(data => {
+                if (data.isValid) {
+                    tempEl.textContent = data.temp.toFixed(1);
+                    unitEl.textContent = data.unit;
+                    conditionEl.textContent = data.condition;
+                    weatherDisplay.classList.remove('d-none');
+                    weatherError.classList.add('d-none');
+                } else {
+                    weatherDisplay.classList.add('d-none');
+                    weatherError.classList.remove('d-none');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                weatherDisplay.classList.add('d-none');
+                weatherError.classList.remove('d-none');
+            });
+    }
+
+    syncBtn.addEventListener('click', () => {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Syncing...';
+        
+        fetch('/api/weather/sync', { method: 'POST' })
+            .then(response => {
+                if (response.ok) {
+                    // Wait a bit for the sync to likely happen, then refresh
+                    setTimeout(() => {
+                        fetchWeather();
+                        syncBtn.disabled = false;
+                        syncBtn.innerHTML = '<i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now';
+                    }, 2000);
+                } else {
+                    alert('Sync failed');
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = '<i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now';
+                }
+            })
+            .catch(e => {
+                alert('Error: ' + e);
+                syncBtn.disabled = false;
+                syncBtn.innerHTML = '<i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now';
+            });
+    });
+
+    // Initial fetch
+    fetchWeather();
+    
+    // Refresh periodically
+    setInterval(fetchWeather, 10000);
+
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+)rawliteral";
+
 const char SERIAL_LOG_TAB_PANE_HTML[] PROGMEM = R"rawliteral(
 <div class="tab-pane fade" id="serial-log" role="tabpanel" aria-labelledby="serial-log-tab">
   <div class="card mb-3">
@@ -137,6 +235,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <div class="d-grid gap-3">
           <a href="/wifi" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center" title="Configure WiFi network settings."><i class="bi bi-wifi me-2"></i>Configure WiFi</a>
           <a href="/alarms" class="btn btn-warning btn-lg d-flex align-items-center justify-content-center" title="Set and manage alarms."><i class="bi bi-alarm-fill me-2"></i>Alarms</a>
+          <a href="/weather" class="btn btn-success btn-lg d-flex align-items-center justify-content-center" title="View weather and manual sync."><i class="bi bi-cloud-sun-fill me-2"></i>Weather</a>
           <a href="/settings" class="btn btn-info btn-lg d-flex align-items-center justify-content-center" title="Adjust clock and display settings."><i class="bi bi-gear-fill me-2"></i>Settings</a>
           <a href="/system" class="btn btn-secondary btn-lg d-flex align-items-center justify-content-center" title="Update firmware and view logs."><i class="bi bi-hdd-fill me-2"></i>System</a>
         </div>

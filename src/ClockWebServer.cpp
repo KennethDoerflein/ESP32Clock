@@ -112,6 +112,38 @@ void ClockWebServer::begin()
     server.on("/alarms", HTTP_GET, [this](AsyncWebServerRequest *request)
               { onAlarmsRequest(request); });
 
+    server.on("/weather", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { request->send_P(200, "text/html", WEATHER_PAGE_HTML, [this](const String &var)
+                                { return processor(var); }); });
+
+    // --- API Handlers for Weather ---
+    server.on("/api/weather", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      auto& weatherService = WeatherService::getInstance();
+      WeatherData data = weatherService.getCurrentWeather();
+      JsonDocument doc;
+
+      bool isMetric = ConfigManager::getInstance().isCelsius();
+      float temp = data.temp; // WeatherService stores temp in Fahrenheit
+
+      if (isMetric) {
+          temp = (temp - 32.0f) * 5.0f / 9.0f;
+      }
+
+      doc["temp"] = temp;
+      doc["condition"] = data.condition;
+      doc["isValid"] = data.isValid;
+      doc["unit"] = isMetric ? "C" : "F";
+      
+      String response;
+      serializeJson(doc, response);
+      request->send(200, "application/json", response); });
+
+    server.on("/api/weather/sync", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+      WeatherService::getInstance().updateWeather();
+      request->send(200, "text/plain", "Weather sync started."); });
+
     // --- API Handlers for Alarms ---
     server.on("/api/alarms", HTTP_GET, [](AsyncWebServerRequest *request)
               {
