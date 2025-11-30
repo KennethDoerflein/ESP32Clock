@@ -107,6 +107,8 @@ void ConfigManager::setDefaults()
   snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
   alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+  weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+  weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
 
   _alarms.clear();
   for (int i = 0; i < DEFAULT_ALARMS_COUNT; ++i)
@@ -204,6 +206,8 @@ void ConfigManager::load()
   snoozeIconColor = _preferences.getString("snzIconClr", DEFAULT_SNOOZE_ICON_COLOR);
   alarmTextColor = _preferences.getString("alarmTextClr", DEFAULT_ALARM_TEXT_COLOR);
   errorTextColor = _preferences.getString("errorTextClr", DEFAULT_ERROR_TEXT_COLOR);
+  weatherTempColor = _preferences.getString("weaTempClr", DEFAULT_WEATHER_TEMP_COLOR);
+  weatherForecastColor = _preferences.getString("weaFcstClr", DEFAULT_WEATHER_FORECAST_COLOR);
 
   // Validate colors to prevent issues with URL-encoded values
   if (backgroundColor.startsWith("%"))
@@ -230,6 +234,10 @@ void ConfigManager::load()
     alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   if (errorTextColor.startsWith("%"))
     errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+  if (weatherTempColor.startsWith("%"))
+    weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+  if (weatherForecastColor.startsWith("%"))
+    weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
 
   // Load alarms
   _alarms.clear();
@@ -339,6 +347,8 @@ bool ConfigManager::save()
   _preferences.putString("snzIconClr", snoozeIconColor);
   _preferences.putString("alarmTextClr", alarmTextColor);
   _preferences.putString("errorTextClr", errorTextColor);
+  _preferences.putString("weaTempClr", weatherTempColor);
+  _preferences.putString("weaFcstClr", weatherForecastColor);
 
   // Save alarms
   _preferences.putInt("numAlarms", _alarms.size());
@@ -580,6 +590,8 @@ void ConfigManager::resetDisplayToDefaults()
   alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
   alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+  weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+  weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
 
   if (!isAnyAlarmSnoozed())
   {

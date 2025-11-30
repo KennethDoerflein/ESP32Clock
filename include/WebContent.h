@@ -1042,6 +1042,18 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                       <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity." value="%HUMIDITY_COLOR%">
                     </div>
                   </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="weather-temp-color" title="Set the color for the weather temperature display.">Weather Temp Color</label>
+                      <input type="color" id="weather-temp-color" name="weatherTempColor" title="Select a color for the weather temperature." value="%WEATHER_TEMP_COLOR%">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="weather-forecast-color" title="Set the color for the weather forecast display.">Weather Forecast Color</label>
+                      <input type="color" id="weather-forecast-color" name="weatherForecastColor" title="Select a color for the weather forecast." value="%WEATHER_FORECAST_COLOR%">
+                    </div>
+                  </div>
                 </div>
               </form>
               <div class="d-grid gap-2 mt-4">
@@ -1314,6 +1326,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         if (settings.dateColor) document.getElementById('date-color').value = settings.dateColor;
         if (settings.tempColor) document.getElementById('temp-color').value = settings.tempColor;
         if (settings.humidityColor) document.getElementById('humidity-color').value = settings.humidityColor;
+        if (settings.weatherTempColor) document.getElementById('weather-temp-color').value = settings.weatherTempColor;
+        if (settings.weatherForecastColor) document.getElementById('weather-forecast-color').value = settings.weatherForecastColor;
       }
       
       async function fetchGeneralSettings() {

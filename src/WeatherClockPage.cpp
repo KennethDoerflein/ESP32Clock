@@ -174,12 +174,13 @@ void WeatherClockPage::updateSpriteColors()
   ClockPage::updateSpriteColors();
 
   auto &config = ConfigManager::getInstance();
-  uint16_t todColor = hexToRGB565(config.getTodColor());
+  uint16_t weatherTempColor = hexToRGB565(config.getWeatherTempColor());
+  uint16_t weatherForecastColor = hexToRGB565(config.getWeatherForecastColor());
   uint16_t tempColor = hexToRGB565(config.getTempColor());
   uint16_t humidityColor = hexToRGB565(config.getHumidityColor());
   uint16_t alarmColor = hexToRGB565(config.getAlarmTextColor());
 
-  _sprWeather.setTextColor(todColor, _bgColor);
+  _sprWeather.setTextColor(weatherTempColor, _bgColor);
   _sprIndoorTemp.setTextColor(tempColor, _bgColor);
   _sprBottomAlarm.setTextColor(alarmColor, _bgColor);
   _sprIndoorHumidity.setTextColor(humidityColor, _bgColor);
@@ -190,9 +191,11 @@ void WeatherClockPage::drawWeather(TFT_eSPI &tft)
   auto &config = ConfigManager::getInstance();
 
   WeatherData wd = WeatherService::getInstance().getCurrentWeather();
-  uint16_t txtColor = hexToRGB565(config.getTodColor().c_str());
+  uint16_t tempColor = hexToRGB565(config.getWeatherTempColor());
+  uint16_t forecastColor = hexToRGB565(config.getWeatherForecastColor());
 
   _sprWeather.fillSprite(_bgColor);
+  _sprWeather.setTextColor(tempColor, _bgColor);
 
   if (wd.isValid)
   {
@@ -209,26 +212,55 @@ void WeatherClockPage::drawWeather(TFT_eSPI &tft)
     _sprWeather.loadFont(CenturyGothicBold48);
     _sprWeather.setTextDatum(ML_DATUM);
 
+    // Calculate widths to center everything as a block
     int tempW = _sprWeather.textWidth(tempBuf);
+
+    _sprWeather.unloadFont();
+    _sprWeather.setTextFont(4);
+    int unitW = _sprWeather.textWidth(unit);
+    int degreeW = 6; // Estimation for small circle spacing
+
+    _sprWeather.loadFont(CenturyGothicBold48);
     int spaceW = _sprWeather.textWidth(" ");
     int condW = _sprWeather.textWidth(wd.condition);
-    int degreeW = 10;
-    int unitW = _sprWeather.textWidth(unit);
 
     int totalW = tempW + degreeW + unitW + spaceW + condW;
     int startX = (_sprWeather.width() - totalW) / 2;
     if (startX < 0)
       startX = 0;
 
-    _sprWeather.drawString(tempBuf, startX, _sprWeather.height() / 2);
+    int centerY = _sprWeather.height() / 2;
+
+    // Draw Temp
+    _sprWeather.setTextColor(tempColor, _bgColor);
+    _sprWeather.setTextDatum(ML_DATUM);
+    _sprWeather.drawString(tempBuf, startX, centerY);
+
+    // Draw Unit (Degree + C/F)
+    int currentX = startX + tempW;
 
     // Degree Circle
-    int circleX = startX + tempW + 8;
-    int circleY = _sprWeather.height() / 2 - 15;
-    _sprWeather.fillCircle(circleX, circleY, 3, txtColor);
+    int circleRadius = 3;
+    int circleX = currentX + circleRadius + 6;
+    int degreeCenterY = centerY - 15;
+    int unitTextY = centerY - 8;
 
-    _sprWeather.drawString(unit, startX + tempW + degreeW + 4, _sprWeather.height() / 2);
-    _sprWeather.drawString(" " + wd.condition, startX + tempW + degreeW + unitW + 4, _sprWeather.height() / 2);
+    _sprWeather.fillCircle(circleX, degreeCenterY, circleRadius, tempColor);
+
+    currentX += (circleRadius * 2) + 4;
+
+    _sprWeather.unloadFont();
+    _sprWeather.setTextFont(4);
+    _sprWeather.setTextDatum(ML_DATUM);
+    _sprWeather.drawString(unit, currentX + 8, unitTextY);
+
+    currentX += unitW;
+
+    // Draw Condition
+    _sprWeather.loadFont(CenturyGothicBold48);
+    _sprWeather.setTextColor(forecastColor, _bgColor);
+    _sprWeather.setTextDatum(ML_DATUM);
+    _sprWeather.drawString(" " + wd.condition, currentX, centerY);
   }
   else
   {
@@ -256,7 +288,7 @@ void WeatherClockPage::drawIndoorTemp(TFT_eSPI &tft)
   int tempWidth = _sprIndoorTemp.textWidth(tempBuf);
   int fontHeight = _sprIndoorTemp.fontHeight();
   int circleRadius = max(2, fontHeight / 14);
-  int circleX = tempWidth + circleRadius + 8;
+  int circleX = tempWidth + circleRadius + 4;
   int circleY = (_sprIndoorTemp.height() / 2) - (fontHeight / 2) + circleRadius;
   _sprIndoorTemp.fillCircle(circleX, circleY, circleRadius, tempColor);
 

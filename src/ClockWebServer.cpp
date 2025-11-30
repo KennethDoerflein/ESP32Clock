@@ -427,6 +427,8 @@ void ClockWebServer::begin()
       doc["dateColor"] = config.getDateColor();
       doc["tempColor"] = config.getTempColor();
       doc["humidityColor"] = config.getHumidityColor();
+      doc["weatherTempColor"] = config.getWeatherTempColor();
+      doc["weatherForecastColor"] = config.getWeatherForecastColor();
       
       String response;
       serializeJson(doc, response);
@@ -503,6 +505,8 @@ void ClockWebServer::begin()
               config.setDateColor(doc["dateColor"].as<String>());
               config.setTempColor(doc["tempColor"].as<String>());
               config.setHumidityColor(doc["humidityColor"].as<String>());
+              config.setWeatherTempColor(doc["weatherTempColor"].as<String>());
+              config.setWeatherForecastColor(doc["weatherForecastColor"].as<String>());
 
               if (oldBgColor != newBgColor)
               {
@@ -1013,6 +1017,10 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.getTempColor();
   if (var == "HUMIDITY_COLOR")
     return config.getHumidityColor();
+  if (var == "WEATHER_TEMP_COLOR")
+    return config.getWeatherTempColor();
+  if (var == "WEATHER_FORECAST_COLOR")
+    return config.getWeatherForecastColor();
   if (var == "SNOOZE_DURATION")
     return String(config.getSnoozeDuration());
   if (var == "DISMISS_DURATION")

@@ -64,7 +64,7 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
   // Simple text based rendering for now
 
   uint16_t bg = hexToRGB565(ConfigManager::getInstance().getBackgroundColor());
-  uint16_t txtColor = hexToRGB565(ConfigManager::getInstance().getTempColor());
+  uint16_t txtColor = hexToRGB565(ConfigManager::getInstance().getWeatherTempColor());
 
   tft.fillScreen(bg);
 
@@ -109,20 +109,32 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
   int tempWidth = tft.textWidth(tempStr, 7);
   int unitX = (tft.width() / 2) + (tempWidth / 2) + 8; // Padding
 
+  // Draw degree circle manually to match WeatherClockPage style
+  int circleRadius = 3;
+  int degreeX = unitX - circleRadius;
+  int degreeY = yPos - 20;
+
+  tft.fillCircle(degreeX, degreeY, circleRadius, txtColor);
+
+  // Draw Unit Text
+  int unitTextX = degreeX + circleRadius + 4;
+  int unitTextY = yPos - 25;
+
   tft.setTextFont(4);
-  tft.setTextDatum(ML_DATUM);
-  tft.drawString(unit, unitX, yPos, 4);
+  tft.setTextDatum(TL_DATUM);
+  tft.drawString(unit, unitTextX, unitTextY, 4);
 
   // Condition
   tft.setTextFont(4);
   tft.setTextDatum(MC_DATUM); // Reset datum to center
-  tft.setTextColor(hexToRGB565(ConfigManager::getInstance().getTimeColor()), bg);
+  tft.setTextColor(hexToRGB565(ConfigManager::getInstance().getWeatherForecastColor()), bg);
 
   String condition = data.condition;
   tft.drawString(condition, tft.width() / 2, yPos + 55, 4);
 
   // Extended Data Grid
-  tft.setTextColor(hexToRGB565(ConfigManager::getInstance().getDateColor()), bg);
+  // Use Forecast color for these labels too as they are part of weather info
+  tft.setTextColor(hexToRGB565(ConfigManager::getInstance().getWeatherForecastColor()), bg);
 
   int gridY = yPos + 95;
   int leftColX = tft.width() / 4;

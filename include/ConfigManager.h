@@ -24,6 +24,8 @@ static constexpr const char *DEFAULT_ALARM_ICON_COLOR = "#FFFF00";
 static constexpr const char *DEFAULT_SNOOZE_ICON_COLOR = "#0000FF";
 static constexpr const char *DEFAULT_ALARM_TEXT_COLOR = "#FF0000";
 static constexpr const char *DEFAULT_ERROR_TEXT_COLOR = "#FF0000";
+static constexpr const char *DEFAULT_WEATHER_TEMP_COLOR = "#02e3ab";
+static constexpr const char *DEFAULT_WEATHER_FORECAST_COLOR = "#FFFFFF";
 
 // Default System Settings
 static constexpr const char *DEFAULT_WIFI_SSID = "";
@@ -326,6 +328,18 @@ public:
    * @return The color as a hex string.
    */
   String getErrorTextColor() const { return errorTextColor; }
+
+  /**
+   * @brief Gets the color of the weather temperature display.
+   * @return The color as a hex string.
+   */
+  String getWeatherTempColor() const { return weatherTempColor; }
+
+  /**
+   * @brief Gets the color of the weather forecast/condition display.
+   * @return The color as a hex string.
+   */
+  String getWeatherForecastColor() const { return weatherForecastColor; }
 
   /**
    * @brief Gets the ID of the alarm that was ringing at shutdown.
@@ -924,6 +938,34 @@ public:
   }
 
   /**
+   * @brief Sets the color of the weather temperature display.
+   * @param color The new color as a hex string.
+   */
+  void setWeatherTempColor(const String &color)
+  {
+    if (weatherTempColor != color)
+    {
+      weatherTempColor = color;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Sets the color of the weather forecast/condition display.
+   * @param color The new color as a hex string.
+   */
+  void setWeatherForecastColor(const String &color)
+  {
+    if (weatherForecastColor != color)
+    {
+      weatherForecastColor = color;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
    * @brief Checks if the configuration has been modified since the last save.
    * @return True if the configuration is "dirty", false otherwise.
    */
@@ -1011,6 +1053,8 @@ private:
   String snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
   String alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   String errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+  String weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+  String weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
 
   bool _isDirty;
   bool _savePending;
