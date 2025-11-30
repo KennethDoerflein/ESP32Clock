@@ -823,6 +823,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   <select class="form-select" id="default-page" name="defaultPage">
                     <option value="0" %DEFAULT_PAGE_SELECTED_0%>Clock</option>
                     <option value="1" %DEFAULT_PAGE_SELECTED_1%>Weather</option>
+                    <option value="3" %DEFAULT_PAGE_SELECTED_3%>Clock + Weather</option>
                   </select>
                 </div>
                 <div class="mb-3 p-3 border rounded">

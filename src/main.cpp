@@ -25,6 +25,7 @@
 #include "pages/ClockPage.h"
 #include "pages/InfoPage.h"
 #include "pages/WeatherPage.h"
+#include "pages/WeatherClockPage.h"
 #include "ClockWebServer.h"
 #include "SerialLog.h"
 #include <LittleFS.h>
@@ -296,6 +297,7 @@ void setup()
   displayManager.addPage(std::make_unique<ClockPage>(&display.getTft()));
   displayManager.addPage(std::make_unique<WeatherPage>());
   displayManager.addPage(std::make_unique<InfoPage>());
+  displayManager.addPage(std::make_unique<WeatherClockPage>(&display.getTft()));
 
   // --- Post-WiFi Initialization Logic ---
   auto &timeManager = TimeManager::getInstance();

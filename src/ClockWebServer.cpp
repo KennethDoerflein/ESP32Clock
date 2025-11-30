@@ -981,6 +981,8 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.getDefaultPage() == 0 ? "selected" : "";
   if (var == "DEFAULT_PAGE_SELECTED_1")
     return config.getDefaultPage() == 1 ? "selected" : "";
+  if (var == "DEFAULT_PAGE_SELECTED_3")
+    return config.getDefaultPage() == 3 ? "selected" : "";
 
   // Timezone selections
   String timezone = config.getTimezone();
