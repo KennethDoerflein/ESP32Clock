@@ -89,6 +89,10 @@ void ConfigManager::setDefaults()
   dismissDuration = DEFAULT_DISMISS_DURATION;
   tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
   tempCorrection = DEFAULT_TEMP_CORRECTION;
+  zipCode = DEFAULT_ZIP_CODE;
+  defaultPage = DEFAULT_DEFAULT_PAGE;
+  lat = DEFAULT_LAT;
+  lon = DEFAULT_LON;
 
   backgroundColor = DEFAULT_BACKGROUND_COLOR;
   timeColor = DEFAULT_TIME_COLOR;
@@ -162,6 +166,10 @@ void ConfigManager::load()
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
   tempCorrectionEnabled = _preferences.getBool("tempCorrEn", DEFAULT_TEMP_CORRECTION_ENABLED);
   tempCorrection = _preferences.getFloat("tempCorr", DEFAULT_TEMP_CORRECTION);
+  zipCode = _preferences.getString("zipCode", DEFAULT_ZIP_CODE);
+  defaultPage = _preferences.getInt("defaultPage", DEFAULT_DEFAULT_PAGE);
+  lat = _preferences.getFloat("lat", DEFAULT_LAT);
+  lon = _preferences.getFloat("lon", DEFAULT_LON);
 
   backgroundColor = _preferences.getString("bgClr", DEFAULT_BACKGROUND_COLOR);
   timeColor = _preferences.getString("timeClr", DEFAULT_TIME_COLOR);
@@ -283,6 +291,10 @@ bool ConfigManager::save()
   _preferences.putUChar("dismissDur", dismissDuration);
   _preferences.putBool("tempCorrEn", tempCorrectionEnabled);
   _preferences.putFloat("tempCorr", tempCorrection);
+  _preferences.putString("zipCode", zipCode);
+  _preferences.putInt("defaultPage", defaultPage);
+  _preferences.putFloat("lat", lat);
+  _preferences.putFloat("lon", lon);
 
   _preferences.putString("bgClr", backgroundColor);
   _preferences.putString("timeClr", timeColor);
@@ -569,6 +581,10 @@ void ConfigManager::resetGeneralSettingsToDefaults()
 
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
+  zipCode = DEFAULT_ZIP_CODE;
+  defaultPage = DEFAULT_DEFAULT_PAGE;
+  lat = DEFAULT_LAT;
+  lon = DEFAULT_LON;
   _isDirty = true;
   scheduleSave();
 }

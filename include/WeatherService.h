@@ -1,0 +1,45 @@
+#pragma once
+
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+
+struct WeatherData
+{
+  float temp;
+  String condition;
+  String iconUrl;
+  bool isValid;
+};
+
+class WeatherService
+{
+public:
+  static WeatherService &getInstance()
+  {
+    static WeatherService instance;
+    return instance;
+  }
+
+  void begin();
+  void loop();
+  void updateLocation();
+  void updateWeather();
+
+  WeatherData getCurrentWeather() const { return _currentWeather; }
+
+private:
+  WeatherService() : _lastUpdate(0), _lastLocationUpdate(0) {}
+
+  unsigned long _lastUpdate;
+  unsigned long _lastLocationUpdate;
+  WeatherData _currentWeather = {0.0, "", "", false};
+  String _gridId;
+  String _stationsUrl;
+  String _stationId;
+  int _gridX;
+  int _gridY;
+
+  bool fetchGridData(float lat, float lon);
+  bool fetchForecastData();
+};

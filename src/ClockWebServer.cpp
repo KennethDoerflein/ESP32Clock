@@ -23,6 +23,7 @@
 #include "NtpSync.h"
 #include "AlarmManager.h"
 #include "Constants.h"
+#include "WeatherService.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -242,6 +243,8 @@ void ClockWebServer::begin()
       doc["screenFlipped"] = config.isScreenFlipped();
       doc["invertColors"] = config.isInvertColors();
       doc["timezone"] = config.getTimezone();
+      doc["zipCode"] = config.getZipCode();
+      doc["defaultPage"] = config.getDefaultPage();
       doc["snoozeDuration"] = config.getSnoozeDuration();
       doc["dismissDuration"] = config.getDismissDuration();
       doc["tempCorrectionEnabled"] = config.isTempCorrectionEnabled();
@@ -278,6 +281,7 @@ void ClockWebServer::begin()
             {
               auto &config = ConfigManager::getInstance();
               String oldTimezone = config.getTimezone();
+              String oldZipCode = config.getZipCode();
               bool oldScreenFlipped = config.isScreenFlipped();
               bool oldInvertColors = config.isInvertColors();
               float oldTempCorrection = config.getTempCorrection();
@@ -293,6 +297,8 @@ void ClockWebServer::begin()
               config.setScreenFlipped(doc["screenFlipped"]);
               config.setInvertColors(doc["invertColors"]);
               config.setTimezone(doc["timezone"]);
+              config.setZipCode(doc["zipCode"]);
+              config.setDefaultPage(doc["defaultPage"]);
               config.setSnoozeDuration(doc["snoozeDuration"]);
               config.setDismissDuration(doc["dismissDuration"]);
               config.setTempCorrectionEnabled(doc["tempCorrectionEnabled"]);
@@ -318,6 +324,11 @@ void ClockWebServer::begin()
               if (oldTempCorrection != config.getTempCorrection() || oldTempCorrectionEnabled != config.isTempCorrectionEnabled())
               {
                 handleSensorUpdates(true);
+              }
+
+              if (oldZipCode != config.getZipCode())
+              {
+                WeatherService::getInstance().updateLocation();
               }
 
               request->send(200, "text/plain", "Settings saved!");
@@ -962,6 +973,14 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.isTempCorrectionEnabled() ? "checked" : "";
   if (var == "TEMP_CORRECTION_CONTROLS_CLASS")
     return config.isTempCorrectionEnabled() ? "" : "d-none";
+
+  if (var == "ZIP_CODE")
+    return config.getZipCode();
+
+  if (var == "DEFAULT_PAGE_SELECTED_0")
+    return config.getDefaultPage() == 0 ? "selected" : "";
+  if (var == "DEFAULT_PAGE_SELECTED_1")
+    return config.getDefaultPage() == 1 ? "selected" : "";
 
   // Timezone selections
   String timezone = config.getTimezone();

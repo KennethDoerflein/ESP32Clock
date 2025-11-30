@@ -24,10 +24,12 @@
 #include "DisplayManager.h"
 #include "pages/ClockPage.h"
 #include "pages/InfoPage.h"
+#include "pages/WeatherPage.h"
 #include "ClockWebServer.h"
 #include "SerialLog.h"
 #include <LittleFS.h>
 #include "ButtonManager.h"
+#include "WeatherService.h"
 #if __has_include("version.h")
 // This file exists, so we'll include it.
 #include "version.h"
@@ -245,6 +247,10 @@ void setup()
   logger.print("Initializing AlarmManager...\n");
   AlarmManager::getInstance().begin();
 
+  // Initialize Weather Service
+  logger.print("Initializing WeatherService...\n");
+  WeatherService::getInstance().begin();
+
   auto &displayManager = DisplayManager::getInstance();
   logger.print("Initializing DisplayManager...\n");
   displayManager.begin(display.getTft());
@@ -288,6 +294,7 @@ void setup()
   // Add pages to the manager.
   logger.print("Adding pages to DisplayManager...\n");
   displayManager.addPage(std::make_unique<ClockPage>(&display.getTft()));
+  displayManager.addPage(std::make_unique<WeatherPage>());
   displayManager.addPage(std::make_unique<InfoPage>());
 
   // --- Post-WiFi Initialization Logic ---
@@ -315,7 +322,7 @@ void setup()
       logger.print("RTC time is not set or invalid.\n");
     }
     timeManager.begin(); // This will perform the initial NTP sync.
-    displayManager.setPage(0);
+    displayManager.setPage(ConfigManager::getInstance().getDefaultPage());
   }
   // If no captive portal and no connection, it's a network outage.
   // Fall back to RTC if the time is valid.
@@ -324,7 +331,7 @@ void setup()
     logger.print("WiFi connection failed. RTC time is valid. Starting in offline mode.\n");
     display.drawMultiLineStatusMessage("Offline Mode", "AP: Clock-Setup");
     delay(OFFLINE_MODE_MESSAGE_DELAY); // Show the message for 5 seconds.
-    displayManager.setPage(0);
+    displayManager.setPage(ConfigManager::getInstance().getDefaultPage());
   }
   // This case should rarely be hit, but as a fallback, show setup.
   else
@@ -366,6 +373,7 @@ void loop()
   // Perform periodic tasks that don't require WiFi.
   SerialLog::getInstance().loop();
   config.loop();
+  WeatherService::getInstance().loop();
   alarmManager.update();
   bool timeUpdated = timeManager.update(); // Updates time from the RTC
   if (g_alarm_triggered)

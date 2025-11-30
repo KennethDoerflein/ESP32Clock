@@ -48,6 +48,10 @@ static constexpr float DEFAULT_TEMP_CORRECTION = 0.0;
 static constexpr bool DEFAULT_IS_DST = false;
 static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
 static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
+static constexpr const char *DEFAULT_ZIP_CODE = "";
+static constexpr int DEFAULT_DEFAULT_PAGE = 0;
+static constexpr float DEFAULT_LAT = 0.0;
+static constexpr float DEFAULT_LON = 0.0;
 
 /**
  * @class ConfigManager
@@ -411,6 +415,86 @@ public:
     if (tempCorrection != value)
     {
       tempCorrection = value;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Gets the stored Zip Code.
+   * @return The Zip Code as a String.
+   */
+  String getZipCode() const { return zipCode; }
+
+  /**
+   * @brief Sets the Zip Code.
+   * @param zip The new Zip Code.
+   */
+  void setZipCode(const String &zip)
+  {
+    if (zipCode != zip)
+    {
+      zipCode = zip;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Gets the default page index.
+   * @return The default page index.
+   */
+  int getDefaultPage() const { return defaultPage; }
+
+  /**
+   * @brief Sets the default page index.
+   * @param page The new default page index.
+   */
+  void setDefaultPage(int page)
+  {
+    if (defaultPage != page)
+    {
+      defaultPage = page;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Gets the latitude.
+   * @return The latitude.
+   */
+  float getLat() const { return lat; }
+
+  /**
+   * @brief Sets the latitude.
+   * @param latitude The new latitude.
+   */
+  void setLat(float latitude)
+  {
+    if (lat != latitude)
+    {
+      lat = latitude;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Gets the longitude.
+   * @return The longitude.
+   */
+  float getLon() const { return lon; }
+
+  /**
+   * @brief Sets the longitude.
+   * @param longitude The new longitude.
+   */
+  void setLon(float longitude)
+  {
+    if (lon != longitude)
+    {
+      lon = longitude;
       _isDirty = true;
       scheduleSave();
     }
@@ -888,6 +972,10 @@ private:
   bool isDst = DEFAULT_IS_DST;
   uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
   uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;
+  String zipCode = DEFAULT_ZIP_CODE;
+  int defaultPage = DEFAULT_DEFAULT_PAGE;
+  float lat = DEFAULT_LAT;
+  float lon = DEFAULT_LON;
 
   // Colors
   String backgroundColor = DEFAULT_BACKGROUND_COLOR;

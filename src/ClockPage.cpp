@@ -226,6 +226,7 @@ void ClockPage::setupLayout(TFT_eSPI &tft)
   // --- Bottom Rows Layout (Date and Sensors) ---
   tft.loadFont(DSEG14ModernBold32);
   int fontHeight = tft.fontHeight();
+  tft.unloadFont(); // Unload to prevent bleeding into other pages
   _alarmRowY = screenHeight - (fontHeight * 3 + MARGIN + 80);
   _dateY = screenHeight - (fontHeight * 2 + MARGIN + 55);
   _sensorY = screenHeight - (fontHeight + MARGIN + 20);

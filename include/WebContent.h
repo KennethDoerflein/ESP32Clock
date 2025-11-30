@@ -815,6 +815,17 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   </select>
                 </div>
                 <div class="mb-3 p-3 border rounded">
+                  <label for="zip-code" class="form-label">Zip Code (for Weather)</label>
+                  <input type="text" class="form-control" id="zip-code" name="zipCode" placeholder="e.g. 10001" value="%ZIP_CODE%">
+                </div>
+                <div class="mb-3 p-3 border rounded">
+                  <label for="default-page" class="form-label">Default Display Page</label>
+                  <select class="form-select" id="default-page" name="defaultPage">
+                    <option value="0" %DEFAULT_PAGE_SELECTED_0%>Clock</option>
+                    <option value="1" %DEFAULT_PAGE_SELECTED_1%>Weather</option>
+                  </select>
+                </div>
+                <div class="mb-3 p-3 border rounded">
                   <label for="snooze-duration" class="form-label">Snooze Duration (minutes)</label>
                   <input type="number" class="form-control" id="snooze-duration" name="snoozeDuration" min="1" max="60" value="%SNOOZE_DURATION%">
                 </div>
@@ -925,6 +936,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const screenFlippedEl = document.getElementById("screen-flipped");
       const invertColorsEl = document.getElementById("invert-colors");
       const timezoneEl = document.getElementById("timezone-select");
+      const zipCodeEl = document.getElementById("zip-code");
+      const defaultPageEl = document.getElementById("default-page");
       const colorPickers = displaySettingsForm.querySelectorAll('input[type="color"]');
       const resetGeneralBtn = document.getElementById('reset-general-btn');
       const resetColorsBtn = document.getElementById('reset-colors-btn');
@@ -1021,6 +1034,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         screenFlippedEl.checked = settings.screenFlipped || false;
         invertColorsEl.checked = settings.invertColors || false;
         timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
+        zipCodeEl.value = settings.zipCode || "";
+        defaultPageEl.value = settings.defaultPage || 0;
         document.getElementById('snooze-duration').value = settings.snoozeDuration || 9;
         document.getElementById('dismiss-duration').value = settings.dismissDuration || 3;
         
@@ -1097,6 +1112,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           screenFlipped: screenFlippedEl.checked,
           invertColors: invertColorsEl.checked,
           timezone: timezoneEl.value,
+          zipCode: zipCodeEl.value,
+          defaultPage: parseInt(defaultPageEl.value),
           snoozeDuration: parseInt(document.getElementById('snooze-duration').value),
           dismissDuration: parseInt(document.getElementById('dismiss-duration').value),
           tempCorrection: parseFloat(document.getElementById('temp-correction').value)
