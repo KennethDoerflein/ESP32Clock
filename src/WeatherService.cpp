@@ -15,8 +15,8 @@ void weatherUpdateTask(void *parameter)
 {
   WeatherService *service = static_cast<WeatherService *>(parameter);
   service->updateWeather();
-  vTaskDelete(NULL); // Delete self when done
   weatherTaskHandle = NULL;
+  vTaskDelete(NULL); // Delete self when done
 }
 
 // Helper to convert WMO Weather Codes to String Condition
