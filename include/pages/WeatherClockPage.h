@@ -9,20 +9,18 @@ struct WeatherClockDisplayData
   String time;
   String date;
   String dayOfWeek;
-  float temp; // Can be indoor or outdoor
-  bool isIndoorTemp;
-  float humidity;   // For indoor
-  String condition; // For outdoor
-  bool showIndoor;  // Which mode are we in?
+  float indoorTemp;
+  float indoorHumidity;
+  float outdoorTemp;
+  String outdoorCondition;
   String tod;
   String seconds;
-  String nextAlarm1;
-  String nextAlarm2;
+  String nextAlarm;
 };
 
 /**
  * @class WeatherClockPage
- * @brief A combo page that alternates between clock/internal sensors and outdoor weather.
+ * @brief A combo page that displays clock, outdoor weather, and indoor sensors.
  */
 class WeatherClockPage : public Page
 {
@@ -45,10 +43,14 @@ private:
   void drawClock(TFT_eSPI &tft);
   void drawDate(TFT_eSPI &tft);
   void drawDayOfWeek(TFT_eSPI &tft);
-  void drawTemperature(TFT_eSPI &tft);
-  void drawRightElement(TFT_eSPI &tft); // Humidity or Condition
+  void drawWeather(TFT_eSPI &tft);
+
+  // New drawing functions for the bottom row
+  void drawIndoorTemp(TFT_eSPI &tft);
+  void drawBottomAlarm(TFT_eSPI &tft);
+  void drawIndoorHumidity(TFT_eSPI &tft);
+
   void drawSeconds(TFT_eSPI &tft);
-  void drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String &alarm2);
   void updateSpriteColors();
   void initAlarmSprite(TFT_eSPI &tft);
   void updateDisplayData(WeatherClockDisplayData &data);
@@ -60,13 +62,13 @@ private:
   TFT_eSprite _sprClock;
   TFT_eSprite _sprDayOfWeek;
   TFT_eSprite _sprDate;
-  TFT_eSprite _sprTemp;
-  TFT_eSprite _sprRightElement; // Replaces _sprHumidity, used for both Humidity and Condition
+  TFT_eSprite _sprWeather;        // Row 2
+  TFT_eSprite _sprIndoorTemp;     // Row 4 Left
+  TFT_eSprite _sprBottomAlarm;    // Row 4 Center
+  TFT_eSprite _sprIndoorHumidity; // Row 4 Right
   TFT_eSprite _sprTOD;
   TFT_eSprite _sprSeconds;
-  TFT_eSprite _alarmSprite;
-  TFT_eSprite _sprNextAlarm1;
-  TFT_eSprite _sprNextAlarm2;
+  TFT_eSprite _alarmSprite; // Full screen overlay
 
   // Cached values
   WeatherClockDisplayData _lastData;
@@ -79,18 +81,17 @@ private:
   int _todY;
   int _secondsX;
   int _secondsY;
+  int _weatherY;
   int _dateY;
   int _sensorY;
-  int _alarmRowY;
   int _alarmSpriteX;
   int _alarmSpriteY;
 
-  bool _wasAlarmActive = false;
+  // Calculated widths
+  int _sensorWidth;
+  int _alarmWidth;
 
-  // Alternating logic
-  bool _showIndoor = true;
-  unsigned long _lastToggleTime = 0;
-  const unsigned long TOGGLE_INTERVAL = 5000; // 5 seconds
+  bool _wasAlarmActive = false;
 
   // Cached background color
   uint16_t _bgColor;
