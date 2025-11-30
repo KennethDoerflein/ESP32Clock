@@ -97,16 +97,25 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
     unit = "C";
   }
 
-  String tempStr = String(temp, 1) + " " + unit;
+  String tempStr = String(temp, 1);
 
   tft.setTextColor(txtColor, bg);
   tft.setTextDatum(MC_DATUM);
   tft.setTextFont(7);
 
-  tft.drawString(tempStr, tft.width() / 2, tft.height() / 2 - 20, 7);
+  int yPos = tft.height() / 2 - 20;
+  tft.drawString(tempStr, tft.width() / 2, yPos, 7);
+
+  int tempWidth = tft.textWidth(tempStr, 7);
+  int unitX = (tft.width() / 2) + (tempWidth / 2) + 8; // Padding
+
+  tft.setTextFont(4);
+  tft.setTextDatum(ML_DATUM);
+  tft.drawString(unit, unitX, yPos, 4);
 
   // Condition
   tft.setTextFont(4);
+  tft.setTextDatum(MC_DATUM); // Reset datum to center
   tft.setTextColor(hexToRGB565(ConfigManager::getInstance().getTimeColor()), bg);
 
   // Word wrap condition text?

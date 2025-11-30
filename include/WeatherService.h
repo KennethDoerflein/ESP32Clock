@@ -34,12 +34,4 @@ private:
   unsigned long _lastUpdate;
   unsigned long _lastLocationUpdate;
   WeatherData _currentWeather = {0.0, "", "", false};
-  String _gridId;
-  String _stationsUrl;
-  String _stationId;
-  int _gridX;
-  int _gridY;
-
-  bool fetchGridData(float lat, float lon);
-  bool fetchForecastData();
 };
