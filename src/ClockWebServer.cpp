@@ -125,15 +125,25 @@ void ClockWebServer::begin()
 
       bool isMetric = ConfigManager::getInstance().isCelsius();
       float temp = data.temp; // WeatherService stores temp in Fahrenheit
+      float feelsLike = data.feelsLike;
+      float windSpeed = data.windSpeed;
 
       if (isMetric) {
           temp = (temp - 32.0f) * 5.0f / 9.0f;
+          feelsLike = (feelsLike - 32.0f) * 5.0f / 9.0f;
+          windSpeed = windSpeed * 1.60934f; // mph to km/h
       }
 
       doc["temp"] = temp;
+      doc["feelsLike"] = feelsLike;
+      doc["humidity"] = data.humidity;
+      doc["windSpeed"] = windSpeed;
+      doc["pressure"] = data.pressure;
       doc["condition"] = data.condition;
       doc["isValid"] = data.isValid;
       doc["unit"] = isMetric ? "C" : "F";
+      doc["windUnit"] = isMetric ? "km/h" : "mph";
+      doc["pressureUnit"] = "hPa";
       
       String response;
       serializeJson(doc, response);

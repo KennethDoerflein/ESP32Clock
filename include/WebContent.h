@@ -50,6 +50,34 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
             <div id="weather-display" class="d-none">
                 <h2 class="display-1"><span id="temp">--</span>&deg;<span id="unit"></span></h2>
                 <h3 id="condition" class="text-muted">--</h3>
+                
+                <div class="row mt-4 g-3">
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-thermometer-half"></i> Feels Like</div>
+                       <div class="h5 mb-0"><span id="feels-like">--</span>&deg;</div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-droplet-half"></i> Humidity</div>
+                       <div class="h5 mb-0"><span id="humidity">--</span>%</div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-wind"></i> Wind</div>
+                       <div class="h5 mb-0"><span id="wind-speed">--</span> <small id="wind-unit" class="text-muted" style="font-size: 0.7em"></small></div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-speedometer2"></i> Pressure</div>
+                       <div class="h5 mb-0"><span id="pressure">--</span> <small class="text-muted" style="font-size: 0.7em">hPa</small></div>
+                     </div>
+                  </div>
+                </div>
+
             </div>
             <div id="weather-error" class="d-none alert alert-warning">
                 Weather data unavailable.
@@ -73,6 +101,12 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
     const weatherDisplay = document.getElementById('weather-display');
     const weatherError = document.getElementById('weather-error');
     const syncBtn = document.getElementById('sync-btn');
+    
+    const feelsLikeEl = document.getElementById('feels-like');
+    const humidityEl = document.getElementById('humidity');
+    const windSpeedEl = document.getElementById('wind-speed');
+    const windUnitEl = document.getElementById('wind-unit');
+    const pressureEl = document.getElementById('pressure');
 
     function fetchWeather() {
         fetch('/api/weather')
@@ -82,6 +116,13 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
                     tempEl.textContent = data.temp.toFixed(1);
                     unitEl.textContent = data.unit;
                     conditionEl.textContent = data.condition;
+                    
+                    feelsLikeEl.textContent = data.feelsLike.toFixed(1);
+                    humidityEl.textContent = data.humidity.toFixed(0);
+                    windSpeedEl.textContent = data.windSpeed.toFixed(1);
+                    windUnitEl.textContent = data.windUnit;
+                    pressureEl.textContent = data.pressure.toFixed(0);
+
                     weatherDisplay.classList.remove('d-none');
                     weatherError.classList.add('d-none');
                 } else {

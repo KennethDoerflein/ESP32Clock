@@ -7,6 +7,10 @@
 struct WeatherData
 {
   float temp;
+  float feelsLike;
+  float humidity;
+  float windSpeed;
+  float pressure;
   String condition;
   String iconUrl;
   bool isValid;
@@ -33,5 +37,5 @@ private:
 
   unsigned long _lastUpdate;
   unsigned long _lastLocationUpdate;
-  WeatherData _currentWeather = {0.0, "", "", false};
+  WeatherData _currentWeather = {0.0, 0.0, 0.0, 0.0, 0.0, "", "", false};
 };

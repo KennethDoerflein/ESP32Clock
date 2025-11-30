@@ -81,7 +81,7 @@ void AlarmManager::update()
   {
     SerialLog::getInstance().print("AlarmManager: Ramping to STAGE_CONTINUOUS\n");
     _rampStage = STAGE_CONTINUOUS;
-    digitalWrite(BUZZER_PIN, HIGH); // Turn buzzer on permanently for this stage
+    //digitalWrite(BUZZER_PIN, HIGH); // Turn buzzer on permanently for this stage
     return;                         // Skip beeping logic
   }
 
@@ -102,7 +102,7 @@ void AlarmManager::update()
     {
       _buzzerState = BEEP_OFF;
       _lastBeepTime = currentTime;
-      digitalWrite(BUZZER_PIN, LOW);
+      //digitalWrite(BUZZER_PIN, LOW);
     }
   }
   else // BEEP_OFF
@@ -111,7 +111,7 @@ void AlarmManager::update()
     {
       _buzzerState = BEEP_ON;
       _lastBeepTime = currentTime;
-      digitalWrite(BUZZER_PIN, HIGH);
+      //digitalWrite(BUZZER_PIN, HIGH);
     }
   }
 }
@@ -129,7 +129,7 @@ void AlarmManager::stop()
     return;
 
   SerialLog::getInstance().printf("Stopping alarm ID %d\n", _activeAlarmId);
-  digitalWrite(BUZZER_PIN, LOW); // Ensure buzzer is off
+  //digitalWrite(BUZZER_PIN, LOW); // Ensure buzzer is off
   _isRinging = false;
   _activeAlarmId = -1;
 
@@ -188,7 +188,7 @@ void AlarmManager::trigger(uint8_t alarmId)
   _lastBeepTime = millis();
   _rampStage = STAGE_SLOW_BEEP;
   _buzzerState = BEEP_ON;
-  digitalWrite(BUZZER_PIN, HIGH); // Start with the buzzer on
+  //digitalWrite(BUZZER_PIN, HIGH); // Start with the buzzer on
   _isRinging = true;
   _activeAlarmId = alarmId;
 
@@ -228,7 +228,7 @@ void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
   // We don't know the buzzer state from before the reboot, so start it
   _lastBeepTime = millis();
   _buzzerState = BEEP_ON;
-  digitalWrite(BUZZER_PIN, HIGH);
+  //digitalWrite(BUZZER_PIN, HIGH);
 
   // Re-evaluate the ramp stage based on how long it's been ringing.
   uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();

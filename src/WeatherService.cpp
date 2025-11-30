@@ -91,7 +91,7 @@ void WeatherService::loop()
     xTaskCreatePinnedToCore(
         weatherUpdateTask,  // Function to implement the task
         "WeatherUpdate",    // Name of the task
-        40960,              // Stack size (40KB)
+        8192,               // Stack size (8KB is sufficient for HTTPS)
         this,               // Task input parameter
         1,                  // Priority
         &weatherTaskHandle, // Task handle
@@ -185,7 +185,7 @@ void WeatherService::updateWeather()
 
   String url = "https://api.open-meteo.com/v1/forecast?latitude=" + String(lat, 4) +
                "&longitude=" + String(lon, 4) +
-               "&current=temperature_2m,weather_code&temperature_unit=fahrenheit";
+               "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,pressure_msl,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch";
 
   SerialLog::getInstance().printf("Fetching Weather: %s\n", url.c_str());
 
@@ -202,9 +202,17 @@ void WeatherService::updateWeather()
     if (!error)
     {
       float temp = doc["current"]["temperature_2m"];
+      float feelsLike = doc["current"]["apparent_temperature"];
+      float humidity = doc["current"]["relative_humidity_2m"];
+      float windSpeed = doc["current"]["wind_speed_10m"];
+      float pressure = doc["current"]["pressure_msl"];
       int code = doc["current"]["weather_code"];
 
       _currentWeather.temp = temp;
+      _currentWeather.feelsLike = feelsLike;
+      _currentWeather.humidity = humidity;
+      _currentWeather.windSpeed = windSpeed;
+      _currentWeather.pressure = pressure;
       _currentWeather.condition = getConditionFromWMO(code);
       _currentWeather.isValid = true;
 
