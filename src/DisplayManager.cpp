@@ -12,6 +12,15 @@
 #include "Utils.h"
 #include "ConfigManager.h"
 #include "Display.h"
+#include "AlarmManager.h"
+#include "TimeManager.h"
+#include "fonts/CenturyGothicBold48.h"
+#include "SerialLog.h"
+
+/**
+ * @brief Private constructor to enforce the singleton pattern.
+ */
+DisplayManager::DisplayManager() : _tft(nullptr), _currentPage(nullptr), _alarmSprite(nullptr) {}
 
 /**
  * @brief Initializes the DisplayManager.
@@ -20,6 +29,7 @@
 void DisplayManager::begin(TFT_eSPI &tft_instance)
 {
   this->_tft = &tft_instance;
+  initAlarmSprite();
 }
 
 #include <utility> // For std::move
@@ -72,6 +82,51 @@ void DisplayManager::setPage(int index, bool forceRedraw)
   // After a page change, the screen is cleared, so the icon is no longer visible.
   // We need to reset its state to force a redraw on the next loop.
   _alarmIconVisible = false;
+
+  // Also force alarm overlay redraw if active
+  if (AlarmManager::getInstance().isRinging() || ConfigManager::getInstance().isAnyAlarmSnoozed())
+  {
+    _wasAlarmActive = false; // Will trigger redraw in next update
+  }
+}
+
+/**
+ * @brief Cycles to the next page in the configured sequence.
+ */
+void DisplayManager::cyclePage()
+{
+  auto &config = ConfigManager::getInstance();
+  std::vector<int> enabled = config.getEnabledPages();
+
+  if (enabled.empty())
+  {
+    // Fallback if nothing enabled
+    setPage(0);
+    return;
+  }
+
+  int currentIndex = _currentPageIndex;
+  int nextIndex = -1;
+
+  // Find current index in the enabled list
+  for (size_t i = 0; i < enabled.size(); ++i)
+  {
+    if (enabled[i] == currentIndex)
+    {
+      // Found it, go to next
+      nextIndex = enabled[(i + 1) % enabled.size()];
+      break;
+    }
+  }
+
+  if (nextIndex == -1)
+  {
+    // Current page not in list, go to first enabled
+    nextIndex = enabled[0];
+  }
+
+  SerialLog::getInstance().printf("Cycling to page index: %d\n", nextIndex);
+  setPage(nextIndex);
 }
 
 /**
@@ -94,6 +149,7 @@ void DisplayManager::update()
     _partialRefresh = false; // A full refresh implies a partial one
     // After a full refresh, we must force the alarm icon to be redrawn.
     _alarmIconVisible = false;
+    _wasAlarmActive = false; // Force alarm overlay redraw
   }
   else if (_partialRefresh)
   {
@@ -109,6 +165,10 @@ void DisplayManager::update()
     _currentPage->update();
     _currentPage->render(*_tft);
   }
+
+  // Render Alarm Overlay on top of everything
+  renderAlarmOverlay();
+
   Display::getInstance().unlock();
 }
 
@@ -212,4 +272,141 @@ void DisplayManager::showErrorScreen(const char *message)
   _tft->setTextDatum(TL_DATUM);
   _tft->setTextColor(hexToRGB565(ConfigManager::getInstance().getTimeColor().c_str()));
   Display::getInstance().unlock();
+}
+
+void DisplayManager::initAlarmSprite()
+{
+  if (_alarmSprite == nullptr)
+  {
+    _alarmSprite = new TFT_eSprite(_tft);
+    _tft->loadFont(CenturyGothicBold48);
+    int textWidth = _tft->textWidth("ALARM");
+    _alarmSprite->createSprite(textWidth + ALARM_SPRITE_WIDTH_PADDING, ALARM_SPRITE_HEIGHT);
+    _tft->unloadFont();
+  }
+}
+
+void DisplayManager::renderAlarmOverlay()
+{
+  auto &alarmManager = AlarmManager::getInstance();
+  auto &config = ConfigManager::getInstance();
+  bool isAlarmActive = alarmManager.isRinging() || config.isAnyAlarmSnoozed();
+
+  if (!isAlarmActive)
+  {
+    if (_wasAlarmActive)
+    {
+      // Clear the overlay
+      clearAlarmOverlay();
+      _wasAlarmActive = false;
+      requestPartialRefresh();
+    }
+    return;
+  }
+
+  _wasAlarmActive = true;
+
+  uint16_t alarmColor = hexToRGB565(config.getAlarmTextColor().c_str());
+  uint16_t bgColor = hexToRGB565(config.getBackgroundColor().c_str());
+
+  // Clear the sprite with the background color
+  _alarmSprite->fillSprite(bgColor);
+
+  _alarmSprite->loadFont(CenturyGothicBold48);
+  _alarmSprite->setTextDatum(MC_DATUM);
+
+  bool showButton = false;
+  String text = "";
+
+  if (alarmManager.isRinging())
+  {
+    showButton = true;
+    text = "ALARM";
+  }
+  else
+  {
+    // Check for snoozed alarms
+    for (int i = 0; i < config.getNumAlarms(); ++i)
+    {
+      const auto &alarm = config.getAlarmByIndex(i);
+      if (alarm.isSnoozed())
+      {
+        time_t snoozeUntil = alarm.getSnoozeUntil();
+        time_t now = TimeManager::getInstance().getRTCTime().unixtime();
+        long remaining = snoozeUntil - now;
+        if (remaining < 0)
+        {
+          remaining = 0;
+        }
+
+        char buf[10];
+        snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
+        text = String(buf);
+        showButton = true;
+        break;
+      }
+    }
+  }
+
+  if (showButton)
+  {
+    // Draw the rounded button body
+    _alarmSprite->fillRoundRect(0, 0, _alarmSprite->width(), _alarmSprite->height(), 10, alarmColor);
+
+    // Set text color to background color (inverted)
+    _alarmSprite->setTextColor(bgColor);
+    _alarmSprite->drawString(text.c_str(), _alarmSprite->width() / 2, _alarmSprite->height() / 2);
+
+    // Draw the progress bar if the button is being held
+    if (_dismissProgress > 0.0f)
+    {
+      int margin = 5;
+      int availableWidth = _alarmSprite->width() - (2 * margin);
+      int barWidth = availableWidth * _dismissProgress;
+      _alarmSprite->fillRoundRect(margin, _alarmSprite->height() - ALARM_PROGRESS_BAR_HEIGHT - margin, barWidth, ALARM_PROGRESS_BAR_HEIGHT, 3, TFT_WHITE);
+    }
+  }
+  else
+  {
+    _dismissProgress = 0.0f;
+  }
+
+  int screenWidth = _tft->width();
+  int screenHeight = _tft->height();
+  int x = (screenWidth - _alarmSprite->width()) / 2;
+  int y = (screenHeight - _alarmSprite->height()) / 2;
+
+  _alarmSprite->pushSprite(x, y);
+}
+
+void DisplayManager::setDismissProgress(float progress)
+{
+  _dismissProgress = progress;
+}
+
+void DisplayManager::clearAlarmOverlay()
+{
+  if (_alarmSprite)
+  {
+    // Calculate position (must match renderAlarmOverlay)
+    int screenWidth = _tft->width();
+    int screenHeight = _tft->height();
+    int x = (screenWidth - _alarmSprite->width()) / 2;
+    int y = (screenHeight - _alarmSprite->height()) / 2;
+
+    uint16_t bgColor = hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str());
+    _tft->fillRect(x, y, _alarmSprite->width(), _alarmSprite->height(), bgColor);
+  }
+}
+
+void DisplayManager::showAlarmScreen()
+{
+  // Deprecated/Unused with new overlay logic, but kept for interface compatibility
+}
+
+void DisplayManager::drawDismissProgressBar(float progress)
+{
+  // Delegated to renderAlarmOverlay via state
+  setDismissProgress(progress);
+  renderAlarmOverlay();
 }

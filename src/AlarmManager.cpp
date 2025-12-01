@@ -144,6 +144,9 @@ void AlarmManager::stop()
   _buzzerState = BEEP_OFF;
 
   Display::getInstance().setBacklightFlashing(false);
+
+  // Refresh display to clear alarm overlay
+  DisplayManager::getInstance().requestPartialRefresh();
 }
 
 /**
@@ -195,9 +198,11 @@ void AlarmManager::trigger(uint8_t alarmId)
   config.setRingingAlarmStartTimestamp(_alarmStartTimestamp);
   config.saveRingingAlarmState(); // Persist the change immediately
 
-  // Switch to the clock page before showing the alarm overlay
-  DisplayManager::getInstance().setPage(0);
+  // Flash backlight
   Display::getInstance().setBacklightFlashing(true);
+
+  // Update display immediately to show alarm overlay
+  DisplayManager::getInstance().requestPartialRefresh();
 }
 
 /**
@@ -205,7 +210,6 @@ void AlarmManager::trigger(uint8_t alarmId)
  *
  * This function is called at startup if a ringing alarm was detected in
  * the saved configuration. It recalculates the current ramp stage based on
-
  * the original start time and continues the alarm sequence.
  *
  * @param alarmId The ID of the alarm to resume.
@@ -244,7 +248,9 @@ void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
   }
   SerialLog::getInstance().printf("Resumed at ramp stage %d\n", _rampStage);
 
-  // Switch to the clock page before showing the alarm overlay
-  DisplayManager::getInstance().setPage(0);
+  // Flash backlight
   Display::getInstance().setBacklightFlashing(true);
+
+  // Update display immediately to show alarm overlay
+  DisplayManager::getInstance().requestPartialRefresh();
 }

@@ -33,6 +33,148 @@ const char SERIAL_LOG_TAB_HTML[] PROGMEM = R"rawliteral(
 </li>
 )rawliteral";
 
+const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html data-bs-theme="dark">
+<head>
+  <title>Weather</title>
+  %HEAD%
+</head>
+<body>
+  <div class="container my-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="card-title text-center mb-4">Weather</h1>
+        
+        <div class="text-center mb-4">
+            <div id="weather-display" class="d-none">
+                <h2 class="display-1"><span id="temp">--</span>&deg;<span id="unit"></span></h2>
+                <h3 id="condition" class="text-muted">--</h3>
+                
+                <div class="row mt-4 g-3">
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-thermometer-half"></i> Feels Like</div>
+                       <div class="h5 mb-0"><span id="feels-like">--</span>&deg;</div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-droplet-half"></i> Humidity</div>
+                       <div class="h5 mb-0"><span id="humidity">--</span>%</div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-wind"></i> Wind</div>
+                       <div class="h5 mb-0"><span id="wind-speed">--</span> <small id="wind-unit" class="text-muted" style="font-size: 0.7em"></small></div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-speedometer2"></i> Pressure</div>
+                       <div class="h5 mb-0"><span id="pressure">--</span> <small class="text-muted" style="font-size: 0.7em">hPa</small></div>
+                     </div>
+                  </div>
+                </div>
+
+            </div>
+            <div id="weather-error" class="d-none alert alert-warning">
+                Weather data unavailable.
+            </div>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button id="sync-btn" class="btn btn-primary btn-lg"><i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now</button>
+            <a href="/" class="btn btn-secondary" title="Return to the main menu.">Back to Menu</a>
+        </div>
+        <div class="mt-3 text-center">
+            <small class="text-muted">Weather data provided by <a href="https://open-meteo.com/" target="_blank" class="link-secondary">open-meteo.com</a></small>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tempEl = document.getElementById('temp');
+    const unitEl = document.getElementById('unit');
+    const conditionEl = document.getElementById('condition');
+    const weatherDisplay = document.getElementById('weather-display');
+    const weatherError = document.getElementById('weather-error');
+    const syncBtn = document.getElementById('sync-btn');
+    
+    const feelsLikeEl = document.getElementById('feels-like');
+    const humidityEl = document.getElementById('humidity');
+    const windSpeedEl = document.getElementById('wind-speed');
+    const windUnitEl = document.getElementById('wind-unit');
+    const pressureEl = document.getElementById('pressure');
+
+    function fetchWeather() {
+        fetch('/api/weather')
+            .then(response => response.json())
+            .then(data => {
+                if (data.isValid) {
+                    tempEl.textContent = data.temp.toFixed(1);
+                    unitEl.textContent = data.unit;
+                    conditionEl.textContent = data.condition;
+                    
+                    feelsLikeEl.textContent = data.feelsLike.toFixed(1);
+                    humidityEl.textContent = data.humidity.toFixed(0);
+                    windSpeedEl.textContent = data.windSpeed.toFixed(1);
+                    windUnitEl.textContent = data.windUnit;
+                    pressureEl.textContent = data.pressure.toFixed(0);
+
+                    weatherDisplay.classList.remove('d-none');
+                    weatherError.classList.add('d-none');
+                } else {
+                    weatherDisplay.classList.add('d-none');
+                    weatherError.classList.remove('d-none');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                weatherDisplay.classList.add('d-none');
+                weatherError.classList.remove('d-none');
+            });
+    }
+
+    syncBtn.addEventListener('click', () => {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Syncing...';
+        
+        fetch('/api/weather/sync', { method: 'POST' })
+            .then(response => {
+                if (response.ok) {
+                    // Wait a bit for the sync to likely happen, then refresh
+                    setTimeout(() => {
+                        fetchWeather();
+                        syncBtn.disabled = false;
+                        syncBtn.innerHTML = '<i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now';
+                    }, 2000);
+                } else {
+                    alert('Sync failed');
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = '<i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now';
+                }
+            })
+            .catch(e => {
+                alert('Error: ' + e);
+                syncBtn.disabled = false;
+                syncBtn.innerHTML = '<i class="bi bi-cloud-arrow-down-fill me-2"></i>Sync Now';
+            });
+    });
+
+    // Initial fetch
+    fetchWeather();
+    
+    // Refresh periodically
+    setInterval(fetchWeather, 10000);
+
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+)rawliteral";
+
 const char SERIAL_LOG_TAB_PANE_HTML[] PROGMEM = R"rawliteral(
 <div class="tab-pane fade" id="serial-log" role="tabpanel" aria-labelledby="serial-log-tab">
   <div class="card mb-3">
@@ -137,6 +279,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <div class="d-grid gap-3">
           <a href="/wifi" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center" title="Configure WiFi network settings."><i class="bi bi-wifi me-2"></i>Configure WiFi</a>
           <a href="/alarms" class="btn btn-warning btn-lg d-flex align-items-center justify-content-center" title="Set and manage alarms."><i class="bi bi-alarm-fill me-2"></i>Alarms</a>
+          <a href="/weather" class="btn btn-success btn-lg d-flex align-items-center justify-content-center" title="View weather and manual sync."><i class="bi bi-cloud-sun-fill me-2"></i>Weather</a>
           <a href="/settings" class="btn btn-info btn-lg d-flex align-items-center justify-content-center" title="Adjust clock and display settings."><i class="bi bi-gear-fill me-2"></i>Settings</a>
           <a href="/system" class="btn btn-secondary btn-lg d-flex align-items-center justify-content-center" title="Update firmware and view logs."><i class="bi bi-hdd-fill me-2"></i>System</a>
         </div>
@@ -815,6 +958,27 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   </select>
                 </div>
                 <div class="mb-3 p-3 border rounded">
+                  <label for="zip-code" class="form-label">Zip Code (for Weather)</label>
+                  <input type="text" class="form-control" id="zip-code" name="zipCode" placeholder="e.g. 10001" value="%ZIP_CODE%">
+                </div>
+                <div class="mb-3 p-3 border rounded">
+                  <label class="form-label">Page Cycle Order</label>
+                  <div class="text-muted small mb-2">
+                    Check to enable. Use arrows to reorder.
+                  </div>
+                  <div id="page-order-list" class="list-group mb-3">
+                    <!-- Items injected by JS -->
+                  </div>
+
+                  <label for="default-page" class="form-label">Default Display Page</label>
+                  <select class="form-select" id="default-page" name="defaultPage">
+                    <option value="0" %DEFAULT_PAGE_SELECTED_0%>Clock</option>
+                    <option value="1" %DEFAULT_PAGE_SELECTED_1%>Weather</option>
+                    <option value="2">System Info</option>
+                    <option value="3" %DEFAULT_PAGE_SELECTED_3%>Clock + Weather</option>
+                  </select>
+                </div>
+                <div class="mb-3 p-3 border rounded">
                   <label for="snooze-duration" class="form-label">Snooze Duration (minutes)</label>
                   <input type="number" class="form-control" id="snooze-duration" name="snoozeDuration" min="1" max="60" value="%SNOOZE_DURATION%">
                 </div>
@@ -878,6 +1042,18 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                       <input type="color" id="humidity-color" name="humidityColor" title="Select a color for the humidity." value="%HUMIDITY_COLOR%">
                     </div>
                   </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="weather-temp-color" title="Set the color for the weather temperature display.">Weather Temp Color</label>
+                      <input type="color" id="weather-temp-color" name="weatherTempColor" title="Select a color for the weather temperature." value="%WEATHER_TEMP_COLOR%">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="color-picker-wrapper">
+                      <label for="weather-forecast-color" title="Set the color for the weather forecast display.">Weather Forecast Color</label>
+                      <input type="color" id="weather-forecast-color" name="weatherForecastColor" title="Select a color for the weather forecast." value="%WEATHER_FORECAST_COLOR%">
+                    </div>
+                  </div>
                 </div>
               </form>
               <div class="d-grid gap-2 mt-4">
@@ -925,9 +1101,23 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const screenFlippedEl = document.getElementById("screen-flipped");
       const invertColorsEl = document.getElementById("invert-colors");
       const timezoneEl = document.getElementById("timezone-select");
+      const zipCodeEl = document.getElementById("zip-code");
+      const defaultPageEl = document.getElementById("default-page");
+      const pageOrderListEl = document.getElementById("page-order-list");
       const colorPickers = displaySettingsForm.querySelectorAll('input[type="color"]');
       const resetGeneralBtn = document.getElementById('reset-general-btn');
       const resetColorsBtn = document.getElementById('reset-colors-btn');
+
+      // Map of Page IDs to friendly names
+      const PAGE_NAMES = {
+        0: "Clock",
+        1: "Weather",
+        2: "System Info",
+        3: "Clock + Weather"
+      };
+
+      // All available pages in the system (could be dynamic, but hardcoded for now based on main.cpp)
+      const ALL_PAGE_IDS = [0, 1, 3, 2]; // Default preferred order
 
       const STATUS_INDICATORS = {
         SAVED: '<i class="bi bi-check-circle-fill text-success"></i> <span class="text-muted">Saved</span>',
@@ -1015,12 +1205,94 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         autoBrightnessEndHourValueEl.textContent = formatHour(autoBrightnessEndHourEl.value, is24Hour);
       }
       
+      function renderPageOrderList(enabledPages) {
+        pageOrderListEl.innerHTML = '';
+        
+        // Combine enabled pages with disabled ones (at the end)
+        // Make a copy of enabledPages to work with
+        let currentOrder = [...(enabledPages || [])];
+        
+        // Add any missing pages to the end
+        ALL_PAGE_IDS.forEach(id => {
+          if (!currentOrder.includes(id)) {
+            currentOrder.push(id);
+          }
+        });
+
+        currentOrder.forEach((id, index) => {
+           const isEnabled = enabledPages ? enabledPages.includes(id) : ALL_PAGE_IDS.includes(id); // Default to all if null, but usually loaded
+           
+           const item = document.createElement('div');
+           item.className = 'list-group-item d-flex align-items-center justify-content-between p-2';
+           item.dataset.id = id;
+           
+           item.innerHTML = `
+             <div class="form-check m-0 d-flex align-items-center gap-2">
+               <input class="form-check-input page-enable-check" type="checkbox" ${isEnabled ? 'checked' : ''} id="page-check-${id}">
+               <label class="form-check-label user-select-none" for="page-check-${id}">${PAGE_NAMES[id] || 'Unknown Page ' + id}</label>
+             </div>
+             <div class="btn-group" role="group">
+               <button type="button" class="btn btn-sm btn-outline-secondary move-up-btn" title="Move Up"><i class="bi bi-arrow-up"></i></button>
+               <button type="button" class="btn btn-sm btn-outline-secondary move-down-btn" title="Move Down"><i class="bi bi-arrow-down"></i></button>
+             </div>
+           `;
+           
+           // Event listeners
+           item.querySelector('.page-enable-check').addEventListener('change', () => handleGeneralInputChange());
+           item.querySelector('.move-up-btn').addEventListener('click', (e) => {
+               e.preventDefault();
+               moveItem(item, -1);
+           });
+           item.querySelector('.move-down-btn').addEventListener('click', (e) => {
+               e.preventDefault();
+               moveItem(item, 1);
+           });
+
+           pageOrderListEl.appendChild(item);
+        });
+        
+        updateMoveButtons();
+      }
+
+      function moveItem(item, direction) {
+          if (direction === -1 && item.previousElementSibling) {
+              item.parentNode.insertBefore(item, item.previousElementSibling);
+          } else if (direction === 1 && item.nextElementSibling) {
+              item.parentNode.insertBefore(item.nextElementSibling, item);
+          }
+          updateMoveButtons();
+          handleGeneralInputChange();
+      }
+
+      function updateMoveButtons() {
+          const items = pageOrderListEl.querySelectorAll('.list-group-item');
+          items.forEach((item, index) => {
+              const upBtn = item.querySelector('.move-up-btn');
+              const downBtn = item.querySelector('.move-down-btn');
+              upBtn.disabled = index === 0;
+              downBtn.disabled = index === items.length - 1;
+          });
+      }
+
+      function getEnabledPagesFromUI() {
+          const enabled = [];
+          pageOrderListEl.querySelectorAll('.list-group-item').forEach(item => {
+              const checkbox = item.querySelector('.page-enable-check');
+              if (checkbox.checked) {
+                  enabled.push(parseInt(item.dataset.id));
+              }
+          });
+          return enabled;
+      }
+
       function updateGeneralSettingsUI(settings) {
         autoBrightnessEl.checked = settings.autoBrightness || false;
         celsiusEl.checked = settings.useCelsius || false;
         screenFlippedEl.checked = settings.screenFlipped || false;
         invertColorsEl.checked = settings.invertColors || false;
         timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
+        zipCodeEl.value = settings.zipCode || "";
+        defaultPageEl.value = settings.defaultPage || 0;
         document.getElementById('snooze-duration').value = settings.snoozeDuration || 9;
         document.getElementById('dismiss-duration').value = settings.dismissDuration || 3;
         
@@ -1036,6 +1308,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         } else {
           tempCorrectionControlsEl.classList.add('d-none');
         }
+        
+        renderPageOrderList(settings.enabledPages);
 
         // Manually trigger UI updates that depend on these values
         updateBrightnessUI(settings);
@@ -1052,6 +1326,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         if (settings.dateColor) document.getElementById('date-color').value = settings.dateColor;
         if (settings.tempColor) document.getElementById('temp-color').value = settings.tempColor;
         if (settings.humidityColor) document.getElementById('humidity-color').value = settings.humidityColor;
+        if (settings.weatherTempColor) document.getElementById('weather-temp-color').value = settings.weatherTempColor;
+        if (settings.weatherForecastColor) document.getElementById('weather-forecast-color').value = settings.weatherForecastColor;
       }
       
       async function fetchGeneralSettings() {
@@ -1097,6 +1373,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           screenFlipped: screenFlippedEl.checked,
           invertColors: invertColorsEl.checked,
           timezone: timezoneEl.value,
+          zipCode: zipCodeEl.value,
+          defaultPage: parseInt(defaultPageEl.value),
+          enabledPages: getEnabledPagesFromUI(),
           snoozeDuration: parseInt(document.getElementById('snooze-duration').value),
           dismissDuration: parseInt(document.getElementById('dismiss-duration').value),
           tempCorrection: parseFloat(document.getElementById('temp-correction').value)

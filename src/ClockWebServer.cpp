@@ -23,6 +23,7 @@
 #include "NtpSync.h"
 #include "AlarmManager.h"
 #include "Constants.h"
+#include "WeatherService.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -110,6 +111,48 @@ void ClockWebServer::begin()
 
     server.on("/alarms", HTTP_GET, [this](AsyncWebServerRequest *request)
               { onAlarmsRequest(request); });
+
+    server.on("/weather", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { request->send_P(200, "text/html", WEATHER_PAGE_HTML, [this](const String &var)
+                                { return processor(var); }); });
+
+    // --- API Handlers for Weather ---
+    server.on("/api/weather", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+      auto& weatherService = WeatherService::getInstance();
+      WeatherData data = weatherService.getCurrentWeather();
+      JsonDocument doc;
+
+      bool isMetric = ConfigManager::getInstance().isCelsius();
+      float temp = data.temp; // WeatherService stores temp in Fahrenheit
+      float feelsLike = data.feelsLike;
+      float windSpeed = data.windSpeed;
+
+      if (isMetric) {
+          temp = (temp - 32.0f) * 5.0f / 9.0f;
+          feelsLike = (feelsLike - 32.0f) * 5.0f / 9.0f;
+          windSpeed = windSpeed * 1.60934f; // mph to km/h
+      }
+
+      doc["temp"] = temp;
+      doc["feelsLike"] = feelsLike;
+      doc["humidity"] = data.humidity;
+      doc["windSpeed"] = windSpeed;
+      doc["pressure"] = data.pressure;
+      doc["condition"] = data.condition;
+      doc["isValid"] = data.isValid;
+      doc["unit"] = isMetric ? "C" : "F";
+      doc["windUnit"] = isMetric ? "km/h" : "mph";
+      doc["pressureUnit"] = "hPa";
+      
+      String response;
+      serializeJson(doc, response);
+      request->send(200, "application/json", response); });
+
+    server.on("/api/weather/sync", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+      WeatherService::getInstance().updateWeather();
+      request->send(200, "text/plain", "Weather sync started."); });
 
     // --- API Handlers for Alarms ---
     server.on("/api/alarms", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -242,6 +285,14 @@ void ClockWebServer::begin()
       doc["screenFlipped"] = config.isScreenFlipped();
       doc["invertColors"] = config.isInvertColors();
       doc["timezone"] = config.getTimezone();
+      doc["zipCode"] = config.getZipCode();
+      
+      JsonArray pagesArray = doc["enabledPages"].to<JsonArray>();
+      for (int pageId : config.getEnabledPages()) {
+        pagesArray.add(pageId);
+      }
+
+      doc["defaultPage"] = config.getDefaultPage();
       doc["snoozeDuration"] = config.getSnoozeDuration();
       doc["dismissDuration"] = config.getDismissDuration();
       doc["tempCorrectionEnabled"] = config.isTempCorrectionEnabled();
@@ -278,6 +329,7 @@ void ClockWebServer::begin()
             {
               auto &config = ConfigManager::getInstance();
               String oldTimezone = config.getTimezone();
+              String oldZipCode = config.getZipCode();
               bool oldScreenFlipped = config.isScreenFlipped();
               bool oldInvertColors = config.isInvertColors();
               float oldTempCorrection = config.getTempCorrection();
@@ -293,6 +345,19 @@ void ClockWebServer::begin()
               config.setScreenFlipped(doc["screenFlipped"]);
               config.setInvertColors(doc["invertColors"]);
               config.setTimezone(doc["timezone"]);
+              config.setZipCode(doc["zipCode"]);
+
+              if (doc["enabledPages"].is<JsonArray>())
+              {
+                std::vector<int> pages;
+                for (int id : doc["enabledPages"].as<JsonArray>())
+                {
+                  pages.push_back(id);
+                }
+                config.setEnabledPages(pages);
+              }
+
+              config.setDefaultPage(doc["defaultPage"]);
               config.setSnoozeDuration(doc["snoozeDuration"]);
               config.setDismissDuration(doc["dismissDuration"]);
               config.setTempCorrectionEnabled(doc["tempCorrectionEnabled"]);
@@ -318,6 +383,11 @@ void ClockWebServer::begin()
               if (oldTempCorrection != config.getTempCorrection() || oldTempCorrectionEnabled != config.isTempCorrectionEnabled())
               {
                 handleSensorUpdates(true);
+              }
+
+              if (oldZipCode != config.getZipCode())
+              {
+                WeatherService::getInstance().updateLocation();
               }
 
               request->send(200, "text/plain", "Settings saved!");
@@ -357,6 +427,8 @@ void ClockWebServer::begin()
       doc["dateColor"] = config.getDateColor();
       doc["tempColor"] = config.getTempColor();
       doc["humidityColor"] = config.getHumidityColor();
+      doc["weatherTempColor"] = config.getWeatherTempColor();
+      doc["weatherForecastColor"] = config.getWeatherForecastColor();
       
       String response;
       serializeJson(doc, response);
@@ -433,6 +505,8 @@ void ClockWebServer::begin()
               config.setDateColor(doc["dateColor"].as<String>());
               config.setTempColor(doc["tempColor"].as<String>());
               config.setHumidityColor(doc["humidityColor"].as<String>());
+              config.setWeatherTempColor(doc["weatherTempColor"].as<String>());
+              config.setWeatherForecastColor(doc["weatherForecastColor"].as<String>());
 
               if (oldBgColor != newBgColor)
               {
@@ -943,6 +1017,10 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.getTempColor();
   if (var == "HUMIDITY_COLOR")
     return config.getHumidityColor();
+  if (var == "WEATHER_TEMP_COLOR")
+    return config.getWeatherTempColor();
+  if (var == "WEATHER_FORECAST_COLOR")
+    return config.getWeatherForecastColor();
   if (var == "SNOOZE_DURATION")
     return String(config.getSnoozeDuration());
   if (var == "DISMISS_DURATION")
@@ -962,6 +1040,16 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.isTempCorrectionEnabled() ? "checked" : "";
   if (var == "TEMP_CORRECTION_CONTROLS_CLASS")
     return config.isTempCorrectionEnabled() ? "" : "d-none";
+
+  if (var == "ZIP_CODE")
+    return config.getZipCode();
+
+  if (var == "DEFAULT_PAGE_SELECTED_0")
+    return config.getDefaultPage() == 0 ? "selected" : "";
+  if (var == "DEFAULT_PAGE_SELECTED_1")
+    return config.getDefaultPage() == 1 ? "selected" : "";
+  if (var == "DEFAULT_PAGE_SELECTED_3")
+    return config.getDefaultPage() == 3 ? "selected" : "";
 
   // Timezone selections
   String timezone = config.getTimezone();

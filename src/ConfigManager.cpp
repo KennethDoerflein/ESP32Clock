@@ -89,6 +89,11 @@ void ConfigManager::setDefaults()
   dismissDuration = DEFAULT_DISMISS_DURATION;
   tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
   tempCorrection = DEFAULT_TEMP_CORRECTION;
+  zipCode = DEFAULT_ZIP_CODE;
+  enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
+  defaultPage = DEFAULT_DEFAULT_PAGE;
+  lat = DEFAULT_LAT;
+  lon = DEFAULT_LON;
 
   backgroundColor = DEFAULT_BACKGROUND_COLOR;
   timeColor = DEFAULT_TIME_COLOR;
@@ -102,6 +107,8 @@ void ConfigManager::setDefaults()
   snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
   alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+  weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+  weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
 
   _alarms.clear();
   for (int i = 0; i < DEFAULT_ALARMS_COUNT; ++i)
@@ -162,6 +169,30 @@ void ConfigManager::load()
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
   tempCorrectionEnabled = _preferences.getBool("tempCorrEn", DEFAULT_TEMP_CORRECTION_ENABLED);
   tempCorrection = _preferences.getFloat("tempCorr", DEFAULT_TEMP_CORRECTION);
+  zipCode = _preferences.getString("zipCode", DEFAULT_ZIP_CODE);
+
+  String pagesStr = _preferences.getString("pageOrder", "");
+  enabledPages.clear();
+  if (pagesStr.length() > 0)
+  {
+    int start = 0;
+    int end = pagesStr.indexOf(',');
+    while (end != -1)
+    {
+      enabledPages.push_back(pagesStr.substring(start, end).toInt());
+      start = end + 1;
+      end = pagesStr.indexOf(',', start);
+    }
+    enabledPages.push_back(pagesStr.substring(start).toInt());
+  }
+  else
+  {
+    enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
+  }
+
+  defaultPage = _preferences.getInt("defaultPage", DEFAULT_DEFAULT_PAGE);
+  lat = _preferences.getFloat("lat", DEFAULT_LAT);
+  lon = _preferences.getFloat("lon", DEFAULT_LON);
 
   backgroundColor = _preferences.getString("bgClr", DEFAULT_BACKGROUND_COLOR);
   timeColor = _preferences.getString("timeClr", DEFAULT_TIME_COLOR);
@@ -175,6 +206,8 @@ void ConfigManager::load()
   snoozeIconColor = _preferences.getString("snzIconClr", DEFAULT_SNOOZE_ICON_COLOR);
   alarmTextColor = _preferences.getString("alarmTextClr", DEFAULT_ALARM_TEXT_COLOR);
   errorTextColor = _preferences.getString("errorTextClr", DEFAULT_ERROR_TEXT_COLOR);
+  weatherTempColor = _preferences.getString("weaTempClr", DEFAULT_WEATHER_TEMP_COLOR);
+  weatherForecastColor = _preferences.getString("weaFcstClr", DEFAULT_WEATHER_FORECAST_COLOR);
 
   // Validate colors to prevent issues with URL-encoded values
   if (backgroundColor.startsWith("%"))
@@ -201,6 +234,10 @@ void ConfigManager::load()
     alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   if (errorTextColor.startsWith("%"))
     errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+  if (weatherTempColor.startsWith("%"))
+    weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+  if (weatherForecastColor.startsWith("%"))
+    weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
 
   // Load alarms
   _alarms.clear();
@@ -283,6 +320,20 @@ bool ConfigManager::save()
   _preferences.putUChar("dismissDur", dismissDuration);
   _preferences.putBool("tempCorrEn", tempCorrectionEnabled);
   _preferences.putFloat("tempCorr", tempCorrection);
+  _preferences.putString("zipCode", zipCode);
+
+  String pagesStr = "";
+  for (size_t i = 0; i < enabledPages.size(); ++i)
+  {
+    pagesStr += String(enabledPages[i]);
+    if (i < enabledPages.size() - 1)
+      pagesStr += ",";
+  }
+  _preferences.putString("pageOrder", pagesStr);
+
+  _preferences.putInt("defaultPage", defaultPage);
+  _preferences.putFloat("lat", lat);
+  _preferences.putFloat("lon", lon);
 
   _preferences.putString("bgClr", backgroundColor);
   _preferences.putString("timeClr", timeColor);
@@ -296,6 +347,8 @@ bool ConfigManager::save()
   _preferences.putString("snzIconClr", snoozeIconColor);
   _preferences.putString("alarmTextClr", alarmTextColor);
   _preferences.putString("errorTextClr", errorTextColor);
+  _preferences.putString("weaTempClr", weatherTempColor);
+  _preferences.putString("weaFcstClr", weatherForecastColor);
 
   // Save alarms
   _preferences.putInt("numAlarms", _alarms.size());
@@ -537,6 +590,8 @@ void ConfigManager::resetDisplayToDefaults()
   alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
   alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+  weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+  weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
 
   if (!isAnyAlarmSnoozed())
   {
@@ -569,6 +624,11 @@ void ConfigManager::resetGeneralSettingsToDefaults()
 
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
+  zipCode = DEFAULT_ZIP_CODE;
+  enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
+  defaultPage = DEFAULT_DEFAULT_PAGE;
+  lat = DEFAULT_LAT;
+  lon = DEFAULT_LON;
   _isDirty = true;
   scheduleSave();
 }

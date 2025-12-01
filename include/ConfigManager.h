@@ -24,6 +24,8 @@ static constexpr const char *DEFAULT_ALARM_ICON_COLOR = "#FFFF00";
 static constexpr const char *DEFAULT_SNOOZE_ICON_COLOR = "#0000FF";
 static constexpr const char *DEFAULT_ALARM_TEXT_COLOR = "#FF0000";
 static constexpr const char *DEFAULT_ERROR_TEXT_COLOR = "#FF0000";
+static constexpr const char *DEFAULT_WEATHER_TEMP_COLOR = "#02e3ab";
+static constexpr const char *DEFAULT_WEATHER_FORECAST_COLOR = "#FFFFFF";
 
 // Default System Settings
 static constexpr const char *DEFAULT_WIFI_SSID = "";
@@ -48,6 +50,13 @@ static constexpr float DEFAULT_TEMP_CORRECTION = 0.0;
 static constexpr bool DEFAULT_IS_DST = false;
 static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
 static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
+static constexpr const char *DEFAULT_ZIP_CODE = "";
+static constexpr int DEFAULT_DEFAULT_PAGE = 0;
+static constexpr float DEFAULT_LAT = 0.0;
+static constexpr float DEFAULT_LON = 0.0;
+// 0: Clock, 1: Weather, 2: Info, 3: Weather+Clock
+// Using a C-style array for default initializer which can be easily converted to vector
+static constexpr int DEFAULT_ENABLED_PAGES[] = {0, 1, 3, 2};
 
 /**
  * @class ConfigManager
@@ -321,6 +330,18 @@ public:
   String getErrorTextColor() const { return errorTextColor; }
 
   /**
+   * @brief Gets the color of the weather temperature display.
+   * @return The color as a hex string.
+   */
+  String getWeatherTempColor() const { return weatherTempColor; }
+
+  /**
+   * @brief Gets the color of the weather forecast/condition display.
+   * @return The color as a hex string.
+   */
+  String getWeatherForecastColor() const { return weatherForecastColor; }
+
+  /**
    * @brief Gets the ID of the alarm that was ringing at shutdown.
    * @return The ID of the alarm, or -1 if none.
    */
@@ -411,6 +432,103 @@ public:
     if (tempCorrection != value)
     {
       tempCorrection = value;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Gets the stored Zip Code.
+   * @return The Zip Code as a String.
+   */
+  String getZipCode() const { return zipCode; }
+
+  /**
+   * @brief Sets the Zip Code.
+   * @param zip The new Zip Code.
+   */
+  void setZipCode(const String &zip)
+  {
+    if (zipCode != zip)
+    {
+      zipCode = zip;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Gets the enabled pages and their order.
+   * @return A vector of page IDs.
+   */
+  std::vector<int> getEnabledPages() const { return enabledPages; }
+
+  /**
+   * @brief Sets the enabled pages and their order.
+   * @param pages The new vector of page IDs.
+   */
+  void setEnabledPages(const std::vector<int> &pages)
+  {
+    enabledPages = pages;
+    _isDirty = true;
+    scheduleSave();
+  }
+
+  /**
+   * @brief Gets the default page index.
+   * @return The default page index.
+   */
+  int getDefaultPage() const { return defaultPage; }
+
+  /**
+   * @brief Sets the default page index.
+   * @param page The new default page index.
+   */
+  void setDefaultPage(int page)
+  {
+    if (defaultPage != page)
+    {
+      defaultPage = page;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Gets the latitude.
+   * @return The latitude.
+   */
+  float getLat() const { return lat; }
+
+  /**
+   * @brief Sets the latitude.
+   * @param latitude The new latitude.
+   */
+  void setLat(float latitude)
+  {
+    if (lat != latitude)
+    {
+      lat = latitude;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Gets the longitude.
+   * @return The longitude.
+   */
+  float getLon() const { return lon; }
+
+  /**
+   * @brief Sets the longitude.
+   * @param longitude The new longitude.
+   */
+  void setLon(float longitude)
+  {
+    if (lon != longitude)
+    {
+      lon = longitude;
       _isDirty = true;
       scheduleSave();
     }
@@ -820,6 +938,34 @@ public:
   }
 
   /**
+   * @brief Sets the color of the weather temperature display.
+   * @param color The new color as a hex string.
+   */
+  void setWeatherTempColor(const String &color)
+  {
+    if (weatherTempColor != color)
+    {
+      weatherTempColor = color;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
+   * @brief Sets the color of the weather forecast/condition display.
+   * @param color The new color as a hex string.
+   */
+  void setWeatherForecastColor(const String &color)
+  {
+    if (weatherForecastColor != color)
+    {
+      weatherForecastColor = color;
+      _isDirty = true;
+      scheduleSave();
+    }
+  }
+
+  /**
    * @brief Checks if the configuration has been modified since the last save.
    * @return True if the configuration is "dirty", false otherwise.
    */
@@ -888,6 +1034,11 @@ private:
   bool isDst = DEFAULT_IS_DST;
   uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
   uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;
+  String zipCode = DEFAULT_ZIP_CODE;
+  std::vector<int> enabledPages;
+  int defaultPage = DEFAULT_DEFAULT_PAGE;
+  float lat = DEFAULT_LAT;
+  float lon = DEFAULT_LON;
 
   // Colors
   String backgroundColor = DEFAULT_BACKGROUND_COLOR;
@@ -902,6 +1053,8 @@ private:
   String snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
   String alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
   String errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+  String weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+  String weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
 
   bool _isDirty;
   bool _savePending;

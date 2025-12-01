@@ -46,6 +46,11 @@ public:
   void setPage(int index, bool forceRedraw = false);
 
   /**
+   * @brief Cycles to the next page in the configured sequence.
+   */
+  void cyclePage();
+
+  /**
    * @brief Gets the number of pages managed.
    * @return The total number of pages.
    */
@@ -103,6 +108,12 @@ public:
   void drawDismissProgressBar(float progress);
 
   /**
+   * @brief Sets the progress of the alarm dismiss action.
+   * @param progress The progress, from 0.0 (empty) to 1.0 (full).
+   */
+  void setDismissProgress(float progress);
+
+  /**
    * @brief Clears the alarm text and progress bar from the screen.
    */
   void clearAlarmOverlay();
@@ -118,7 +129,10 @@ private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
    */
-  DisplayManager() : _tft(nullptr), _currentPage(nullptr) {}
+  DisplayManager();
+
+  void initAlarmSprite();
+  void renderAlarmOverlay();
 
   TFT_eSPI *_tft;                            ///< Pointer to the main TFT object.
   std::vector<std::unique_ptr<Page>> _pages; ///< A list of all available pages.
@@ -128,4 +142,9 @@ private:
   bool _isSnoozing = false;                  ///< Tracks the snooze state of the icon.
   bool _partialRefresh = false;
   bool _fullRefresh = false;
+
+  // Alarm Overlay
+  TFT_eSprite *_alarmSprite;
+  float _dismissProgress = 0.0f;
+  bool _wasAlarmActive = false;
 };
