@@ -1,3 +1,5 @@
+// ConfigManager.cpp
+
 /**
  * @file ConfigManager.cpp
  * @brief Implements the ConfigManager class for handling application settings.
@@ -19,7 +21,7 @@
  */
 ConfigManager::ConfigManager() : _isDirty(false), _savePending(false), _saveDebounceTimer(0), _nextAlarmId(0)
 {
-  _mutex = xSemaphoreCreateMutex();
+  _mutex = xSemaphoreCreateRecursiveMutex();
 }
 
 /**
@@ -36,14 +38,14 @@ void ConfigManager::loop()
 
   bool pending = false;
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     pending = _savePending && (millis() - _saveDebounceTimer >= SAVE_DEBOUNCE_DELAY);
   }
 
   if (pending)
   {
     save();
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     _savePending = false;
   }
 }
@@ -57,7 +59,7 @@ void ConfigManager::loop()
  */
 void ConfigManager::scheduleSave()
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   _savePending = true;
   _saveDebounceTimer = millis();
 }
@@ -83,7 +85,7 @@ void ConfigManager::begin()
  */
 void ConfigManager::setDefaults()
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   // Set all configuration parameters to their default initial state.
   wifiSSID = DEFAULT_WIFI_SSID;
   wifiPassword = DEFAULT_WIFI_PASSWORD;
@@ -164,7 +166,7 @@ void ConfigManager::load()
 
   SerialLog::getInstance().print("Loading configuration from Preferences...");
 
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   // Load each setting from the Preferences
   wifiSSID = _preferences.getString("wifiSSID", DEFAULT_WIFI_SSID);
   wifiPassword = _preferences.getString("wifiPass", DEFAULT_WIFI_PASSWORD);
@@ -322,7 +324,7 @@ bool ConfigManager::save()
   if (UpdateManager::getInstance().isUpdateInProgress())
     return false;
 
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   _preferences.putString("wifiSSID", wifiSSID);
   _preferences.putString("wifiPass", wifiPassword);
   _preferences.putString("hostname", hostname);
@@ -405,7 +407,7 @@ bool ConfigManager::save()
  */
 void ConfigManager::saveRingingAlarmState()
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   _preferences.putChar("ringAlarmId", ringingAlarmId);
   _preferences.putUInt("ringAlarmTS", ringingAlarmStartTimestamp);
 }
@@ -417,7 +419,7 @@ void ConfigManager::saveRingingAlarmState()
  */
 Alarm ConfigManager::getAlarmByIndex(int index) const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   if (index < 0 || index >= _alarms.size())
   {
     SerialLog::getInstance().print("FATAL: Alarm index out of bounds!");
@@ -435,7 +437,7 @@ Alarm ConfigManager::getAlarmByIndex(int index) const
  */
 Alarm ConfigManager::getAlarmById(int id) const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   for (const auto &alarm : _alarms)
   {
     if (alarm.getId() == id)
@@ -455,7 +457,7 @@ Alarm ConfigManager::getAlarmById(int id) const
  */
 int ConfigManager::getNumAlarms() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return _alarms.size();
 }
 
@@ -467,7 +469,7 @@ int ConfigManager::getNumAlarms() const
 void ConfigManager::setAlarmByIndex(int index, const Alarm &alarm)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (index < 0 || index >= _alarms.size())
     {
       SerialLog::getInstance().print("ERROR: Alarm index out of bounds!");
@@ -488,7 +490,7 @@ void ConfigManager::setAlarmById(int id, const Alarm &alarm)
 {
   bool found = false;
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     for (auto &a : _alarms)
     {
       if (a.getId() == id)
@@ -509,7 +511,7 @@ void ConfigManager::setAlarmById(int id, const Alarm &alarm)
 void ConfigManager::replaceAlarms(const std::vector<Alarm> &newAlarms)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     _alarms.clear();
     for (const auto &incomingAlarm : newAlarms)
     {
@@ -600,7 +602,7 @@ void ConfigManager::factoryResetExceptWiFi()
 void ConfigManager::resetDisplayToDefaults()
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     backgroundColor = DEFAULT_BACKGROUND_COLOR;
     timeColor = DEFAULT_TIME_COLOR;
     todColor = DEFAULT_TOD_COLOR;
@@ -618,12 +620,12 @@ void ConfigManager::resetDisplayToDefaults()
 
   if (!isAnyAlarmSnoozed())
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
   }
 
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     _isDirty = true;
   }
   scheduleSave();
@@ -635,7 +637,7 @@ void ConfigManager::resetDisplayToDefaults()
 void ConfigManager::resetGeneralSettingsToDefaults()
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
     brightness = DEFAULT_BRIGHTNESS;
     autoBrightnessStartHour = DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
@@ -669,7 +671,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
  */
 bool ConfigManager::isAnyAlarmSnoozed() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   for (const auto &alarm : _alarms)
   {
     if (alarm.isSnoozed())
@@ -683,217 +685,217 @@ bool ConfigManager::isAnyAlarmSnoozed() const
 // Getters
 String ConfigManager::getWifiSSID() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return wifiSSID;
 }
 String ConfigManager::getWifiPassword() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return wifiPassword;
 }
 bool ConfigManager::isAutoBrightness() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return autoBrightness;
 }
 uint8_t ConfigManager::getBrightness() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return brightness;
 }
 uint8_t ConfigManager::getAutoBrightnessStartHour() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return autoBrightnessStartHour;
 }
 uint8_t ConfigManager::getAutoBrightnessEndHour() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return autoBrightnessEndHour;
 }
 uint8_t ConfigManager::getDayBrightness() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return dayBrightness;
 }
 uint8_t ConfigManager::getNightBrightness() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return nightBrightness;
 }
 bool ConfigManager::is24HourFormat() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return use24HourFormat;
 }
 bool ConfigManager::isCelsius() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return useCelsius;
 }
 String ConfigManager::getHostname() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return hostname;
 }
 bool ConfigManager::isScreenFlipped() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return screenFlipped;
 }
 bool ConfigManager::isInvertColors() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return invertColors;
 }
 String ConfigManager::getTimezone() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return timezone;
 }
 uint8_t ConfigManager::getSnoozeDuration() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return snoozeDuration;
 }
 uint8_t ConfigManager::getDismissDuration() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return dismissDuration;
 }
 float ConfigManager::getTempCorrection() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return tempCorrection;
 }
 bool ConfigManager::isTempCorrectionEnabled() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return tempCorrectionEnabled;
 }
 bool ConfigManager::isDST() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return isDst;
 }
 String ConfigManager::getBackgroundColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return backgroundColor;
 }
 String ConfigManager::getTimeColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return timeColor;
 }
 String ConfigManager::getTodColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return todColor;
 }
 String ConfigManager::getSecondsColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return secondsColor;
 }
 String ConfigManager::getDayOfWeekColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return dayOfWeekColor;
 }
 String ConfigManager::getDateColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return dateColor;
 }
 String ConfigManager::getTempColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return tempColor;
 }
 String ConfigManager::getHumidityColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return humidityColor;
 }
 String ConfigManager::getAlarmIconColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return alarmIconColor;
 }
 String ConfigManager::getSnoozeIconColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return snoozeIconColor;
 }
 String ConfigManager::getAlarmTextColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return alarmTextColor;
 }
 String ConfigManager::getErrorTextColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return errorTextColor;
 }
 String ConfigManager::getWeatherTempColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return weatherTempColor;
 }
 String ConfigManager::getWeatherForecastColor() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return weatherForecastColor;
 }
 int8_t ConfigManager::getRingingAlarmId() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return ringingAlarmId;
 }
 uint32_t ConfigManager::getRingingAlarmStartTimestamp() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return ringingAlarmStartTimestamp;
 }
 bool ConfigManager::areWifiCredsValid() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return wifiCredsValid;
 }
 String ConfigManager::getZipCode() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return zipCode;
 }
 std::vector<int> ConfigManager::getEnabledPages() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return enabledPages;
 }
 int ConfigManager::getDefaultPage() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return defaultPage;
 }
 float ConfigManager::getLat() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return lat;
 }
 float ConfigManager::getLon() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return lon;
 }
 bool ConfigManager::isDirty() const
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   return _isDirty;
 }
 void ConfigManager::clearDirtyFlag()
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   _isDirty = false;
 }
 
@@ -902,7 +904,7 @@ void ConfigManager::clearDirtyFlag()
 void ConfigManager::setWifiSSID(const String &ssid)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     wifiSSID = ssid;
     wifiCredsValid = false;
     _isDirty = true;
@@ -913,7 +915,7 @@ void ConfigManager::setWifiSSID(const String &ssid)
 void ConfigManager::setWifiPassword(const String &password)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     wifiPassword = password;
     wifiCredsValid = false;
     _isDirty = true;
@@ -924,7 +926,7 @@ void ConfigManager::setWifiPassword(const String &password)
 void ConfigManager::setHostname(const String &name)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     hostname = name;
     _isDirty = true;
   }
@@ -934,7 +936,7 @@ void ConfigManager::setHostname(const String &name)
 void ConfigManager::setWifiCredsValid(bool valid)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (wifiCredsValid != valid)
     {
       wifiCredsValid = valid;
@@ -947,7 +949,7 @@ void ConfigManager::setWifiCredsValid(bool valid)
 void ConfigManager::setTempCorrectionEnabled(bool enabled)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (tempCorrectionEnabled != enabled)
     {
       tempCorrectionEnabled = enabled;
@@ -960,7 +962,7 @@ void ConfigManager::setTempCorrectionEnabled(bool enabled)
 void ConfigManager::setTempCorrection(float value)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (tempCorrection != value)
     {
       tempCorrection = value;
@@ -973,7 +975,7 @@ void ConfigManager::setTempCorrection(float value)
 void ConfigManager::setZipCode(const String &zip)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (zipCode != zip)
     {
       zipCode = zip;
@@ -986,7 +988,7 @@ void ConfigManager::setZipCode(const String &zip)
 void ConfigManager::setEnabledPages(const std::vector<int> &pages)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     enabledPages = pages;
     _isDirty = true;
   }
@@ -996,7 +998,7 @@ void ConfigManager::setEnabledPages(const std::vector<int> &pages)
 void ConfigManager::setDefaultPage(int page)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (defaultPage != page)
     {
       defaultPage = page;
@@ -1009,7 +1011,7 @@ void ConfigManager::setDefaultPage(int page)
 void ConfigManager::setLat(float latitude)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (lat != latitude)
     {
       lat = latitude;
@@ -1022,7 +1024,7 @@ void ConfigManager::setLat(float latitude)
 void ConfigManager::setLon(float longitude)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (lon != longitude)
     {
       lon = longitude;
@@ -1035,7 +1037,7 @@ void ConfigManager::setLon(float longitude)
 void ConfigManager::setDST(bool active)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (isDst != active)
     {
       isDst = active;
@@ -1048,7 +1050,7 @@ void ConfigManager::setDST(bool active)
 void ConfigManager::setInvertColors(bool inverted)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (invertColors != inverted)
     {
       invertColors = inverted;
@@ -1061,7 +1063,7 @@ void ConfigManager::setInvertColors(bool inverted)
 void ConfigManager::setSnoozeDuration(uint8_t duration)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (snoozeDuration != duration)
     {
       snoozeDuration = duration;
@@ -1074,7 +1076,7 @@ void ConfigManager::setSnoozeDuration(uint8_t duration)
 void ConfigManager::setDismissDuration(uint8_t duration)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (dismissDuration != duration)
     {
       dismissDuration = duration;
@@ -1086,7 +1088,7 @@ void ConfigManager::setDismissDuration(uint8_t duration)
 
 void ConfigManager::setRingingAlarmId(int8_t id)
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   if (ringingAlarmId != id)
   {
     ringingAlarmId = id;
@@ -1095,7 +1097,7 @@ void ConfigManager::setRingingAlarmId(int8_t id)
 
 void ConfigManager::setRingingAlarmStartTimestamp(uint32_t timestamp)
 {
-  LockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
   if (ringingAlarmStartTimestamp != timestamp)
   {
     ringingAlarmStartTimestamp = timestamp;
@@ -1105,7 +1107,7 @@ void ConfigManager::setRingingAlarmStartTimestamp(uint32_t timestamp)
 void ConfigManager::setScreenFlipped(bool flipped)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (screenFlipped != flipped)
     {
       screenFlipped = flipped;
@@ -1118,7 +1120,7 @@ void ConfigManager::setScreenFlipped(bool flipped)
 void ConfigManager::setAutoBrightness(bool enabled)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (autoBrightness != enabled)
     {
       autoBrightness = enabled;
@@ -1131,7 +1133,7 @@ void ConfigManager::setAutoBrightness(bool enabled)
 void ConfigManager::setBrightness(uint8_t value)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (brightness != value)
     {
       brightness = value;
@@ -1144,7 +1146,7 @@ void ConfigManager::setBrightness(uint8_t value)
 void ConfigManager::setAutoBrightnessStartHour(uint8_t value)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (autoBrightnessStartHour != value)
     {
       autoBrightnessStartHour = value;
@@ -1157,7 +1159,7 @@ void ConfigManager::setAutoBrightnessStartHour(uint8_t value)
 void ConfigManager::setAutoBrightnessEndHour(uint8_t value)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (autoBrightnessEndHour != value)
     {
       autoBrightnessEndHour = value;
@@ -1170,7 +1172,7 @@ void ConfigManager::setAutoBrightnessEndHour(uint8_t value)
 void ConfigManager::setDayBrightness(uint8_t value)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (dayBrightness != value)
     {
       dayBrightness = value;
@@ -1183,7 +1185,7 @@ void ConfigManager::setDayBrightness(uint8_t value)
 void ConfigManager::setNightBrightness(uint8_t value)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (nightBrightness != value)
     {
       nightBrightness = value;
@@ -1196,7 +1198,7 @@ void ConfigManager::setNightBrightness(uint8_t value)
 void ConfigManager::set24HourFormat(bool enabled)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (use24HourFormat != enabled)
     {
       use24HourFormat = enabled;
@@ -1209,7 +1211,7 @@ void ConfigManager::set24HourFormat(bool enabled)
 void ConfigManager::setCelsius(bool enabled)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (useCelsius != enabled)
     {
       useCelsius = enabled;
@@ -1222,7 +1224,7 @@ void ConfigManager::setCelsius(bool enabled)
 void ConfigManager::setTimezone(const String &tz)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (timezone != tz)
     {
       timezone = tz;
@@ -1235,7 +1237,7 @@ void ConfigManager::setTimezone(const String &tz)
 void ConfigManager::setBackgroundColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (backgroundColor != color)
     {
       backgroundColor = color;
@@ -1248,7 +1250,7 @@ void ConfigManager::setBackgroundColor(const String &color)
 void ConfigManager::setTimeColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (timeColor != color)
     {
       timeColor = color;
@@ -1261,7 +1263,7 @@ void ConfigManager::setTimeColor(const String &color)
 void ConfigManager::setTodColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (todColor != color)
     {
       todColor = color;
@@ -1274,7 +1276,7 @@ void ConfigManager::setTodColor(const String &color)
 void ConfigManager::setSecondsColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (secondsColor != color)
     {
       secondsColor = color;
@@ -1287,7 +1289,7 @@ void ConfigManager::setSecondsColor(const String &color)
 void ConfigManager::setDayOfWeekColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (dayOfWeekColor != color)
     {
       dayOfWeekColor = color;
@@ -1300,7 +1302,7 @@ void ConfigManager::setDayOfWeekColor(const String &color)
 void ConfigManager::setDateColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (dateColor != color)
     {
       dateColor = color;
@@ -1313,7 +1315,7 @@ void ConfigManager::setDateColor(const String &color)
 void ConfigManager::setTempColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (tempColor != color)
     {
       tempColor = color;
@@ -1326,7 +1328,7 @@ void ConfigManager::setTempColor(const String &color)
 void ConfigManager::setHumidityColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (humidityColor != color)
     {
       humidityColor = color;
@@ -1339,7 +1341,7 @@ void ConfigManager::setHumidityColor(const String &color)
 void ConfigManager::setAlarmIconColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (alarmIconColor != color)
     {
       alarmIconColor = color;
@@ -1352,7 +1354,7 @@ void ConfigManager::setAlarmIconColor(const String &color)
 void ConfigManager::setSnoozeIconColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (snoozeIconColor != color)
     {
       snoozeIconColor = color;
@@ -1365,7 +1367,7 @@ void ConfigManager::setSnoozeIconColor(const String &color)
 void ConfigManager::setAlarmTextColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (alarmTextColor != color)
     {
       alarmTextColor = color;
@@ -1378,7 +1380,7 @@ void ConfigManager::setAlarmTextColor(const String &color)
 void ConfigManager::setErrorTextColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (errorTextColor != color)
     {
       errorTextColor = color;
@@ -1391,7 +1393,7 @@ void ConfigManager::setErrorTextColor(const String &color)
 void ConfigManager::setWeatherTempColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (weatherTempColor != color)
     {
       weatherTempColor = color;
@@ -1404,7 +1406,7 @@ void ConfigManager::setWeatherTempColor(const String &color)
 void ConfigManager::setWeatherForecastColor(const String &color)
 {
   {
-    LockGuard lock(_mutex);
+    RecursiveLockGuard lock(_mutex);
     if (weatherForecastColor != color)
     {
       weatherForecastColor = color;

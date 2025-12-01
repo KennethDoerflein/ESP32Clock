@@ -1,3 +1,5 @@
+// SerialLog.cpp
+
 /**
  * @file SerialLog.cpp
  * @brief Implements the SerialLog class for logging to Serial and WebSocket.
@@ -7,6 +9,7 @@
  */
 #include "SerialLog.h"
 #include "UpdateManager.h"
+#include "LockGuard.h"
 
 // Initialize static members
 const char *SerialLog::LOG_FILE_PATH = "/system.log";
@@ -20,7 +23,7 @@ const unsigned long SerialLog::FLUSH_INTERVAL = 2000; // 2 Seconds
  */
 SerialLog::SerialLog() : _ws("/ws/log"), _lastFlushTime(0)
 {
-  _mutex = xSemaphoreCreateMutex();
+  _mutex = xSemaphoreCreateRecursiveMutex();
   _logBuffer.reserve(BUFFER_THRESHOLD + 64); // Pre-allocate to reduce fragmentation
 }
 
@@ -49,13 +52,13 @@ void SerialLog::begin(AsyncWebServer *server)
  */
 void SerialLog::loop()
 {
-  if (xSemaphoreTake(_mutex, 0) == pdTRUE)
+  if (xSemaphoreTakeRecursive(_mutex, 0) == pdTRUE)
   { // Non-blocking check
     if (_logBuffer.length() > 0 && (millis() - _lastFlushTime >= FLUSH_INTERVAL))
     {
       flush();
     }
-    xSemaphoreGive(_mutex);
+    xSemaphoreGiveRecursive(_mutex);
   }
 }
 
@@ -98,6 +101,7 @@ void SerialLog::onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, Aw
  */
 void SerialLog::setConsoleLoggingEnabled(bool enabled)
 {
+  RecursiveLockGuard lock(_mutex);
   _consoleLoggingEnabled = enabled;
 }
 
@@ -107,6 +111,7 @@ void SerialLog::setConsoleLoggingEnabled(bool enabled)
  */
 void SerialLog::setFileLoggingEnabled(bool enabled)
 {
+  RecursiveLockGuard lock(_mutex);
   _fileLoggingEnabled = enabled;
 }
 
@@ -117,6 +122,7 @@ void SerialLog::setFileLoggingEnabled(bool enabled)
  */
 void SerialLog::setLoggingEnabled(bool enabled)
 {
+  RecursiveLockGuard lock(_mutex);
   _consoleLoggingEnabled = enabled;
   _fileLoggingEnabled = enabled;
 }
@@ -127,6 +133,8 @@ void SerialLog::setLoggingEnabled(bool enabled)
  */
 void SerialLog::print(const String &message)
 {
+  RecursiveLockGuard lock(_mutex);
+
   if (_consoleLoggingEnabled)
   {
     Serial.println(message);
@@ -145,6 +153,8 @@ void SerialLog::print(const String &message)
  */
 void SerialLog::printf(const char *format, ...)
 {
+  RecursiveLockGuard lock(_mutex);
+
   // Avoid doing vsnprintf if neither log target is enabled
   if (!_consoleLoggingEnabled && !_fileLoggingEnabled)
     return;
@@ -175,16 +185,13 @@ void SerialLog::logToFile(const char *message)
   if (UpdateManager::getInstance().isUpdateInProgress())
     return;
 
-  if (xSemaphoreTake(_mutex, portMAX_DELAY) == pdTRUE)
-  {
-    _logBuffer += message;
-    _logBuffer += '\n';
+  // Mutex is already held by print/printf/loop
+  _logBuffer += message;
+  _logBuffer += '\n';
 
-    if (_logBuffer.length() >= BUFFER_THRESHOLD)
-    {
-      flush();
-    }
-    xSemaphoreGive(_mutex);
+  if (_logBuffer.length() >= BUFFER_THRESHOLD)
+  {
+    flush();
   }
 }
 
@@ -233,11 +240,8 @@ void SerialLog::flush()
  */
 void SerialLog::rotate()
 {
-  if (xSemaphoreTake(_mutex, portMAX_DELAY) == pdTRUE)
-  {
-    rotateLogFile();
-    xSemaphoreGive(_mutex);
-  }
+  RecursiveLockGuard lock(_mutex);
+  rotateLogFile();
 }
 
 /**
@@ -245,6 +249,7 @@ void SerialLog::rotate()
  */
 void SerialLog::rotateLogFile()
 {
+  // Mutex should be held by caller
   String oldLogPath = String(LOG_FILE_PATH) + ".old";
 
   // Remove the old backup if it exists

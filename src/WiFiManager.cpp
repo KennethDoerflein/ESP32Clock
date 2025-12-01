@@ -14,6 +14,7 @@
 #include "ClockWebServer.h"
 #include <ArduinoJson.h>
 #include "SerialLog.h"
+#include "LockGuard.h"
 
 // --- Static Member Initialization ---
 const char *WiFiManager::AP_SSID = "Clock-Setup";
@@ -34,6 +35,9 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
 {
   auto &logger = SerialLog::getInstance();
   auto &instance = getInstance();
+
+  // Protect shared state access in ISR context (technically task context in ESP32)
+  LockGuard lock(instance._mutex);
 
   // --- Handle Connection Test Events ---
   if (instance._testStatus == TEST_IN_PROGRESS)
@@ -130,27 +134,31 @@ void WiFiManager::handleConnection()
   // This is a robust way to handle missed events or state inconsistencies.
   // A true connection requires both a connected status and a valid IP address.
   bool isReallyConnected = (WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0));
-  if (isReallyConnected != _isConnected)
+
   {
-    _isConnected = isReallyConnected;
+    LockGuard lock(_mutex);
+    if (isReallyConnected != _isConnected)
+    {
+      _isConnected = isReallyConnected;
+      if (_isConnected)
+      {
+        SerialLog::getInstance().print("WiFi connection state corrected to CONNECTED by polling.\n");
+      }
+      else
+      {
+        SerialLog::getInstance().print("WiFi connection state corrected to DISCONNECTED by polling.\n");
+      }
+    }
+
     if (_isConnected)
     {
-      SerialLog::getInstance().print("WiFi connection state corrected to CONNECTED by polling.\n");
+      if (_isReconnecting)
+      {
+        _isReconnecting = false;
+      }
+      return;
     }
-    else
-    {
-      SerialLog::getInstance().print("WiFi connection state corrected to DISCONNECTED by polling.\n");
-    }
-  }
-
-  if (_isConnected)
-  {
-    if (_isReconnecting)
-    {
-      _isReconnecting = false;
-    }
-    return;
-  }
+  } // Release lock before potentially blocking operations
 
   if (ConfigManager::getInstance().getWifiSSID().length() == 0)
   {
@@ -159,20 +167,30 @@ void WiFiManager::handleConnection()
 
   unsigned long now = millis();
 
-  if (_isReconnecting)
+  // Check reconnection state with lock
+  bool shouldReconnect = false;
   {
-    if (now - _lastReconnectAttempt > 15000) // 15s timeout
+    LockGuard lock(_mutex);
+    if (_isReconnecting)
     {
-      SerialLog::getInstance().print("WiFi reconnection timed out.\n");
-      _isReconnecting = false;
+      if (now - _lastReconnectAttempt > 15000) // 15s timeout
+      {
+        SerialLog::getInstance().print("WiFi reconnection timed out.\n");
+        _isReconnecting = false;
+      }
+      return;
     }
-    return;
+
+    if (now - _lastReconnectAttempt > 30000) // 30s interval
+    {
+      _lastReconnectAttempt = now;
+      _isReconnecting = true;
+      shouldReconnect = true;
+    }
   }
 
-  if (now - _lastReconnectAttempt > 30000) // 30s interval
+  if (shouldReconnect)
   {
-    _lastReconnectAttempt = now;
-    _isReconnecting = true;
     SerialLog::getInstance().print("Attempting to reconnect WiFi...\n");
     WiFi.reconnect();
   }
@@ -192,7 +210,10 @@ WiFiManager &WiFiManager::getInstance()
  * @brief Private constructor for the WiFiManager.
  * Initializes internal state variables.
  */
-WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr), _pendingReboot(false) {}
+WiFiManager::WiFiManager() : _isConnected(false), _dnsServer(nullptr), _pendingReboot(false)
+{
+  _mutex = xSemaphoreCreateMutex();
+}
 
 /**
  * @brief Initializes the WiFi module.
@@ -247,6 +268,7 @@ bool WiFiManager::begin()
     if (_connectionResult)
     {
       logger.print("\nWiFiManager: Connection successful.\n");
+      LockGuard lock(_mutex);
       _isConnected = true;
       display.drawStatusMessage(("IP: " + WiFi.localIP().toString()).c_str());
       delay(2000);
@@ -261,7 +283,13 @@ bool WiFiManager::begin()
     logger.print("WiFiManager: No SSID configured.\n");
   }
 
-  if (!_isConnected)
+  bool currentlyConnected;
+  {
+    LockGuard lock(_mutex);
+    currentlyConnected = _isConnected;
+  }
+
+  if (!currentlyConnected)
   {
     // Disconnect and stop the station to prevent it from retrying
     // with bad credentials in the background, which causes log spam.
@@ -301,6 +329,7 @@ void WiFiManager::handleDns()
  */
 bool WiFiManager::isConnected() const
 {
+  LockGuard lock(_mutex);
   return _isConnected;
 }
 
@@ -465,6 +494,7 @@ void WiFiManager::setHostname(const String &hostname)
  */
 void WiFiManager::startConnectionTest(const String &ssid, const String &password, bool saveOnSuccess)
 {
+  LockGuard lock(_mutex);
   if (_pendingReboot)
   {
     SerialLog::getInstance().print("Ignoring new connection test, reboot is pending.\n");
@@ -516,6 +546,7 @@ void WiFiManager::saveCredentialsAndReboot(const String &ssid, const String &pas
  */
 WiFiManager::ConnectionTestStatus WiFiManager::getConnectionTestStatus() const
 {
+  LockGuard lock(_mutex);
   return _testStatus;
 }
 
@@ -525,6 +556,7 @@ WiFiManager::ConnectionTestStatus WiFiManager::getConnectionTestStatus() const
  */
 bool WiFiManager::isPendingReboot() const
 {
+  LockGuard lock(_mutex);
   return _pendingReboot;
 }
 
@@ -533,6 +565,7 @@ bool WiFiManager::isPendingReboot() const
  */
 void WiFiManager::resetConnectionTestStatus()
 {
+  LockGuard lock(_mutex);
   _testStatus = TEST_IDLE;
   _pendingReboot = false;
 }
