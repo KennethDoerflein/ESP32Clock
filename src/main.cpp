@@ -31,6 +31,7 @@
 #include <LittleFS.h>
 #include "ButtonManager.h"
 #include "WeatherService.h"
+#include "UpdateManager.h"
 #if __has_include("version.h")
 // This file exists, so we'll include it.
 #include "version.h"
@@ -58,6 +59,9 @@ enum AlarmState
 AlarmState g_alarmState = IDLE;
 
 ButtonManager snoozeButton(SNOOZE_BUTTON_PIN);
+
+// --- Task Handles ---
+TaskHandle_t g_logicTaskHandle = NULL;
 
 /**
  * @brief Updates the global alarm state based on the current system status.
@@ -170,6 +174,48 @@ void handleBootButton()
       SerialLog::getInstance().print("Boot button released. Factory reset cancelled.\n");
       g_bootButtonPressTime = 0;
     }
+  }
+}
+
+/**
+ * @brief The background logic task running on Core 0.
+ *
+ * Handles network connectivity, time synchronization, weather updates,
+ * and configuration saving.
+ */
+void logicTask(void *pvParameters)
+{
+  SerialLog::getInstance().print("Logic Task started on Core 0\n");
+
+  auto &wifiManager = WiFiManager::getInstance();
+  auto &timeManager = TimeManager::getInstance();
+  auto &config = ConfigManager::getInstance();
+  auto &weatherService = WeatherService::getInstance();
+
+  for (;;)
+  {
+    // Handle WiFi
+    wifiManager.handleDns();
+    wifiManager.handleConnection();
+
+    if (!UpdateManager::getInstance().isUpdateInProgress())
+    {
+      config.loop();
+      weatherService.loop();
+    }
+
+    if (!UpdateManager::getInstance().isUpdateInProgress() && wifiManager.isConnected())
+    {
+      timeManager.updateNtp();
+      timeManager.checkDailySync();
+      timeManager.checkDriftAndResync();
+    }
+
+    // Handle Serial Log (WebSocket updates etc)
+    SerialLog::getInstance().loop();
+
+    // Yield to prevent watchdog triggers
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
@@ -342,20 +388,26 @@ void setup()
     display.drawMultiLineStatusMessage("Connect to Clock-Setup", "Go to http://192.168.4.1");
   }
 
+  // Create the Logic Task on Core 0
+  xTaskCreatePinnedToCore(
+      logicTask,
+      "LogicTask",
+      8192,
+      NULL,
+      1,
+      &g_logicTaskHandle,
+      0 // Core 0
+  );
+
   logger.print("--- Setup Complete ---\n");
 }
 
 /**
  * @brief The main application loop.
+ * Runs on Core 1 by default (Arduino Loop).
  */
 void loop()
 {
-  // Handle DNS requests for the captive portal if it's active.
-  auto &wifiManager = WiFiManager::getInstance();
-  wifiManager.handleDns();
-  // Manage WiFi connection and reconnection.
-  wifiManager.handleConnection();
-
   // Implement a non-blocking delay to prevent watchdog timeouts.
   unsigned long currentMillis = millis();
   if (currentMillis - g_lastLoopTime < LOOP_INTERVAL)
@@ -373,9 +425,8 @@ void loop()
   auto &config = ConfigManager::getInstance();
 
   // Perform periodic tasks that don't require WiFi.
-  SerialLog::getInstance().loop();
-  config.loop();
-  WeatherService::getInstance().loop();
+  // Note: Config, Weather, WiFi, and SerialLog loops are now in Logic Task (Core 0)
+
   alarmManager.update();
   bool timeUpdated = timeManager.update(); // Updates time from the RTC
   if (g_alarm_triggered)
@@ -439,10 +490,9 @@ void loop()
         int alarmId = alarmManager.getActiveAlarmId();
         if (alarmId != -1)
         {
-          Alarm *alarmPtr = config.getAlarmById(alarmId);
-          if (alarmPtr)
+          Alarm alarm = config.getAlarmById(alarmId);
+          if (alarm.getId() != 255)
           {
-            Alarm alarm = *alarmPtr;
             alarm.dismiss(timeManager.getRTCTime());
             config.setAlarmById(alarmId, alarm);
             config.save();
@@ -467,10 +517,9 @@ void loop()
         int alarmId = alarmManager.getActiveAlarmId();
         if (alarmId != -1)
         {
-          Alarm *alarmPtr = config.getAlarmById(alarmId);
-          if (alarmPtr)
+          Alarm alarm = config.getAlarmById(alarmId);
+          if (alarm.getId() != 255)
           {
-            Alarm alarm = *alarmPtr;
             alarm.snooze(config.getSnoozeDuration());
             config.setAlarmById(alarmId, alarm);
             config.save();
@@ -562,7 +611,7 @@ void loop()
   bool anyAlarmSnoozed = false;
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    const auto &alarm = config.getAlarmByIndex(i);
+    Alarm alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled())
     {
       anyAlarmEnabled = true;
@@ -574,18 +623,5 @@ void loop()
   }
   displayManager.drawAlarmIcon(anyAlarmEnabled, anyAlarmSnoozed);
 
-  // --- WiFi-Dependent Logic ---
-  if (WiFiManager::getInstance().isConnected())
-  {
-    // Only attempt to sync time with the internet if connected.
-    if (timeManager.updateNtp())
-    {
-      displayManager.update();
-    }
-    timeManager.checkDailySync();
-    timeManager.checkDriftAndResync();
-  }
-
-  // --- Handle Boot Button for Factory Reset (Runs regardless of WiFi connection) ---
   handleBootButton();
 }

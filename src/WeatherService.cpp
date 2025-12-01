@@ -5,17 +5,15 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include "LockGuard.h"
 
 static const unsigned long WEATHER_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
-
-// Task handle for the background update task
-TaskHandle_t weatherTaskHandle = NULL;
 
 void weatherUpdateTask(void *parameter)
 {
   WeatherService *service = static_cast<WeatherService *>(parameter);
   service->updateWeather();
-  weatherTaskHandle = NULL;
+  service->notifyTaskFinished();
   vTaskDelete(NULL); // Delete self when done
 }
 
@@ -71,6 +69,11 @@ String getConditionFromWMO(int code)
   }
 }
 
+WeatherService::WeatherService() : _lastUpdate(0), _lastLocationUpdate(0), _weatherTaskHandle(NULL)
+{
+  _mutex = xSemaphoreCreateMutex();
+}
+
 void WeatherService::begin()
 {
   // Initial check handled in loop or triggered by events
@@ -82,22 +85,45 @@ void WeatherService::loop()
     return;
 
   unsigned long now = millis();
+
+  bool isTaskRunning = false;
+  {
+    LockGuard lock(_mutex);
+    isTaskRunning = (_weatherTaskHandle != NULL);
+  }
+
   // Check if it's time to update and if a task isn't already running
-  if ((now - _lastUpdate > WEATHER_UPDATE_INTERVAL || _lastUpdate == 0) && weatherTaskHandle == NULL)
+  if ((now - _lastUpdate > WEATHER_UPDATE_INTERVAL || _lastUpdate == 0) && !isTaskRunning)
   {
     _lastUpdate = now;
 
+    SerialLog::getInstance().print("Starting Weather Update Task...\n");
+
     // Create a FreeRTOS task pinned to Core 0
+    // We protect the handle assignment
+    LockGuard lock(_mutex);
     xTaskCreatePinnedToCore(
-        weatherUpdateTask,  // Function to implement the task
-        "WeatherUpdate",    // Name of the task
-        8192,               // Stack size (8KB is sufficient for HTTPS)
-        this,               // Task input parameter
-        1,                  // Priority
-        &weatherTaskHandle, // Task handle
-        0                   // Core 0
+        weatherUpdateTask,   // Function to implement the task
+        "WeatherUpdate",     // Name of the task
+        12288,               // Stack size (12KB is sufficient for HTTPS)
+        this,                // Task input parameter
+        1,                   // Priority
+        &_weatherTaskHandle, // Task handle
+        0                    // Core 0
     );
   }
+}
+
+void WeatherService::notifyTaskFinished()
+{
+  LockGuard lock(_mutex);
+  _weatherTaskHandle = NULL;
+}
+
+WeatherData WeatherService::getCurrentWeather() const
+{
+  LockGuard lock(_mutex);
+  return _currentWeather;
 }
 
 void WeatherService::updateLocation()
@@ -208,13 +234,16 @@ void WeatherService::updateWeather()
       float pressure = doc["current"]["pressure_msl"];
       int code = doc["current"]["weather_code"];
 
-      _currentWeather.temp = temp;
-      _currentWeather.feelsLike = feelsLike;
-      _currentWeather.humidity = humidity;
-      _currentWeather.windSpeed = windSpeed;
-      _currentWeather.pressure = pressure;
-      _currentWeather.condition = getConditionFromWMO(code);
-      _currentWeather.isValid = true;
+      {
+        LockGuard lock(_mutex);
+        _currentWeather.temp = temp;
+        _currentWeather.feelsLike = feelsLike;
+        _currentWeather.humidity = humidity;
+        _currentWeather.windSpeed = windSpeed;
+        _currentWeather.pressure = pressure;
+        _currentWeather.condition = getConditionFromWMO(code);
+        _currentWeather.isValid = true;
+      }
 
       SerialLog::getInstance().printf("Weather Updated: %.1fF, %s\n", temp, _currentWeather.condition.c_str());
     }

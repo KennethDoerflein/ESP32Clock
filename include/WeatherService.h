@@ -1,19 +1,18 @@
 #pragma once
 
 #include <Arduino.h>
-#include <ArduinoJson.h>
-#include <HTTPClient.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 struct WeatherData
 {
-  float temp;
-  float feelsLike;
-  float humidity;
-  float windSpeed;
-  float pressure;
-  String condition;
-  String iconUrl;
-  bool isValid;
+  float temp = 0.0;
+  float feelsLike = 0.0;
+  float humidity = 0.0;
+  float windSpeed = 0.0;
+  float pressure = 0.0;
+  String condition = "";
+  bool isValid = false;
 };
 
 class WeatherService
@@ -27,15 +26,20 @@ public:
 
   void begin();
   void loop();
-  void updateLocation();
-  void updateWeather();
+  WeatherData getCurrentWeather() const;
 
-  WeatherData getCurrentWeather() const { return _currentWeather; }
+  // Called by the background task
+  void updateWeather();
+  void notifyTaskFinished();
+  void updateLocation();
 
 private:
-  WeatherService() : _lastUpdate(0), _lastLocationUpdate(0) {}
+  WeatherService();
 
+  WeatherData _currentWeather;
   unsigned long _lastUpdate;
   unsigned long _lastLocationUpdate;
-  WeatherData _currentWeather = {0.0, 0.0, 0.0, 0.0, 0.0, "", "", false};
+
+  mutable SemaphoreHandle_t _mutex;
+  TaskHandle_t _weatherTaskHandle;
 };

@@ -162,7 +162,7 @@ void ClockWebServer::begin()
       JsonArray alarmsArray = doc.to<JsonArray>();
 
       for (int i = 0; i < config.getNumAlarms(); ++i) {
-        const Alarm& alarm = config.getAlarmByIndex(i);
+        Alarm alarm = config.getAlarmByIndex(i);
         JsonObject alarmObj = alarmsArray.add<JsonObject>();
         alarmObj["id"] = alarm.getId();
         alarmObj["enabled"] = alarm.isEnabled();
@@ -175,7 +175,12 @@ void ClockWebServer::begin()
       serializeJson(doc, response);
       request->send(200, "application/json", response); });
 
-    server.on("/api/alarms/save", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+    server.on("/api/alarms/save", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+        if (request->_tempObject) {
+            delete (std::vector<uint8_t>*)request->_tempObject;
+            request->_tempObject = nullptr;
+        } }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
               {
         
         if (index == 0) {
@@ -183,6 +188,8 @@ void ClockWebServer::begin()
           // We allocate it on the heap because it can be large.
           request->_tempObject = new std::vector<uint8_t>();
         }
+
+        if (!request->_tempObject) return;
 
         std::vector<uint8_t>* buffer = (std::vector<uint8_t>*)request->_tempObject;
         buffer->insert(buffer->end(), data, data + len);
@@ -218,14 +225,16 @@ void ClockWebServer::begin()
             int id = alarmObj["id"] | -1;
             
             // If the alarm has a valid ID, try to get its existing state (for snooze)
-            Alarm* existingAlarmPtr = nullptr;
+            bool found = false;
             if (id >= 0) {
-              existingAlarmPtr = config.getAlarmById(id);
+              Alarm existingAlarm = config.getAlarmById(id);
+              if (existingAlarm.getId() != 255) {
+                  alarm = existingAlarm; // Copy existing state
+                  found = true;
+              }
             }
 
-            if (existingAlarmPtr) {
-              alarm = *existingAlarmPtr; // Copy existing state
-            } else {
+            if (!found) {
               // New alarm (or ID not found, treat as new)
               alarm.setId(id); // -1 will be assigned a new ID by ConfigManager
             }
@@ -304,7 +313,12 @@ void ClockWebServer::begin()
 
     // API handler for settings save
     server.on(
-        "/api/settings/save", HTTP_POST, [](AsyncWebServerRequest *request) {},
+        "/api/settings/save", HTTP_POST, [](AsyncWebServerRequest *request)
+        {
+            if (request->_tempObject) {
+                delete (std::vector<uint8_t>*)request->_tempObject;
+                request->_tempObject = nullptr;
+            } },
         NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
            size_t index, size_t total)
@@ -314,6 +328,9 @@ void ClockWebServer::begin()
             request->_tempObject = new std::vector<uint8_t>();
           }
 
+          if (!request->_tempObject)
+            return;
+
           std::vector<uint8_t> *buffer =
               (std::vector<uint8_t> *)request->_tempObject;
           buffer->insert(buffer->end(), data, data + len);
@@ -321,7 +338,12 @@ void ClockWebServer::begin()
           if (index + len == total)
           {
             JsonDocument doc;
-            if (deserializeJson(doc, buffer->data(), buffer->size()))
+            DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
+
+            delete buffer;
+            request->_tempObject = nullptr;
+
+            if (error)
             {
               request->send(400, "text/plain", "Invalid JSON");
             }
@@ -392,8 +414,6 @@ void ClockWebServer::begin()
 
               request->send(200, "text/plain", "Settings saved!");
             }
-            delete buffer;
-            request->_tempObject = nullptr;
           }
         });
 
@@ -470,7 +490,12 @@ void ClockWebServer::begin()
       request->send(200, "text/plain", "NTP sync started successfully."); });
 
     server.on(
-        "/api/display/save", HTTP_POST, [](AsyncWebServerRequest *request) {},
+        "/api/display/save", HTTP_POST, [](AsyncWebServerRequest *request)
+        {
+            if (request->_tempObject) {
+                delete (std::vector<uint8_t>*)request->_tempObject;
+                request->_tempObject = nullptr;
+            } },
         NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
            size_t index, size_t total)
@@ -480,6 +505,9 @@ void ClockWebServer::begin()
             request->_tempObject = new std::vector<uint8_t>();
           }
 
+          if (!request->_tempObject)
+            return;
+
           std::vector<uint8_t> *buffer =
               (std::vector<uint8_t> *)request->_tempObject;
           buffer->insert(buffer->end(), data, data + len);
@@ -487,7 +515,11 @@ void ClockWebServer::begin()
           if (index + len == total)
           {
             JsonDocument doc;
-            if (deserializeJson(doc, buffer->data(), buffer->size()))
+            DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
+            delete buffer;
+            request->_tempObject = nullptr;
+
+            if (error)
             {
               request->send(400, "text/plain", "Invalid JSON");
             }
@@ -519,8 +551,6 @@ void ClockWebServer::begin()
 
               request->send(200, "text/plain", "Display settings saved!");
             }
-            delete buffer;
-            request->_tempObject = nullptr;
           }
         });
 
