@@ -15,6 +15,7 @@
 #include "ConfigManager.h"
 #include "AlarmManager.h"
 #include "SerialLog.h"
+#include "LockGuard.h"
 
 #include <vector>
 #include <algorithm>
@@ -53,6 +54,11 @@ DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
   }
 
   return DateTime(); // No valid ring time found
+}
+
+TimeManager::TimeManager()
+{
+  _mutex = xSemaphoreCreateRecursiveMutex();
 }
 
 /**
@@ -105,7 +111,7 @@ bool TimeManager::update()
   }
 
   // Update alarm cache if the minute has changed
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime(); // Thread safe access
   if (now.minute() != _lastCacheUpdateMinute)
   {
     updateNextAlarmsCache(now);
@@ -123,9 +129,10 @@ void TimeManager::syncWithNTP()
   if (syncTime())
   {
     // If the sync was successful, update the last sync date.
-    DateTime now = RTC.now();
+    DateTime now = getRTCTime();
+    RecursiveLockGuard lock(_mutex);
     // Store the date as a single integer (e.g., 20231026) for easy comparison.
-    uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day(); // -1 from day to test immediately re-sync after initial sync
+    uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;
     SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
   }
@@ -143,7 +150,8 @@ bool TimeManager::updateNtp()
   if (state == NTP_SYNC_SUCCESS)
   {
     SerialLog::getInstance().print("TimeManager: NTP sync successful.\n");
-    DateTime now = RTC.now();
+    DateTime now = getRTCTime();
+    RecursiveLockGuard lock(_mutex);
     uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;
     SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
@@ -167,7 +175,7 @@ bool TimeManager::updateNtp()
  */
 String TimeManager::getFormattedTime() const
 {
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   char timeStr[6]; // Buffer for "HH:MM"
 
   // Format the time based on the user's preference (12/24 hour).
@@ -192,7 +200,7 @@ String TimeManager::getFormattedTime() const
  */
 String TimeManager::getFormattedSeconds() const
 {
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   char secondsStr[3];
   sprintf(secondsStr, "%02d", now.second());
   return String(secondsStr);
@@ -204,7 +212,7 @@ String TimeManager::getFormattedSeconds() const
  */
 String TimeManager::getFormattedDate() const
 {
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   // Array of month abbreviations for a compact date format.
   static const char *monthNames[] = {
       "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
@@ -226,7 +234,7 @@ String TimeManager::getTOD() const
   {
     return "";
   }
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   // Determine AM or PM based on the hour.
   return (now.hour() < 12) ? "AM" : "PM";
 }
@@ -237,7 +245,7 @@ String TimeManager::getTOD() const
  */
 String TimeManager::getDayOfWeek() const
 {
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   // Array of day abbreviations.
   static const char *dayNames[] = {
       "SUN", "MON", "TUE", "WED",
@@ -263,7 +271,7 @@ bool TimeManager::is24HourFormat() const
 uint8_t TimeManager::getHour() const
 {
   // Return the raw hour (0-23) from the RTC.
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   return now.hour();
 }
 
@@ -275,7 +283,7 @@ uint8_t TimeManager::getHour() const
  */
 void TimeManager::checkDailySync()
 {
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   if (now.hour() < 2)
   {
     return;
@@ -284,13 +292,14 @@ void TimeManager::checkDailySync()
   // Create a YYYYMMDD integer for the current date.
   uint32_t today = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
 
-  // If the last sync was on a different day, and it's 3 AM or later, we should sync.
-  // If the device was off at 3 AM
-  // but is on at 4 AM, this will correctly trigger a sync.
-  if (lastSyncDate < today)
   {
-    SerialLog::getInstance().print("Performing daily time sync...\n");
-    startNtpSync(); // This starts the non-blocking NTP sync.
+    RecursiveLockGuard lock(_mutex);
+    // If the last sync was on a different day, and it's 3 AM or later, we should sync.
+    if (lastSyncDate < today)
+    {
+      SerialLog::getInstance().print("Performing daily time sync...\n");
+      startNtpSync(); // This starts the non-blocking NTP sync.
+    }
   }
 }
 
@@ -326,7 +335,7 @@ void TimeManager::checkDriftAndResync()
   }
 
   // Get the current time from the local RTC.
-  DateTime rtcTime = RTC.now();
+  DateTime rtcTime = getRTCTime();
   // Calculate the time difference.
   TimeSpan drift = rtcTime - ntpTime;
 
@@ -345,7 +354,7 @@ void TimeManager::checkDST()
   // Get current DST state from config
   bool currentDstState = ConfigManager::getInstance().isDST();
 
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   struct tm t;
   t.tm_year = now.year() - 1900;
   t.tm_mon = now.month() - 1;
@@ -376,6 +385,7 @@ void TimeManager::checkDST()
     if (correctedTime.hour() != now.hour() || correctedTime.minute() != now.minute())
     {
       SerialLog::getInstance().print("Adjusting RTC for DST...\n");
+      RecursiveLockGuard lock(_mutex);
       RTC.adjust(correctedTime);
     }
   }
@@ -390,7 +400,7 @@ void TimeManager::updateSnoozeStates()
   auto &config = ConfigManager::getInstance();
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    Alarm &alarm = config.getAlarmByIndex(i);
+    Alarm alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled() && alarm.isSnoozed())
     {
       if (alarm.updateSnooze())
@@ -408,6 +418,7 @@ void TimeManager::updateSnoozeStates()
 
 DateTime TimeManager::getRTCTime() const
 {
+  RecursiveLockGuard lock(_mutex);
   return RTC.now();
 }
 
@@ -415,6 +426,7 @@ bool TimeManager::isTimeSet() const
 {
   // The DS3231 RTC has a Lost Power flag that is more reliable than checking
   // the year.
+  RecursiveLockGuard lock(_mutex);
   return !RTC.lostPower();
 }
 
@@ -427,7 +439,7 @@ void TimeManager::checkMissedAlarms()
 
   SerialLog::getInstance().print("Checking for missed alarms on boot...\n");
 
-  DateTime now = RTC.now();
+  DateTime now = getRTCTime();
   // Don't look back further than 30 minutes.
   const uint32_t lookbehindSeconds = 30 * 60;
   DateTime startTime = now - TimeSpan(lookbehindSeconds);
@@ -445,7 +457,7 @@ void TimeManager::checkMissedAlarms()
   {
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
-      Alarm &alarm = config.getAlarmByIndex(i);
+      Alarm alarm = config.getAlarmByIndex(i);
 
       if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkTime))
       {
@@ -469,6 +481,7 @@ void TimeManager::checkMissedAlarms()
 
 void TimeManager::handleAlarm()
 {
+  RecursiveLockGuard lock(_mutex);
   if (RTC.alarmFired(1))
   {
     RTC.clearAlarm(1);
@@ -489,11 +502,13 @@ void TimeManager::handleAlarm()
     }
   }
 
+  // Update hardware alarms
   setNextAlarms();
 }
 
 void TimeManager::clearRtcAlarms()
 {
+  // Assumes Mutex is held by caller if called internally
   RTC.clearAlarm(1);
   RTC.clearAlarm(2);
   RTC.disableAlarm(1);
@@ -503,18 +518,22 @@ void TimeManager::clearRtcAlarms()
 
 void TimeManager::updateNextAlarmsCache()
 {
-  updateNextAlarmsCache(RTC.now());
+  updateNextAlarmsCache(getRTCTime());
 }
 
 void TimeManager::updateNextAlarmsCache(const DateTime &now)
 {
   auto &config = ConfigManager::getInstance();
   std::vector<NextAlarmTime> nextAlarms;
-  _lastCacheUpdateMinute = now.minute();
+
+  {
+    RecursiveLockGuard lock(_mutex);
+    _lastCacheUpdateMinute = now.minute();
+  }
 
   for (int i = 0; i < config.getNumAlarms(); ++i)
   {
-    Alarm &alarm = config.getAlarmByIndex(i);
+    Alarm alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled())
     {
       DateTime next = calculateNextRingTime(alarm, now);
@@ -526,11 +545,14 @@ void TimeManager::updateNextAlarmsCache(const DateTime &now)
   }
 
   std::sort(nextAlarms.begin(), nextAlarms.end());
+
+  RecursiveLockGuard lock(_mutex);
   _cachedNextAlarms = nextAlarms;
 }
 
 std::vector<NextAlarmTime> TimeManager::getNextAlarms(int count) const
 {
+  RecursiveLockGuard lock(_mutex);
   std::vector<NextAlarmTime> result = _cachedNextAlarms;
   if (result.size() > count)
   {
@@ -541,6 +563,7 @@ std::vector<NextAlarmTime> TimeManager::getNextAlarms(int count) const
 
 void TimeManager::setNextAlarms()
 {
+  RecursiveLockGuard lock(_mutex);
   clearRtcAlarms();
 
   // Update cache first to ensure we have latest

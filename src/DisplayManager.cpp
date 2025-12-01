@@ -328,7 +328,7 @@ void DisplayManager::renderAlarmOverlay()
     // Check for snoozed alarms
     for (int i = 0; i < config.getNumAlarms(); ++i)
     {
-      const auto &alarm = config.getAlarmByIndex(i);
+      Alarm alarm = config.getAlarmByIndex(i);
       if (alarm.isSnoozed())
       {
         time_t snoozeUntil = alarm.getSnoozeUntil();

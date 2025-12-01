@@ -5,6 +5,8 @@
 #include <Arduino.h>
 #include <RTClib.h>
 #include <vector>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 // Structure to hold an alarm's next occurrence time and its ID
 struct NextAlarmTime
@@ -191,7 +193,7 @@ private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
    */
-  TimeManager() {}
+  TimeManager();
 
   /// @brief Stores the date of the last successful NTP sync in YYYYMMDD format. 0 = never synced.
   uint32_t lastSyncDate = 0;
@@ -211,6 +213,8 @@ private:
 
   std::vector<NextAlarmTime> _cachedNextAlarms;
   uint8_t _lastCacheUpdateMinute = 255;
+
+  mutable SemaphoreHandle_t _mutex;
 
   /**
    * @brief Clears both hardware alarms on the RTC.

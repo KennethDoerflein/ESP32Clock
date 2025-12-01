@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 struct WeatherData
 {
@@ -30,12 +32,13 @@ public:
   void updateLocation();
   void updateWeather();
 
-  WeatherData getCurrentWeather() const { return _currentWeather; }
+  WeatherData getCurrentWeather() const;
 
 private:
-  WeatherService() : _lastUpdate(0), _lastLocationUpdate(0) {}
+  WeatherService();
 
   unsigned long _lastUpdate;
   unsigned long _lastLocationUpdate;
   WeatherData _currentWeather = {0.0, 0.0, 0.0, 0.0, 0.0, "", "", false};
+  mutable SemaphoreHandle_t _mutex;
 };

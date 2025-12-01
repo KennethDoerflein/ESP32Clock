@@ -6,6 +6,7 @@
  * a centralized way to handle log messages.
  */
 #include "SerialLog.h"
+#include "UpdateManager.h"
 
 // Initialize static members
 const char *SerialLog::LOG_FILE_PATH = "/system.log";
@@ -171,6 +172,9 @@ void SerialLog::printf(const char *format, ...)
  */
 void SerialLog::logToFile(const char *message)
 {
+  if (UpdateManager::getInstance().isUpdateInProgress())
+    return;
+
   if (xSemaphoreTake(_mutex, portMAX_DELAY) == pdTRUE)
   {
     _logBuffer += message;

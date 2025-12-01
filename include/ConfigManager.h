@@ -6,6 +6,8 @@
 #include "Alarm.h"
 #include <Preferences.h>
 #include <vector>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 const int LEGACY_ALARMS_COUNT = 5;  // Default number of alarms for legacy data migration
 const int DEFAULT_ALARMS_COUNT = 2; // Default number of alarms for new installs/resets
@@ -62,9 +64,9 @@ static constexpr int DEFAULT_ENABLED_PAGES[] = {0, 1, 3, 2};
  * @class ConfigManager
  * @brief Manages the application's configuration settings using a singleton pattern.
  *
- * This class is responsible for loading, saving, and providing access to
- * configuration settings such as WiFi credentials, display preferences, and
- * other system options. Settings are stored in a preferences object.
+ * This class is responsible for loading, saving, and managing all
+ * configuration settings for the clock. It uses the ESP32's Preferences library
+ * for persistent storage in non-volatile flash memory.
  */
 class ConfigManager
 {
@@ -116,23 +118,21 @@ public:
    * @brief Gets the stored WiFi SSID.
    * @return The WiFi SSID as a String.
    */
-  String getWifiSSID() const { return wifiSSID; }
+  String getWifiSSID() const;
 
   /**
    * @brief Gets a specific alarm by its index.
    * @param index The index of the alarm.
-   * @return A constant reference to the Alarm object.
+   * @return A copy of the Alarm object.
    */
-  const Alarm &getAlarmByIndex(int index) const;
-  Alarm &getAlarmByIndex(int index);
+  Alarm getAlarmByIndex(int index) const;
 
   /**
    * @brief Gets a specific alarm by its unique ID.
    * @param id The unique ID of the alarm.
-   * @return A pointer to the Alarm object, or nullptr if not found.
+   * @return A copy of the Alarm object. If not found, returns an Alarm with ID 255.
    */
-  Alarm *getAlarmById(int id);
-  const Alarm *getAlarmById(int id) const;
+  Alarm getAlarmById(int id) const;
 
   /**
    * @brief Gets the total number of alarms.
@@ -151,109 +151,109 @@ public:
    * @brief Gets the stored WiFi password.
    * @return The WiFi password as a String.
    */
-  String getWifiPassword() const { return wifiPassword; }
+  String getWifiPassword() const;
 
   /**
    * @brief Checks if automatic brightness control is enabled.
    * @return True if auto brightness is enabled, false otherwise.
    */
-  bool isAutoBrightness() const { return autoBrightness; }
+  bool isAutoBrightness() const;
 
   /**
    * @brief Gets the manual brightness level.
    * @return The brightness level (0-255).
    */
-  uint8_t getBrightness() const { return brightness; }
+  uint8_t getBrightness() const;
 
   /**
    * @brief Gets the auto brightness start hour.
    * @return The start hour (0-23).
    */
-  uint8_t getAutoBrightnessStartHour() const { return autoBrightnessStartHour; }
+  uint8_t getAutoBrightnessStartHour() const;
 
   /**
    * @brief Gets the auto brightness end hour.
    * @return The end hour (0-23).
    */
-  uint8_t getAutoBrightnessEndHour() const { return autoBrightnessEndHour; }
+  uint8_t getAutoBrightnessEndHour() const;
 
   /**
    * @brief Gets the day brightness level.
    * @return The brightness level (0-255).
    */
-  uint8_t getDayBrightness() const { return dayBrightness; }
+  uint8_t getDayBrightness() const;
 
   /**
    * @brief Gets the night brightness level.
    * @return The brightness level (0-255).
    */
-  uint8_t getNightBrightness() const { return nightBrightness; }
+  uint8_t getNightBrightness() const;
 
   /**
    * @brief Checks if the clock is in 24-hour format.
    * @return True if 24-hour format is enabled, false otherwise.
    */
-  bool is24HourFormat() const { return use24HourFormat; }
+  bool is24HourFormat() const;
 
   /**
    * @brief Checks if the temperature is displayed in Celsius.
    * @return True if Celsius is used, false for Fahrenheit.
    */
-  bool isCelsius() const { return useCelsius; }
+  bool isCelsius() const;
 
   /**
    * @brief Gets the custom hostname.
    * @return The hostname as a String.
    */
-  String getHostname() const { return hostname; }
+  String getHostname() const;
 
   /**
    * @brief Checks if the screen orientation is flipped.
    * @return True if the screen is flipped, false otherwise.
    */
-  bool isScreenFlipped() const { return screenFlipped; }
+  bool isScreenFlipped() const;
 
   /**
    * @brief Checks if the screen colors are inverted.
    * @return True if the screen is inverted, false otherwise.
    */
-  bool isInvertColors() const { return invertColors; }
+  bool isInvertColors() const;
 
   /**
    * @brief Gets the timezone string.
    * @return The timezone string.
    */
-  String getTimezone() const { return timezone; }
+  String getTimezone() const;
 
   /**
    * @brief Gets the snooze duration for alarms.
    * @return The snooze duration in minutes.
    */
-  uint8_t getSnoozeDuration() const { return snoozeDuration; }
+  uint8_t getSnoozeDuration() const;
 
   /**
    * @brief Gets the hold duration to dismiss an alarm.
    * @return The dismiss duration in seconds.
    */
-  uint8_t getDismissDuration() const { return dismissDuration; }
+  uint8_t getDismissDuration() const;
 
   /**
    * @brief Gets the temperature correction value.
    * @return The correction value.
    */
-  float getTempCorrection() const { return tempCorrection; }
+  float getTempCorrection() const;
 
   /**
    * @brief Checks if temperature correction is enabled.
    * @return True if enabled, false otherwise.
    */
-  bool isTempCorrectionEnabled() const { return tempCorrectionEnabled; }
+  bool isTempCorrectionEnabled() const;
 
   /**
    * @brief Checks if Daylight Saving Time is currently active.
    * @return True if DST is active, false otherwise.
    */
-  bool isDST() const { return isDst; }
+  bool isDST() const;
 
   // Display Colors
 
@@ -261,499 +261,296 @@ public:
    * @brief Gets the background color of the display.
    * @return The color as a hex string (e.g., "#RRGGBB").
    */
-  String getBackgroundColor() const { return backgroundColor; }
+  String getBackgroundColor() const;
 
   /**
    * @brief Gets the color of the time display.
    * @return The color as a hex string.
    */
-  String getTimeColor() const { return timeColor; }
+  String getTimeColor() const;
 
   /**
    * @brief Gets the color of the AM/PM indicator.
    * @return The color as a hex string.
    */
-  String getTodColor() const { return todColor; }
+  String getTodColor() const;
 
   /**
    * @brief Gets the color of the seconds display.
    * @return The color as a hex string.
    */
-  String getSecondsColor() const { return secondsColor; }
+  String getSecondsColor() const;
 
   /**
    * @brief Gets the color of the day of the week display.
    * @return The color as a hex string.
    */
-  String getDayOfWeekColor() const { return dayOfWeekColor; }
+  String getDayOfWeekColor() const;
 
   /**
    * @brief Gets the color of the date display.
    * @return The color as a hex string.
    */
-  String getDateColor() const { return dateColor; }
+  String getDateColor() const;
 
   /**
    * @brief Gets the color of the temperature display.
    * @return The color as a hex string.
    */
-  String getTempColor() const { return tempColor; }
+  String getTempColor() const;
 
   /**
    * @brief Gets the color of the humidity display.
    * @return The color as a hex string.
    */
-  String getHumidityColor() const { return humidityColor; }
+  String getHumidityColor() const;
 
   /**
    * @brief Gets the color of the alarm icon.
    * @return The color as a hex string.
    */
-  String getAlarmIconColor() const { return alarmIconColor; }
+  String getAlarmIconColor() const;
 
   /**
    * @brief Gets the color of the snooze icon.
    * @return The color as a hex string.
    */
-  String getSnoozeIconColor() const { return snoozeIconColor; }
+  String getSnoozeIconColor() const;
 
   /**
    * @brief Gets the color of the alarm text when ringing.
    * @return The color as a hex string.
    */
-  String getAlarmTextColor() const { return alarmTextColor; }
+  String getAlarmTextColor() const;
 
   /**
    * @brief Gets the color of error text messages.
    * @return The color as a hex string.
    */
-  String getErrorTextColor() const { return errorTextColor; }
+  String getErrorTextColor() const;
 
   /**
    * @brief Gets the color of the weather temperature display.
    * @return The color as a hex string.
    */
-  String getWeatherTempColor() const { return weatherTempColor; }
+  String getWeatherTempColor() const;
 
   /**
    * @brief Gets the color of the weather forecast/condition display.
    * @return The color as a hex string.
    */
-  String getWeatherForecastColor() const { return weatherForecastColor; }
+  String getWeatherForecastColor() const;
 
   /**
    * @brief Gets the ID of the alarm that was ringing at shutdown.
    * @return The ID of the alarm, or -1 if none.
    */
-  int8_t getRingingAlarmId() const { return ringingAlarmId; }
+  int8_t getRingingAlarmId() const;
 
   /**
    * @brief Gets the Unix timestamp of when the ringing alarm started.
    * @return The start timestamp, or 0 if no alarm was ringing.
    */
-  uint32_t getRingingAlarmStartTimestamp() const { return ringingAlarmStartTimestamp; }
+  uint32_t getRingingAlarmStartTimestamp() const;
 
   /**
    * @brief Checks if the stored WiFi credentials have been validated.
    * @return True if the credentials are known to be good, false otherwise.
    */
-  bool areWifiCredsValid() const { return wifiCredsValid; }
+  bool areWifiCredsValid() const;
 
   // Setters
   /**
    * @brief Sets the WiFi SSID.
    * @param ssid The new WiFi SSID.
    */
-  void setWifiSSID(const String &ssid)
-  {
-    wifiSSID = ssid;
-    wifiCredsValid = false; // New credentials need validation
-    _isDirty = true;
-    scheduleSave();
-  }
+  void setWifiSSID(const String &ssid);
 
   /**
    * @brief Sets the WiFi password.
    * @param password The new WiFi password.
    */
-  void setWifiPassword(const String &password)
-  {
-    wifiPassword = password;
-    wifiCredsValid = false; // New credentials need validation
-    _isDirty = true;
-    scheduleSave();
-  }
+  void setWifiPassword(const String &password);
 
   /**
    * @brief Sets the custom hostname.
    * @param name The new hostname.
    */
-  void setHostname(const String &name)
-  {
-    hostname = name;
-    _isDirty = true;
-    scheduleSave();
-  }
+  void setHostname(const String &name);
 
   /**
    * @brief Sets the WiFi credential validity.
    * @param valid True if the credentials are valid, false otherwise.
    */
-  void setWifiCredsValid(bool valid)
-  {
-    if (wifiCredsValid != valid)
-    {
-      wifiCredsValid = valid;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setWifiCredsValid(bool valid);
 
   /**
    * @brief Enables or disables temperature correction.
    * @param enabled True to enable, false to disable.
    */
-  void setTempCorrectionEnabled(bool enabled)
-  {
-    if (tempCorrectionEnabled != enabled)
-    {
-      tempCorrectionEnabled = enabled;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setTempCorrectionEnabled(bool enabled);
 
   /**
    * @brief Sets the temperature correction value.
    * @param value The new correction value.
    */
-  void setTempCorrection(float value)
-  {
-    if (tempCorrection != value)
-    {
-      tempCorrection = value;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setTempCorrection(float value);
 
   /**
    * @brief Gets the stored Zip Code.
    * @return The Zip Code as a String.
    */
-  String getZipCode() const { return zipCode; }
+  String getZipCode() const;
 
   /**
    * @brief Sets the Zip Code.
    * @param zip The new Zip Code.
    */
-  void setZipCode(const String &zip)
-  {
-    if (zipCode != zip)
-    {
-      zipCode = zip;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setZipCode(const String &zip);
 
   /**
    * @brief Gets the enabled pages and their order.
    * @return A vector of page IDs.
    */
-  std::vector<int> getEnabledPages() const { return enabledPages; }
+  std::vector<int> getEnabledPages() const;
 
   /**
    * @brief Sets the enabled pages and their order.
    * @param pages The new vector of page IDs.
    */
-  void setEnabledPages(const std::vector<int> &pages)
-  {
-    enabledPages = pages;
-    _isDirty = true;
-    scheduleSave();
-  }
+  void setEnabledPages(const std::vector<int> &pages);
 
   /**
    * @brief Gets the default page index.
    * @return The default page index.
    */
-  int getDefaultPage() const { return defaultPage; }
+  int getDefaultPage() const;
 
   /**
    * @brief Sets the default page index.
    * @param page The new default page index.
    */
-  void setDefaultPage(int page)
-  {
-    if (defaultPage != page)
-    {
-      defaultPage = page;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setDefaultPage(int page);
 
   /**
    * @brief Gets the latitude.
    * @return The latitude.
    */
-  float getLat() const { return lat; }
+  float getLat() const;
 
   /**
    * @brief Sets the latitude.
    * @param latitude The new latitude.
    */
-  void setLat(float latitude)
-  {
-    if (lat != latitude)
-    {
-      lat = latitude;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setLat(float latitude);
 
   /**
    * @brief Gets the longitude.
    * @return The longitude.
    */
-  float getLon() const { return lon; }
+  float getLon() const;
 
   /**
    * @brief Sets the longitude.
    * @param longitude The new longitude.
    */
-  void setLon(float longitude)
-  {
-    if (lon != longitude)
-    {
-      lon = longitude;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setLon(float longitude);
 
   /**
    * @brief Sets the Daylight Saving Time status.
    * @param active True if DST is active, false otherwise.
    */
-  void setDST(bool active)
-  {
-    if (isDst != active)
-    {
-      isDst = active;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setDST(bool active);
 
   /**
    * @brief Sets the screen color inversion.
    * @param inverted True to invert the screen, false for normal.
    */
-  void setInvertColors(bool inverted)
-  {
-    if (invertColors != inverted)
-    {
-      invertColors = inverted;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setInvertColors(bool inverted);
 
   /**
    * @brief Sets the snooze duration for alarms.
    * @param duration The snooze duration in minutes.
    */
-  void setSnoozeDuration(uint8_t duration)
-  {
-    if (snoozeDuration != duration)
-    {
-      snoozeDuration = duration;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setSnoozeDuration(uint8_t duration);
 
   /**
    * @brief Sets the hold duration to dismiss an alarm.
    * @param duration The dismiss duration in seconds.
    */
-  void setDismissDuration(uint8_t duration)
-  {
-    if (dismissDuration != duration)
-    {
-      dismissDuration = duration;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setDismissDuration(uint8_t duration);
 
   /**
    * @brief Sets the ID of the currently ringing alarm.
    * @param id The alarm ID, or -1 to clear.
    */
-  void setRingingAlarmId(int8_t id)
-  {
-    if (ringingAlarmId != id)
-    {
-      ringingAlarmId = id;
-    }
-  }
+  void setRingingAlarmId(int8_t id);
 
   /**
    * @brief Sets the start timestamp of the ringing alarm.
    * @param timestamp The Unix timestamp.
    */
-  void setRingingAlarmStartTimestamp(uint32_t timestamp)
-  {
-    if (ringingAlarmStartTimestamp != timestamp)
-    {
-      ringingAlarmStartTimestamp = timestamp;
-    }
-  }
+  void setRingingAlarmStartTimestamp(uint32_t timestamp);
 
   /**
    * @brief Sets the screen orientation.
    * @param flipped True to flip the screen, false for normal.
    */
-
-  void setScreenFlipped(bool flipped)
-  {
-    if (screenFlipped != flipped)
-    {
-      screenFlipped = flipped;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setScreenFlipped(bool flipped);
 
   /**
    * @brief Enables or disables automatic brightness control.
    * @param enabled True to enable, false to disable.
    */
-  void setAutoBrightness(bool enabled)
-  {
-    if (autoBrightness != enabled)
-    {
-      autoBrightness = enabled;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setAutoBrightness(bool enabled);
 
   /**
    * @brief Sets the manual brightness level.
    * @param value The brightness level (0-255).
    */
-  void setBrightness(uint8_t value)
-  {
-    if (brightness != value)
-    {
-      brightness = value;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setBrightness(uint8_t value);
 
   /**
    * @brief Sets the auto brightness start hour.
    * @param value The start hour (0-23).
    */
-  void setAutoBrightnessStartHour(uint8_t value)
-  {
-    if (autoBrightnessStartHour != value)
-    {
-      autoBrightnessStartHour = value;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setAutoBrightnessStartHour(uint8_t value);
 
   /**
    * @brief Sets the auto brightness end hour.
    * @param value The end hour (0-23).
    */
-  void setAutoBrightnessEndHour(uint8_t value)
-  {
-    if (autoBrightnessEndHour != value)
-    {
-      autoBrightnessEndHour = value;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setAutoBrightnessEndHour(uint8_t value);
 
   /**
    * @brief Sets the day brightness level.
    * @param value The brightness level (0-255).
    */
-  void setDayBrightness(uint8_t value)
-  {
-    if (dayBrightness != value)
-    {
-      dayBrightness = value;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setDayBrightness(uint8_t value);
 
   /**
    * @brief Sets the night brightness level.
    * @param value The brightness level (0-255).
    */
-  void setNightBrightness(uint8_t value)
-  {
-    if (nightBrightness != value)
-    {
-      nightBrightness = value;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setNightBrightness(uint8_t value);
 
   /**
    * @brief Sets the clock to 24-hour or 12-hour format.
    * @param enabled True for 24-hour, false for 12-hour.
    */
-  void set24HourFormat(bool enabled)
-  {
-    if (use24HourFormat != enabled)
-    {
-      use24HourFormat = enabled;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void set24HourFormat(bool enabled);
 
   /**
    * @brief Sets the temperature unit.
    * @param enabled True for Celsius, false for Fahrenheit.
    */
-  void setCelsius(bool enabled)
-  {
-    if (useCelsius != enabled)
-    {
-      useCelsius = enabled;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setCelsius(bool enabled);
 
   /**
    * @brief Sets the timezone string.
    * @param tz The new timezone string.
    */
-  void setTimezone(const String &tz)
-  {
-    if (timezone != tz)
-    {
-      timezone = tz;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setTimezone(const String &tz);
 
   /**
    * @brief Updates an alarm at a specific index.
@@ -773,208 +570,96 @@ public:
    * @brief Sets the background color of the display.
    * @param color The new color as a hex string (e.g., "#RRGGBB").
    */
-  void setBackgroundColor(const String &color)
-  {
-    if (backgroundColor != color)
-    {
-      backgroundColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setBackgroundColor(const String &color);
 
   /**
    * @brief Sets the color of the time display.
    * @param color The new color as a hex string.
    */
-  void setTimeColor(const String &color)
-  {
-    if (timeColor != color)
-    {
-      timeColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setTimeColor(const String &color);
 
   /**
    * @brief Sets the color of the AM/PM indicator.
    * @param color The new color as a hex string.
    */
-  void setTodColor(const String &color)
-  {
-    if (todColor != color)
-    {
-      todColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setTodColor(const String &color);
 
   /**
    * @brief Sets the color of the seconds display.
    * @param color The new color as a hex string.
    */
-  void setSecondsColor(const String &color)
-  {
-    if (secondsColor != color)
-    {
-      secondsColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setSecondsColor(const String &color);
 
   /**
    * @brief Sets the color of the day of the week display.
    * @param color The new color as a hex string.
    */
-  void setDayOfWeekColor(const String &color)
-  {
-    if (dayOfWeekColor != color)
-    {
-      dayOfWeekColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setDayOfWeekColor(const String &color);
 
   /**
    * @brief Sets the color of the date display.
    * @param color The new color as a hex string.
    */
-  void setDateColor(const String &color)
-  {
-    if (dateColor != color)
-    {
-      dateColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setDateColor(const String &color);
 
   /**
    * @brief Sets the color of the temperature display.
    * @param color The new color as a hex string.
    */
-  void setTempColor(const String &color)
-  {
-    if (tempColor != color)
-    {
-      tempColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setTempColor(const String &color);
 
   /**
    * @brief Sets the color of the humidity display.
    * @param color The new color as a hex string.
    */
-  void setHumidityColor(const String &color)
-  {
-    if (humidityColor != color)
-    {
-      humidityColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setHumidityColor(const String &color);
 
   /**
    * @brief Sets the color of the alarm icon.
    * @param color The new color as a hex string.
    */
-  void setAlarmIconColor(const String &color)
-  {
-    if (alarmIconColor != color)
-    {
-      alarmIconColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setAlarmIconColor(const String &color);
 
   /**
    * @brief Sets the color of the snooze icon.
    * @param color The new color as a hex string.
    */
-  void setSnoozeIconColor(const String &color)
-  {
-    if (snoozeIconColor != color)
-    {
-      snoozeIconColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setSnoozeIconColor(const String &color);
 
   /**
    * @brief Sets the color of the alarm text when ringing.
    * @param color The new color as a hex string.
    */
-  void setAlarmTextColor(const String &color)
-  {
-    if (alarmTextColor != color)
-    {
-      alarmTextColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setAlarmTextColor(const String &color);
 
   /**
    * @brief Sets the color of error text messages.
    * @param color The new color as a hex string.
    */
-  void setErrorTextColor(const String &color)
-  {
-    if (errorTextColor != color)
-    {
-      errorTextColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setErrorTextColor(const String &color);
 
   /**
    * @brief Sets the color of the weather temperature display.
    * @param color The new color as a hex string.
    */
-  void setWeatherTempColor(const String &color)
-  {
-    if (weatherTempColor != color)
-    {
-      weatherTempColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setWeatherTempColor(const String &color);
 
   /**
    * @brief Sets the color of the weather forecast/condition display.
    * @param color The new color as a hex string.
    */
-  void setWeatherForecastColor(const String &color)
-  {
-    if (weatherForecastColor != color)
-    {
-      weatherForecastColor = color;
-      _isDirty = true;
-      scheduleSave();
-    }
-  }
+  void setWeatherForecastColor(const String &color);
 
   /**
    * @brief Checks if the configuration has been modified since the last save.
    * @return True if the configuration is "dirty", false otherwise.
    */
-  bool isDirty() const { return _isDirty; }
+  bool isDirty() const;
 
   /**
    * @brief Clears the dirty flag, usually after handling the changes.
    */
-  void clearDirtyFlag() { _isDirty = false; }
+  void clearDirtyFlag();
 
   /**
    * @brief Saves the state of a ringing alarm to persistent storage.
@@ -1006,10 +691,7 @@ public:
   bool isAnyAlarmSnoozed() const;
 
 private:
-  /**
-   * @brief Private constructor to enforce the singleton pattern.
-   */
-  ConfigManager() : _isDirty(false), _savePending(false), _saveDebounceTimer(0), _nextAlarmId(0) {}
+  ConfigManager();
 
   // Configuration variables with default values
   String wifiSSID = DEFAULT_WIFI_SSID;
@@ -1062,16 +744,8 @@ private:
   std::vector<Alarm> _alarms;
   int _nextAlarmId;
   Preferences _preferences;
+  mutable SemaphoreHandle_t _mutex;
 
-  /**
-   * @brief Loads the configuration from the JSON file.
-   *
-   * If the file cannot be read or parsed, default values are used.
-   */
   void load();
-
-  /**
-   * @brief Sets the configuration variables to their default values.
-   */
   void setDefaults();
 };

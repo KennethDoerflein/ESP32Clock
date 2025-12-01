@@ -5,6 +5,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include "LockGuard.h"
 
 static const unsigned long WEATHER_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
@@ -71,6 +72,11 @@ String getConditionFromWMO(int code)
   }
 }
 
+WeatherService::WeatherService() : _lastUpdate(0), _lastLocationUpdate(0)
+{
+  _mutex = xSemaphoreCreateMutex();
+}
+
 void WeatherService::begin()
 {
   // Initial check handled in loop or triggered by events
@@ -91,13 +97,19 @@ void WeatherService::loop()
     xTaskCreatePinnedToCore(
         weatherUpdateTask,  // Function to implement the task
         "WeatherUpdate",    // Name of the task
-        8192,               // Stack size (8KB is sufficient for HTTPS)
+        12288,              // Stack size (12KB is sufficient for HTTPS)
         this,               // Task input parameter
         1,                  // Priority
         &weatherTaskHandle, // Task handle
         0                   // Core 0
     );
   }
+}
+
+WeatherData WeatherService::getCurrentWeather() const
+{
+  LockGuard lock(_mutex);
+  return _currentWeather;
 }
 
 void WeatherService::updateLocation()
@@ -208,6 +220,7 @@ void WeatherService::updateWeather()
       float pressure = doc["current"]["pressure_msl"];
       int code = doc["current"]["weather_code"];
 
+      LockGuard lock(_mutex);
       _currentWeather.temp = temp;
       _currentWeather.feelsLike = feelsLike;
       _currentWeather.humidity = humidity;

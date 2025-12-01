@@ -11,8 +11,16 @@
 #include "SerialLog.h"
 #include "nvs_flash.h"
 #include "Constants.h"
+#include "LockGuard.h"
+#include "UpdateManager.h"
 
-// Define the namespace for preferences
+/**
+ * @brief Private constructor to enforce the singleton pattern.
+ */
+ConfigManager::ConfigManager() : _isDirty(false), _savePending(false), _saveDebounceTimer(0), _nextAlarmId(0)
+{
+  _mutex = xSemaphoreCreateMutex();
+}
 
 /**
  * @brief Handles periodic tasks for the ConfigManager, like debounced saves.
@@ -23,9 +31,19 @@
  */
 void ConfigManager::loop()
 {
-  if (_savePending && (millis() - _saveDebounceTimer >= SAVE_DEBOUNCE_DELAY))
+  if (UpdateManager::getInstance().isUpdateInProgress())
+    return;
+
+  bool pending = false;
+  {
+    LockGuard lock(_mutex);
+    pending = _savePending && (millis() - _saveDebounceTimer >= SAVE_DEBOUNCE_DELAY);
+  }
+
+  if (pending)
   {
     save();
+    LockGuard lock(_mutex);
     _savePending = false;
   }
 }
@@ -39,6 +57,7 @@ void ConfigManager::loop()
  */
 void ConfigManager::scheduleSave()
 {
+  LockGuard lock(_mutex);
   _savePending = true;
   _saveDebounceTimer = millis();
 }
@@ -64,6 +83,7 @@ void ConfigManager::begin()
  */
 void ConfigManager::setDefaults()
 {
+  LockGuard lock(_mutex);
   // Set all configuration parameters to their default initial state.
   wifiSSID = DEFAULT_WIFI_SSID;
   wifiPassword = DEFAULT_WIFI_PASSWORD;
@@ -144,6 +164,7 @@ void ConfigManager::load()
 
   SerialLog::getInstance().print("Loading configuration from Preferences...");
 
+  LockGuard lock(_mutex);
   // Load each setting from the Preferences
   wifiSSID = _preferences.getString("wifiSSID", DEFAULT_WIFI_SSID);
   wifiPassword = _preferences.getString("wifiPass", DEFAULT_WIFI_PASSWORD);
@@ -298,6 +319,10 @@ void ConfigManager::load()
  */
 bool ConfigManager::save()
 {
+  if (UpdateManager::getInstance().isUpdateInProgress())
+    return false;
+
+  LockGuard lock(_mutex);
   _preferences.putString("wifiSSID", wifiSSID);
   _preferences.putString("wifiPass", wifiPassword);
   _preferences.putString("hostname", hostname);
@@ -380,67 +405,48 @@ bool ConfigManager::save()
  */
 void ConfigManager::saveRingingAlarmState()
 {
+  LockGuard lock(_mutex);
   _preferences.putChar("ringAlarmId", ringingAlarmId);
   _preferences.putUInt("ringAlarmTS", ringingAlarmStartTimestamp);
 }
 
 /**
- * @brief Gets a constant reference to a specific alarm by index.
+ * @brief Gets a copy of a specific alarm by index.
  * @param index The index of the alarm.
- * @return A constant reference to the Alarm object.
+ * @return An Alarm object.
  */
-const Alarm &ConfigManager::getAlarmByIndex(int index) const
+Alarm ConfigManager::getAlarmByIndex(int index) const
 {
+  LockGuard lock(_mutex);
   if (index < 0 || index >= _alarms.size())
   {
     SerialLog::getInstance().print("FATAL: Alarm index out of bounds!");
-    ESP.restart();
+    // Return a default alarm or handle error appropriately.
+    // Since we can't crash safely, returning a disabled alarm.
+    return Alarm();
   }
   return _alarms[index];
 }
 
 /**
- * @brief Gets a mutable reference to a specific alarm by index.
- * @param index The index of the alarm.
- * @return A mutable reference to the Alarm object.
- */
-Alarm &ConfigManager::getAlarmByIndex(int index)
-{
-  if (index < 0 || index >= _alarms.size())
-  {
-    SerialLog::getInstance().print("FATAL: Alarm index out of bounds!");
-    ESP.restart();
-  }
-  return _alarms[index];
-}
-
-/**
- * @brief Gets a pointer to a specific alarm by ID.
+ * @brief Gets a copy of a specific alarm by ID.
  * @param id The unique ID of the alarm.
- * @return A pointer to the Alarm object, or nullptr if not found.
+ * @return An Alarm object. If not found, returns an invalid alarm (check via ID or enabled status if applicable).
  */
-Alarm *ConfigManager::getAlarmById(int id)
+Alarm ConfigManager::getAlarmById(int id) const
 {
-  for (auto &alarm : _alarms)
-  {
-    if (alarm.getId() == id)
-    {
-      return &alarm;
-    }
-  }
-  return nullptr;
-}
-
-const Alarm *ConfigManager::getAlarmById(int id) const
-{
+  LockGuard lock(_mutex);
   for (const auto &alarm : _alarms)
   {
     if (alarm.getId() == id)
     {
-      return &alarm;
+      return alarm;
     }
   }
-  return nullptr;
+
+  Alarm notFound;
+  notFound.setId(255); // Sentinel
+  return notFound;
 }
 
 /**
@@ -449,6 +455,7 @@ const Alarm *ConfigManager::getAlarmById(int id) const
  */
 int ConfigManager::getNumAlarms() const
 {
+  LockGuard lock(_mutex);
   return _alarms.size();
 }
 
@@ -459,13 +466,16 @@ int ConfigManager::getNumAlarms() const
  */
 void ConfigManager::setAlarmByIndex(int index, const Alarm &alarm)
 {
-  if (index < 0 || index >= _alarms.size())
   {
-    SerialLog::getInstance().print("ERROR: Alarm index out of bounds!");
-    return;
+    LockGuard lock(_mutex);
+    if (index < 0 || index >= _alarms.size())
+    {
+      SerialLog::getInstance().print("ERROR: Alarm index out of bounds!");
+      return;
+    }
+    _alarms[index] = alarm;
+    _isDirty = true;
   }
-  _alarms[index] = alarm;
-  _isDirty = true;
   scheduleSave();
 }
 
@@ -476,35 +486,45 @@ void ConfigManager::setAlarmByIndex(int index, const Alarm &alarm)
  */
 void ConfigManager::setAlarmById(int id, const Alarm &alarm)
 {
-  for (auto &a : _alarms)
+  bool found = false;
   {
-    if (a.getId() == id)
+    LockGuard lock(_mutex);
+    for (auto &a : _alarms)
     {
-      a = alarm;
-      _isDirty = true;
-      scheduleSave();
-      return;
+      if (a.getId() == id)
+      {
+        a = alarm;
+        _isDirty = true;
+        found = true;
+        break;
+      }
     }
   }
-  SerialLog::getInstance().printf("ERROR: Alarm ID %d not found for update!\n", id);
+  if (found)
+    scheduleSave();
+  else
+    SerialLog::getInstance().printf("ERROR: Alarm ID %d not found for update!\n", id);
 }
 
 void ConfigManager::replaceAlarms(const std::vector<Alarm> &newAlarms)
 {
-  _alarms.clear();
-  for (const auto &incomingAlarm : newAlarms)
   {
-    Alarm alarm = incomingAlarm;
-    // If the ID is invalid (new alarm from frontend), assign a new ID
-    if (alarm.getId() == 255 || alarm.getId() < 0)
-    { // Using uint8_t, 255 might be -1 casted, or we check against known invalid
-      // Assuming frontend sends ID as int, but Alarm stores as uint8_t.
-      // If frontend sends -1, it becomes 255 in uint8_t
-      alarm.setId(_nextAlarmId++);
+    LockGuard lock(_mutex);
+    _alarms.clear();
+    for (const auto &incomingAlarm : newAlarms)
+    {
+      Alarm alarm = incomingAlarm;
+      // If the ID is invalid (new alarm from frontend), assign a new ID
+      if (alarm.getId() == 255 || alarm.getId() < 0)
+      { // Using uint8_t, 255 might be -1 casted, or we check against known invalid
+        // Assuming frontend sends ID as int, but Alarm stores as uint8_t.
+        // If frontend sends -1, it becomes 255 in uint8_t
+        alarm.setId(_nextAlarmId++);
+      }
+      _alarms.push_back(alarm);
     }
-    _alarms.push_back(alarm);
+    _isDirty = true;
   }
-  _isDirty = true;
   scheduleSave();
 }
 
@@ -560,16 +580,16 @@ void ConfigManager::factoryResetExceptWiFi()
   SerialLog::getInstance().print("Performing factory reset, but keeping WiFi credentials...\n");
 
   // Preserve WiFi credentials
-  String ssid = wifiSSID;
-  String password = wifiPassword;
-  bool credsValid = wifiCredsValid;
+  String ssid = getWifiSSID();
+  String password = getWifiPassword();
+  bool credsValid = areWifiCredsValid();
 
   setDefaults();
 
   // Restore WiFi credentials
-  wifiSSID = ssid;
-  wifiPassword = password;
-  wifiCredsValid = credsValid;
+  setWifiSSID(ssid);
+  setWifiPassword(password);
+  setWifiCredsValid(credsValid);
 
   save();
 }
@@ -579,26 +599,33 @@ void ConfigManager::factoryResetExceptWiFi()
  */
 void ConfigManager::resetDisplayToDefaults()
 {
-  backgroundColor = DEFAULT_BACKGROUND_COLOR;
-  timeColor = DEFAULT_TIME_COLOR;
-  todColor = DEFAULT_TOD_COLOR;
-  secondsColor = DEFAULT_SECONDS_COLOR;
-  dayOfWeekColor = DEFAULT_DAY_OF_WEEK_COLOR;
-  dateColor = DEFAULT_DATE_COLOR;
-  tempColor = DEFAULT_TEMP_COLOR;
-  humidityColor = DEFAULT_HUMIDITY_COLOR;
-  alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
-  alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
-  errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
-  weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
-  weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
+  {
+    LockGuard lock(_mutex);
+    backgroundColor = DEFAULT_BACKGROUND_COLOR;
+    timeColor = DEFAULT_TIME_COLOR;
+    todColor = DEFAULT_TOD_COLOR;
+    secondsColor = DEFAULT_SECONDS_COLOR;
+    dayOfWeekColor = DEFAULT_DAY_OF_WEEK_COLOR;
+    dateColor = DEFAULT_DATE_COLOR;
+    tempColor = DEFAULT_TEMP_COLOR;
+    humidityColor = DEFAULT_HUMIDITY_COLOR;
+    alarmIconColor = DEFAULT_ALARM_ICON_COLOR;
+    alarmTextColor = DEFAULT_ALARM_TEXT_COLOR;
+    errorTextColor = DEFAULT_ERROR_TEXT_COLOR;
+    weatherTempColor = DEFAULT_WEATHER_TEMP_COLOR;
+    weatherForecastColor = DEFAULT_WEATHER_FORECAST_COLOR;
+  }
 
   if (!isAnyAlarmSnoozed())
   {
+    LockGuard lock(_mutex);
     snoozeIconColor = DEFAULT_SNOOZE_ICON_COLOR;
   }
 
-  _isDirty = true;
+  {
+    LockGuard lock(_mutex);
+    _isDirty = true;
+  }
   scheduleSave();
 }
 
@@ -607,29 +634,32 @@ void ConfigManager::resetDisplayToDefaults()
  */
 void ConfigManager::resetGeneralSettingsToDefaults()
 {
-  autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
-  brightness = DEFAULT_BRIGHTNESS;
-  autoBrightnessStartHour = DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
-  autoBrightnessEndHour = DEFAULT_AUTO_BRIGHTNESS_END_HOUR;
-  dayBrightness = DEFAULT_DAY_BRIGHTNESS;
-  nightBrightness = DEFAULT_NIGHT_BRIGHTNESS;
-  use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
-  useCelsius = DEFAULT_USE_CELSIUS;
-  screenFlipped = DEFAULT_SCREEN_FLIPPED;
-  invertColors = DEFAULT_INVERT_COLORS;
-  timezone = DEFAULT_TIMEZONE;
-  isDst = DEFAULT_IS_DST;
-  tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
-  tempCorrection = DEFAULT_TEMP_CORRECTION;
+  {
+    LockGuard lock(_mutex);
+    autoBrightness = DEFAULT_AUTO_BRIGHTNESS;
+    brightness = DEFAULT_BRIGHTNESS;
+    autoBrightnessStartHour = DEFAULT_AUTO_BRIGHTNESS_START_HOUR;
+    autoBrightnessEndHour = DEFAULT_AUTO_BRIGHTNESS_END_HOUR;
+    dayBrightness = DEFAULT_DAY_BRIGHTNESS;
+    nightBrightness = DEFAULT_NIGHT_BRIGHTNESS;
+    use24HourFormat = DEFAULT_USE_24_HOUR_FORMAT;
+    useCelsius = DEFAULT_USE_CELSIUS;
+    screenFlipped = DEFAULT_SCREEN_FLIPPED;
+    invertColors = DEFAULT_INVERT_COLORS;
+    timezone = DEFAULT_TIMEZONE;
+    isDst = DEFAULT_IS_DST;
+    tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
+    tempCorrection = DEFAULT_TEMP_CORRECTION;
 
-  snoozeDuration = DEFAULT_SNOOZE_DURATION;
-  dismissDuration = DEFAULT_DISMISS_DURATION;
-  zipCode = DEFAULT_ZIP_CODE;
-  enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
-  defaultPage = DEFAULT_DEFAULT_PAGE;
-  lat = DEFAULT_LAT;
-  lon = DEFAULT_LON;
-  _isDirty = true;
+    snoozeDuration = DEFAULT_SNOOZE_DURATION;
+    dismissDuration = DEFAULT_DISMISS_DURATION;
+    zipCode = DEFAULT_ZIP_CODE;
+    enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
+    defaultPage = DEFAULT_DEFAULT_PAGE;
+    lat = DEFAULT_LAT;
+    lon = DEFAULT_LON;
+    _isDirty = true;
+  }
   scheduleSave();
 }
 
@@ -639,6 +669,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
  */
 bool ConfigManager::isAnyAlarmSnoozed() const
 {
+  LockGuard lock(_mutex);
   for (const auto &alarm : _alarms)
   {
     if (alarm.isSnoozed())
@@ -647,4 +678,738 @@ bool ConfigManager::isAnyAlarmSnoozed() const
     }
   }
   return false;
+}
+
+// Getters
+String ConfigManager::getWifiSSID() const
+{
+  LockGuard lock(_mutex);
+  return wifiSSID;
+}
+String ConfigManager::getWifiPassword() const
+{
+  LockGuard lock(_mutex);
+  return wifiPassword;
+}
+bool ConfigManager::isAutoBrightness() const
+{
+  LockGuard lock(_mutex);
+  return autoBrightness;
+}
+uint8_t ConfigManager::getBrightness() const
+{
+  LockGuard lock(_mutex);
+  return brightness;
+}
+uint8_t ConfigManager::getAutoBrightnessStartHour() const
+{
+  LockGuard lock(_mutex);
+  return autoBrightnessStartHour;
+}
+uint8_t ConfigManager::getAutoBrightnessEndHour() const
+{
+  LockGuard lock(_mutex);
+  return autoBrightnessEndHour;
+}
+uint8_t ConfigManager::getDayBrightness() const
+{
+  LockGuard lock(_mutex);
+  return dayBrightness;
+}
+uint8_t ConfigManager::getNightBrightness() const
+{
+  LockGuard lock(_mutex);
+  return nightBrightness;
+}
+bool ConfigManager::is24HourFormat() const
+{
+  LockGuard lock(_mutex);
+  return use24HourFormat;
+}
+bool ConfigManager::isCelsius() const
+{
+  LockGuard lock(_mutex);
+  return useCelsius;
+}
+String ConfigManager::getHostname() const
+{
+  LockGuard lock(_mutex);
+  return hostname;
+}
+bool ConfigManager::isScreenFlipped() const
+{
+  LockGuard lock(_mutex);
+  return screenFlipped;
+}
+bool ConfigManager::isInvertColors() const
+{
+  LockGuard lock(_mutex);
+  return invertColors;
+}
+String ConfigManager::getTimezone() const
+{
+  LockGuard lock(_mutex);
+  return timezone;
+}
+uint8_t ConfigManager::getSnoozeDuration() const
+{
+  LockGuard lock(_mutex);
+  return snoozeDuration;
+}
+uint8_t ConfigManager::getDismissDuration() const
+{
+  LockGuard lock(_mutex);
+  return dismissDuration;
+}
+float ConfigManager::getTempCorrection() const
+{
+  LockGuard lock(_mutex);
+  return tempCorrection;
+}
+bool ConfigManager::isTempCorrectionEnabled() const
+{
+  LockGuard lock(_mutex);
+  return tempCorrectionEnabled;
+}
+bool ConfigManager::isDST() const
+{
+  LockGuard lock(_mutex);
+  return isDst;
+}
+String ConfigManager::getBackgroundColor() const
+{
+  LockGuard lock(_mutex);
+  return backgroundColor;
+}
+String ConfigManager::getTimeColor() const
+{
+  LockGuard lock(_mutex);
+  return timeColor;
+}
+String ConfigManager::getTodColor() const
+{
+  LockGuard lock(_mutex);
+  return todColor;
+}
+String ConfigManager::getSecondsColor() const
+{
+  LockGuard lock(_mutex);
+  return secondsColor;
+}
+String ConfigManager::getDayOfWeekColor() const
+{
+  LockGuard lock(_mutex);
+  return dayOfWeekColor;
+}
+String ConfigManager::getDateColor() const
+{
+  LockGuard lock(_mutex);
+  return dateColor;
+}
+String ConfigManager::getTempColor() const
+{
+  LockGuard lock(_mutex);
+  return tempColor;
+}
+String ConfigManager::getHumidityColor() const
+{
+  LockGuard lock(_mutex);
+  return humidityColor;
+}
+String ConfigManager::getAlarmIconColor() const
+{
+  LockGuard lock(_mutex);
+  return alarmIconColor;
+}
+String ConfigManager::getSnoozeIconColor() const
+{
+  LockGuard lock(_mutex);
+  return snoozeIconColor;
+}
+String ConfigManager::getAlarmTextColor() const
+{
+  LockGuard lock(_mutex);
+  return alarmTextColor;
+}
+String ConfigManager::getErrorTextColor() const
+{
+  LockGuard lock(_mutex);
+  return errorTextColor;
+}
+String ConfigManager::getWeatherTempColor() const
+{
+  LockGuard lock(_mutex);
+  return weatherTempColor;
+}
+String ConfigManager::getWeatherForecastColor() const
+{
+  LockGuard lock(_mutex);
+  return weatherForecastColor;
+}
+int8_t ConfigManager::getRingingAlarmId() const
+{
+  LockGuard lock(_mutex);
+  return ringingAlarmId;
+}
+uint32_t ConfigManager::getRingingAlarmStartTimestamp() const
+{
+  LockGuard lock(_mutex);
+  return ringingAlarmStartTimestamp;
+}
+bool ConfigManager::areWifiCredsValid() const
+{
+  LockGuard lock(_mutex);
+  return wifiCredsValid;
+}
+String ConfigManager::getZipCode() const
+{
+  LockGuard lock(_mutex);
+  return zipCode;
+}
+std::vector<int> ConfigManager::getEnabledPages() const
+{
+  LockGuard lock(_mutex);
+  return enabledPages;
+}
+int ConfigManager::getDefaultPage() const
+{
+  LockGuard lock(_mutex);
+  return defaultPage;
+}
+float ConfigManager::getLat() const
+{
+  LockGuard lock(_mutex);
+  return lat;
+}
+float ConfigManager::getLon() const
+{
+  LockGuard lock(_mutex);
+  return lon;
+}
+bool ConfigManager::isDirty() const
+{
+  LockGuard lock(_mutex);
+  return _isDirty;
+}
+void ConfigManager::clearDirtyFlag()
+{
+  LockGuard lock(_mutex);
+  _isDirty = false;
+}
+
+// Setters - Implemented here to properly manage locking
+
+void ConfigManager::setWifiSSID(const String &ssid)
+{
+  {
+    LockGuard lock(_mutex);
+    wifiSSID = ssid;
+    wifiCredsValid = false;
+    _isDirty = true;
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setWifiPassword(const String &password)
+{
+  {
+    LockGuard lock(_mutex);
+    wifiPassword = password;
+    wifiCredsValid = false;
+    _isDirty = true;
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setHostname(const String &name)
+{
+  {
+    LockGuard lock(_mutex);
+    hostname = name;
+    _isDirty = true;
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setWifiCredsValid(bool valid)
+{
+  {
+    LockGuard lock(_mutex);
+    if (wifiCredsValid != valid)
+    {
+      wifiCredsValid = valid;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setTempCorrectionEnabled(bool enabled)
+{
+  {
+    LockGuard lock(_mutex);
+    if (tempCorrectionEnabled != enabled)
+    {
+      tempCorrectionEnabled = enabled;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setTempCorrection(float value)
+{
+  {
+    LockGuard lock(_mutex);
+    if (tempCorrection != value)
+    {
+      tempCorrection = value;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setZipCode(const String &zip)
+{
+  {
+    LockGuard lock(_mutex);
+    if (zipCode != zip)
+    {
+      zipCode = zip;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setEnabledPages(const std::vector<int> &pages)
+{
+  {
+    LockGuard lock(_mutex);
+    enabledPages = pages;
+    _isDirty = true;
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setDefaultPage(int page)
+{
+  {
+    LockGuard lock(_mutex);
+    if (defaultPage != page)
+    {
+      defaultPage = page;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setLat(float latitude)
+{
+  {
+    LockGuard lock(_mutex);
+    if (lat != latitude)
+    {
+      lat = latitude;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setLon(float longitude)
+{
+  {
+    LockGuard lock(_mutex);
+    if (lon != longitude)
+    {
+      lon = longitude;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setDST(bool active)
+{
+  {
+    LockGuard lock(_mutex);
+    if (isDst != active)
+    {
+      isDst = active;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setInvertColors(bool inverted)
+{
+  {
+    LockGuard lock(_mutex);
+    if (invertColors != inverted)
+    {
+      invertColors = inverted;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setSnoozeDuration(uint8_t duration)
+{
+  {
+    LockGuard lock(_mutex);
+    if (snoozeDuration != duration)
+    {
+      snoozeDuration = duration;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setDismissDuration(uint8_t duration)
+{
+  {
+    LockGuard lock(_mutex);
+    if (dismissDuration != duration)
+    {
+      dismissDuration = duration;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setRingingAlarmId(int8_t id)
+{
+  LockGuard lock(_mutex);
+  if (ringingAlarmId != id)
+  {
+    ringingAlarmId = id;
+  }
+}
+
+void ConfigManager::setRingingAlarmStartTimestamp(uint32_t timestamp)
+{
+  LockGuard lock(_mutex);
+  if (ringingAlarmStartTimestamp != timestamp)
+  {
+    ringingAlarmStartTimestamp = timestamp;
+  }
+}
+
+void ConfigManager::setScreenFlipped(bool flipped)
+{
+  {
+    LockGuard lock(_mutex);
+    if (screenFlipped != flipped)
+    {
+      screenFlipped = flipped;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setAutoBrightness(bool enabled)
+{
+  {
+    LockGuard lock(_mutex);
+    if (autoBrightness != enabled)
+    {
+      autoBrightness = enabled;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setBrightness(uint8_t value)
+{
+  {
+    LockGuard lock(_mutex);
+    if (brightness != value)
+    {
+      brightness = value;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setAutoBrightnessStartHour(uint8_t value)
+{
+  {
+    LockGuard lock(_mutex);
+    if (autoBrightnessStartHour != value)
+    {
+      autoBrightnessStartHour = value;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setAutoBrightnessEndHour(uint8_t value)
+{
+  {
+    LockGuard lock(_mutex);
+    if (autoBrightnessEndHour != value)
+    {
+      autoBrightnessEndHour = value;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setDayBrightness(uint8_t value)
+{
+  {
+    LockGuard lock(_mutex);
+    if (dayBrightness != value)
+    {
+      dayBrightness = value;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setNightBrightness(uint8_t value)
+{
+  {
+    LockGuard lock(_mutex);
+    if (nightBrightness != value)
+    {
+      nightBrightness = value;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::set24HourFormat(bool enabled)
+{
+  {
+    LockGuard lock(_mutex);
+    if (use24HourFormat != enabled)
+    {
+      use24HourFormat = enabled;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setCelsius(bool enabled)
+{
+  {
+    LockGuard lock(_mutex);
+    if (useCelsius != enabled)
+    {
+      useCelsius = enabled;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setTimezone(const String &tz)
+{
+  {
+    LockGuard lock(_mutex);
+    if (timezone != tz)
+    {
+      timezone = tz;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setBackgroundColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (backgroundColor != color)
+    {
+      backgroundColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setTimeColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (timeColor != color)
+    {
+      timeColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setTodColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (todColor != color)
+    {
+      todColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setSecondsColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (secondsColor != color)
+    {
+      secondsColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setDayOfWeekColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (dayOfWeekColor != color)
+    {
+      dayOfWeekColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setDateColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (dateColor != color)
+    {
+      dateColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setTempColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (tempColor != color)
+    {
+      tempColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setHumidityColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (humidityColor != color)
+    {
+      humidityColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setAlarmIconColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (alarmIconColor != color)
+    {
+      alarmIconColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setSnoozeIconColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (snoozeIconColor != color)
+    {
+      snoozeIconColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setAlarmTextColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (alarmTextColor != color)
+    {
+      alarmTextColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setErrorTextColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (errorTextColor != color)
+    {
+      errorTextColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setWeatherTempColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (weatherTempColor != color)
+    {
+      weatherTempColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setWeatherForecastColor(const String &color)
+{
+  {
+    LockGuard lock(_mutex);
+    if (weatherForecastColor != color)
+    {
+      weatherForecastColor = color;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
 }
