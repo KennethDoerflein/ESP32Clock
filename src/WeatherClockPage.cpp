@@ -242,8 +242,8 @@ void WeatherClockPage::drawWeather(TFT_eSPI &tft)
     // Degree Circle
     int circleRadius = 3;
     int circleX = currentX + circleRadius + 6;
-    int degreeCenterY = centerY - 15;
-    int unitTextY = centerY - 8;
+    int degreeCenterY = centerY - 18;
+    int unitTextY = centerY - 7;
 
     _sprWeather.fillCircle(circleX, degreeCenterY, circleRadius, tempColor);
 
