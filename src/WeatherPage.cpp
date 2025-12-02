@@ -159,14 +159,14 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
   tft.drawString("Humidity", rightColX, gridY, 4);
   tft.drawString(String(data.humidity, 0) + "%", rightColX, gridY + 25, 4);
 
-  // Row 2: Wind & Pressure
+  // Row 2: Wind & Rain Chance
   gridY += rowSpacing;
 
   tft.drawString("Wind", leftColX, gridY, 4);
   tft.drawString(String(windSpeed, 1) + " " + windUnit, leftColX, gridY + 25, 4);
 
-  tft.drawString("Pressure", rightColX, gridY, 4);
-  tft.drawString(String(data.pressure, 0) + " hPa", rightColX, gridY + 25, 4);
+  tft.drawString("Rain Chance", rightColX, gridY, 4);
+  tft.drawString(String(data.rainChance) + "%", rightColX, gridY + 25, 4);
 
   // Location
   tft.setTextDatum(MC_DATUM);

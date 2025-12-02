@@ -1,6 +1,7 @@
 #include "WeatherService.h"
 #include "ConfigManager.h"
 #include "SerialLog.h"
+#include "TimeManager.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -398,7 +399,10 @@ void WeatherService::updateWeather()
 
   String url = "https://api.open-meteo.com/v1/forecast?latitude=" + String(lat, 4) +
                "&longitude=" + String(lon, 4) +
-               "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,pressure_msl,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch";
+               "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m" +
+               "&hourly=precipitation_probability" +
+               "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch" +
+               "&forecast_days=1&timezone=auto";
 
   SerialLog::getInstance().printf("Fetching Weather: %s\n", url.c_str());
 
@@ -410,7 +414,17 @@ void WeatherService::updateWeather()
   {
     String payload = http.getString();
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payload);
+
+    // Filter to reduce memory usage
+    JsonDocument filter;
+    filter["current"]["temperature_2m"] = true;
+    filter["current"]["apparent_temperature"] = true;
+    filter["current"]["relative_humidity_2m"] = true;
+    filter["current"]["wind_speed_10m"] = true;
+    filter["current"]["weather_code"] = true;
+    filter["hourly"]["precipitation_probability"] = true;
+
+    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
     if (!error)
     {
@@ -418,8 +432,25 @@ void WeatherService::updateWeather()
       float feelsLike = doc["current"]["apparent_temperature"];
       float humidity = doc["current"]["relative_humidity_2m"];
       float windSpeed = doc["current"]["wind_speed_10m"];
-      float pressure = doc["current"]["pressure_msl"];
       int code = doc["current"]["weather_code"];
+
+      int rainChance = 0;
+      JsonArray hourlyPrecip = doc["hourly"]["precipitation_probability"];
+
+      if (!hourlyPrecip.isNull() && hourlyPrecip.size() > 0)
+      {
+        // Get the current hour to find the correct forecast
+        int currentHour = TimeManager::getInstance().getHour();
+
+        if (currentHour >= 0 && currentHour < hourlyPrecip.size())
+        {
+          rainChance = hourlyPrecip[currentHour].as<int>();
+        }
+        else
+        {
+          SerialLog::getInstance().printf("Warning: Invalid hour (%d) for precip forecast.\n", currentHour);
+        }
+      }
 
       {
         LockGuard lock(_mutex);
@@ -427,7 +458,7 @@ void WeatherService::updateWeather()
         _currentWeather.feelsLike = feelsLike;
         _currentWeather.humidity = humidity;
         _currentWeather.windSpeed = windSpeed;
-        _currentWeather.pressure = pressure;
+        _currentWeather.rainChance = rainChance;
         _currentWeather.condition = getConditionFromWMO(code);
         _currentWeather.isValid = true;
       }

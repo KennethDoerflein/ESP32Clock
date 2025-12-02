@@ -10,7 +10,7 @@ struct WeatherData
   float feelsLike = 0.0;
   float humidity = 0.0;
   float windSpeed = 0.0;
-  float pressure = 0.0;
+  int rainChance = 0;
   String condition = "";
   bool isValid = false;
 };
