@@ -76,10 +76,10 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
     tft.setTextDatum(MC_DATUM);
     tft.drawString("No Weather Data", tft.width() / 2, tft.height() / 2, 4);
 
-    String zip = ConfigManager::getInstance().getZipCode();
-    if (zip.length() == 0)
+    String address = ConfigManager::getInstance().getAddress();
+    if (address.length() == 0)
     {
-      tft.drawString("Set Zip Code", tft.width() / 2, tft.height() / 2 + 30, 2);
+      tft.drawString("Set Address", tft.width() / 2, tft.height() / 2 + 30, 2);
     }
     else
     {
@@ -170,7 +170,7 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
 
   // Location
   tft.setTextDatum(MC_DATUM);
-  tft.drawString(ConfigManager::getInstance().getZipCode(), tft.width() / 2, 20, 2);
+  tft.drawString(ConfigManager::getInstance().getAddress(), tft.width() / 2, 20, 2);
 
   // Attribution
   tft.setTextColor(tft.color565(100, 100, 100), bg); // Dim gray

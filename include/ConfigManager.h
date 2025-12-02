@@ -52,7 +52,7 @@ static constexpr float DEFAULT_TEMP_CORRECTION = 0.0;
 static constexpr bool DEFAULT_IS_DST = false;
 static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
 static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
-static constexpr const char *DEFAULT_ZIP_CODE = "";
+static constexpr const char *DEFAULT_ADDRESS = "";
 static constexpr int DEFAULT_DEFAULT_PAGE = 0;
 static constexpr float DEFAULT_LAT = 0.0;
 static constexpr float DEFAULT_LON = 0.0;
@@ -397,16 +397,16 @@ public:
   void setTempCorrection(float value);
 
   /**
-   * @brief Gets the stored Zip Code.
-   * @return The Zip Code as a String.
+   * @brief Gets the stored Address/Location.
+   * @return The Address as a String.
    */
-  String getZipCode() const;
+  String getAddress() const;
 
   /**
-   * @brief Sets the Zip Code.
-   * @param zip The new Zip Code.
+   * @brief Sets the Address/Location.
+   * @param address The new Address.
    */
-  void setZipCode(const String &zip);
+  void setAddress(const String &address);
 
   /**
    * @brief Gets the enabled pages and their order.
@@ -716,7 +716,7 @@ private:
   bool isDst = DEFAULT_IS_DST;
   uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
   uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;
-  String zipCode = DEFAULT_ZIP_CODE;
+  String address = DEFAULT_ADDRESS;
   std::vector<int> enabledPages;
   int defaultPage = DEFAULT_DEFAULT_PAGE;
   float lat = DEFAULT_LAT;

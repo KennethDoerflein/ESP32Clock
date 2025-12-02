@@ -69,6 +69,45 @@ String getConditionFromWMO(int code)
   }
 }
 
+// Helper to URL encode a string
+String urlEncode(String str)
+{
+  String encodedString = "";
+  char c;
+  char code0;
+  char code1;
+  for (int i = 0; i < str.length(); i++)
+  {
+    c = str.charAt(i);
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+    {
+      encodedString += c;
+    }
+    else if (c == ' ')
+    {
+      encodedString += '+';
+    }
+    else
+    {
+      code1 = (c & 0xf) + '0';
+      if ((c & 0xf) > 9)
+      {
+        code1 = (c & 0xf) - 10 + 'A';
+      }
+      c = (c >> 4) & 0xf;
+      code0 = (c) + '0';
+      if (c > 9)
+      {
+        code0 = (c)-10 + 'A';
+      }
+      encodedString += '%';
+      encodedString += code0;
+      encodedString += code1;
+    }
+  }
+  return encodedString;
+}
+
 WeatherService::WeatherService() : _lastUpdate(0), _lastLocationUpdate(0), _weatherTaskHandle(NULL)
 {
   _mutex = xSemaphoreCreateMutex();
@@ -126,63 +165,211 @@ WeatherData WeatherService::getCurrentWeather() const
   return _currentWeather;
 }
 
-void WeatherService::updateLocation()
+struct StateMap
 {
-  if (WiFi.status() != WL_CONNECTED)
+  const char *name;
+  const char *code;
+};
+
+const StateMap US_STATES[] = {
+    {"alabama", "al"}, {"alaska", "ak"}, {"arizona", "az"}, {"arkansas", "ar"}, {"california", "ca"}, {"colorado", "co"}, {"connecticut", "ct"}, {"delaware", "de"}, {"florida", "fl"}, {"georgia", "ga"}, {"hawaii", "hi"}, {"idaho", "id"}, {"illinois", "il"}, {"indiana", "in"}, {"iowa", "ia"}, {"kansas", "ks"}, {"kentucky", "ky"}, {"louisiana", "la"}, {"maine", "me"}, {"maryland", "md"}, {"massachusetts", "ma"}, {"michigan", "mi"}, {"minnesota", "mn"}, {"mississippi", "ms"}, {"missouri", "mo"}, {"montana", "mt"}, {"nebraska", "ne"}, {"nevada", "nv"}, {"new hampshire", "nh"}, {"new jersey", "nj"}, {"new mexico", "nm"}, {"new york", "ny"}, {"north carolina", "nc"}, {"north dakota", "nd"}, {"ohio", "oh"}, {"oklahoma", "ok"}, {"oregon", "or"}, {"pennsylvania", "pa"}, {"rhode island", "ri"}, {"south carolina", "sc"}, {"south dakota", "sd"}, {"tennessee", "tn"}, {"texas", "tx"}, {"utah", "ut"}, {"vermont", "vt"}, {"virginia", "va"}, {"washington", "wa"}, {"west virginia", "wv"}, {"wisconsin", "wi"}, {"wyoming", "wy"}, {"district of columbia", "dc"}};
+
+// Check if a word exists in text as a whole word
+bool checkWordPresence(const String &text, const String &word)
+{
+  int index = -1;
+  while ((index = text.indexOf(word, index + 1)) != -1)
   {
-    SerialLog::getInstance().print("WiFi not connected. Cannot update location.\n");
-    return;
+    bool startOk = (index == 0) || !isAlphaNumeric(text.charAt(index - 1));
+    bool endOk = (index + word.length() == text.length()) || !isAlphaNumeric(text.charAt(index + word.length()));
+    if (startOk && endOk)
+      return true;
   }
+  return false;
+}
 
-  String zip = ConfigManager::getInstance().getZipCode();
-  if (zip.length() == 0)
-    return;
-
-  SerialLog::getInstance().printf("Updating location for Zip: %s\n", zip.c_str());
-
+// Helper function for the search logic
+bool performGeocodingSearch(String url, String context, String &resolvedAddress, float &lat, float &lon)
+{
   HTTPClient http;
   WiFiClientSecure client;
   client.setInsecure();
 
-  // using api.zippopotam.us
-  String url = "https://api.zippopotam.us/us/" + zip;
+  SerialLog::getInstance().printf("Resolving Location: %s\n", url.c_str());
 
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+
   int httpCode = http.GET();
+  bool success = false;
 
   if (httpCode == 200)
   {
     String payload = http.getString();
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payload);
-
-    if (!error)
+    if (payload.length() > 0)
     {
-      JsonArray places = doc["places"];
-      if (places.size() > 0)
+      // Create a filter to only deserialize what we need
+      JsonDocument filter;
+      filter["results"][0]["name"] = true;
+      filter["results"][0]["latitude"] = true;
+      filter["results"][0]["longitude"] = true;
+      filter["results"][0]["country"] = true;
+      filter["results"][0]["country_code"] = true;
+      filter["results"][0]["admin1"] = true;
+
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
+
+      if (!error)
       {
-        float lat = places[0]["latitude"].as<float>();
-        float lon = places[0]["longitude"].as<float>();
+        JsonArray results = doc["results"];
+        if (results.size() > 0)
+        {
+          int bestIndex = 0;
 
-        ConfigManager::getInstance().setLat(lat);
-        ConfigManager::getInstance().setLon(lon);
+          // If we have a context string (e.g. "Paris, Texas"), try to find the best scoring match
+          if (context.length() > 0)
+          {
+            String contextLower = context;
+            contextLower.toLowerCase();
+            int maxScore = -1;
 
-        SerialLog::getInstance().printf("Location updated: %.4f, %.4f\n", lat, lon);
+            for (size_t i = 0; i < results.size(); i++)
+            {
+              String country = results[i]["country"].as<String>();
+              String countryCode = results[i]["country_code"].as<String>();
+              String admin1 = results[i]["admin1"].as<String>();
+              country.toLowerCase();
+              admin1.toLowerCase();
 
-        updateWeather(); // Force weather update immediately
+              int score = 0;
+
+              // Direct matches
+              if (admin1.length() > 0 && contextLower.indexOf(admin1) != -1)
+              {
+                score += 10;
+              }
+              if (country.length() > 0 && contextLower.indexOf(country) != -1)
+              {
+                score += 1;
+              }
+
+              // Abbreviation match for US
+              if (countryCode == "US" && admin1.length() > 0)
+              {
+                for (const auto &state : US_STATES)
+                {
+                  if (admin1 == state.name)
+                  {
+                    if (checkWordPresence(contextLower, state.code))
+                    {
+                      score += 10;
+                    }
+                    break;
+                  }
+                }
+              }
+
+              if (score > maxScore)
+              {
+                maxScore = score;
+                bestIndex = i;
+              }
+            }
+            if (maxScore > 0)
+            {
+              SerialLog::getInstance().printf("Best context match at index %d (Score: %d)\n", bestIndex, maxScore);
+            }
+          }
+
+          lat = results[bestIndex]["latitude"];
+          lon = results[bestIndex]["longitude"];
+
+          String name = results[bestIndex]["name"].as<String>();
+          String country = results[bestIndex]["country"].as<String>();
+          String admin1 = results[bestIndex]["admin1"].as<String>();
+
+          resolvedAddress = name;
+          if (admin1.length() > 0 && admin1 != name)
+            resolvedAddress += ", " + admin1;
+          if (country.length() > 0)
+            resolvedAddress += ", " + country;
+
+          success = true;
+          SerialLog::getInstance().printf("Found: %s (%.4f, %.4f)\n", resolvedAddress.c_str(), lat, lon);
+        }
+        else
+        {
+          SerialLog::getInstance().print("No results in Geocoding response.\n");
+        }
+      }
+      else
+      {
+        SerialLog::getInstance().printf("JSON Error: %s\n", error.c_str());
       }
     }
     else
     {
-      SerialLog::getInstance().print("Failed to parse location JSON\n");
+      SerialLog::getInstance().print("Empty payload received.\n");
     }
   }
   else
   {
-    SerialLog::getInstance().printf("Location update failed. HTTP Code: %d\n", httpCode);
+    SerialLog::getInstance().printf("Geocoding HTTP Failed: %d\n", httpCode);
   }
   http.end();
+  return success;
+}
+
+bool WeatherService::resolveLocation(const String &query, String &resolvedAddress, float &lat, float &lon)
+{
+  if (WiFi.status() != WL_CONNECTED || query.length() == 0)
+    return false;
+
+  String url = "https://geocoding-api.open-meteo.com/v1/search?name=" + urlEncode(query) + "&count=1&language=en&format=json";
+
+  if (performGeocodingSearch(url, "", resolvedAddress, lat, lon))
+  {
+    return true;
+  }
+
+  int commaIndex = query.indexOf(',');
+  if (commaIndex != -1)
+  {
+    String city = query.substring(0, commaIndex);
+    url = "https://geocoding-api.open-meteo.com/v1/search?name=" + urlEncode(city) + "&count=10&language=en&format=json";
+
+    if (performGeocodingSearch(url, query, resolvedAddress, lat, lon))
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void WeatherService::updateLocation()
+{
+  String address = ConfigManager::getInstance().getAddress();
+  if (address.length() == 0)
+    return;
+
+  SerialLog::getInstance().printf("Updating location for: %s\n", address.c_str());
+
+  String resolved;
+  float lat, lon;
+
+  if (resolveLocation(address, resolved, lat, lon))
+  {
+    ConfigManager::getInstance().setLat(lat);
+    ConfigManager::getInstance().setLon(lon);
+    SerialLog::getInstance().printf("Location resolved: %s (%.4f, %.4f)\n", resolved.c_str(), lat, lon);
+    updateWeather();
+  }
+  else
+  {
+    SerialLog::getInstance().print("Failed to resolve location.\n");
+  }
 }
 
 void WeatherService::updateWeather()
@@ -195,8 +382,8 @@ void WeatherService::updateWeather()
 
   if (lat == 0.0 && lon == 0.0)
   {
-    // Try to get location if we have zip
-    if (ConfigManager::getInstance().getZipCode().length() > 0)
+    // Try to get location if we have address
+    if (ConfigManager::getInstance().getAddress().length() > 0)
     {
       updateLocation();
       return;

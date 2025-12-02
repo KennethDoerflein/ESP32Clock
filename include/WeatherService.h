@@ -33,6 +33,17 @@ public:
   void notifyTaskFinished();
   void updateLocation();
 
+  /**
+   * @brief Resolves an address string to coordinates and a formatted name.
+   *
+   * @param query The address/location to search for.
+   * @param resolvedAddress Output: The formatted address found (e.g., "Paris, France").
+   * @param lat Output: Latitude.
+   * @param lon Output: Longitude.
+   * @return true if location found, false otherwise.
+   */
+  bool resolveLocation(const String &query, String &resolvedAddress, float &lat, float &lon);
+
 private:
   WeatherService();
 

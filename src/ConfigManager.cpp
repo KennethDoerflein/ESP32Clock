@@ -111,7 +111,7 @@ void ConfigManager::setDefaults()
   dismissDuration = DEFAULT_DISMISS_DURATION;
   tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
   tempCorrection = DEFAULT_TEMP_CORRECTION;
-  zipCode = DEFAULT_ZIP_CODE;
+  address = DEFAULT_ADDRESS;
   enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
   defaultPage = DEFAULT_DEFAULT_PAGE;
   lat = DEFAULT_LAT;
@@ -192,7 +192,13 @@ void ConfigManager::load()
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
   tempCorrectionEnabled = _preferences.getBool("tempCorrEn", DEFAULT_TEMP_CORRECTION_ENABLED);
   tempCorrection = _preferences.getFloat("tempCorr", DEFAULT_TEMP_CORRECTION);
-  zipCode = _preferences.getString("zipCode", DEFAULT_ZIP_CODE);
+
+  // Try to load address, fall back to zipCode for migration
+  address = _preferences.getString("address", "");
+  if (address.isEmpty())
+  {
+    address = _preferences.getString("zipCode", DEFAULT_ADDRESS);
+  }
 
   String pagesStr = _preferences.getString("pageOrder", "");
   enabledPages.clear();
@@ -347,7 +353,7 @@ bool ConfigManager::save()
   _preferences.putUChar("dismissDur", dismissDuration);
   _preferences.putBool("tempCorrEn", tempCorrectionEnabled);
   _preferences.putFloat("tempCorr", tempCorrection);
-  _preferences.putString("zipCode", zipCode);
+  _preferences.putString("address", address);
 
   String pagesStr = "";
   for (size_t i = 0; i < enabledPages.size(); ++i)
@@ -655,7 +661,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
 
     snoozeDuration = DEFAULT_SNOOZE_DURATION;
     dismissDuration = DEFAULT_DISMISS_DURATION;
-    zipCode = DEFAULT_ZIP_CODE;
+    address = DEFAULT_ADDRESS;
     enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
     defaultPage = DEFAULT_DEFAULT_PAGE;
     lat = DEFAULT_LAT;
@@ -863,10 +869,10 @@ bool ConfigManager::areWifiCredsValid() const
   RecursiveLockGuard lock(_mutex);
   return wifiCredsValid;
 }
-String ConfigManager::getZipCode() const
+String ConfigManager::getAddress() const
 {
   RecursiveLockGuard lock(_mutex);
-  return zipCode;
+  return address;
 }
 std::vector<int> ConfigManager::getEnabledPages() const
 {
@@ -972,13 +978,13 @@ void ConfigManager::setTempCorrection(float value)
   scheduleSave();
 }
 
-void ConfigManager::setZipCode(const String &zip)
+void ConfigManager::setAddress(const String &addr)
 {
   {
     RecursiveLockGuard lock(_mutex);
-    if (zipCode != zip)
+    if (address != addr)
     {
-      zipCode = zip;
+      address = addr;
       _isDirty = true;
     }
   }
