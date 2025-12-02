@@ -1711,6 +1711,14 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         saveTimeout = setTimeout(saveAllAlarms, 50);
       }
 
+      function renumberAlarms() {
+        const cards = alarmsContainer.querySelectorAll('.card');
+        cards.forEach((card, index) => {
+            const title = card.querySelector('.card-title');
+            if(title) title.textContent = `Alarm ${index + 1}`;
+        });
+      }
+
       function createAlarmCard(alarm, index) {
         const card = document.createElement("div");
         card.className = "card mb-3";
@@ -1781,6 +1789,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
              e.stopPropagation(); // Prevent collapse toggle
              if (confirm("Delete this alarm?")) {
                  card.remove();
+                 renumberAlarms();
                  handleInputChange();
              }
         });
@@ -1828,6 +1837,7 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
           if (collapseEl) {
               const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: true });
           }
+          renumberAlarms();
           handleInputChange();
       });
 
