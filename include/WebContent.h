@@ -69,7 +69,7 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
                   <div class="col-6 col-md-3">
                      <div class="p-2 border rounded bg-dark-subtle">
                        <div class="small text-muted mb-1"><i class="bi bi-droplet-half"></i> Humidity</div>
-                       <div class="h5 mb-0"><span id="humidity">--</span>%</div>
+                       <div class="h5 mb-0"><span id="humidity">--</span>%%</div>
                      </div>
                   </div>
                   <div class="col-6 col-md-3">
@@ -80,8 +80,8 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
                   </div>
                   <div class="col-6 col-md-3">
                      <div class="p-2 border rounded bg-dark-subtle">
-                       <div class="small text-muted mb-1"><i class="bi bi-speedometer2"></i> Pressure</div>
-                       <div class="h5 mb-0"><span id="pressure">--</span> <small class="text-muted" style="font-size: 0.7em">hPa</small></div>
+                       <div class="small text-muted mb-1"><i class="bi bi-cloud-rain"></i> Rain Chance</div>
+                       <div class="h5 mb-0"><span id="rainChance">--</span>%%</div>
                      </div>
                   </div>
                 </div>
@@ -114,7 +114,7 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
     const humidityEl = document.getElementById('humidity');
     const windSpeedEl = document.getElementById('wind-speed');
     const windUnitEl = document.getElementById('wind-unit');
-    const pressureEl = document.getElementById('pressure');
+    const rainChanceEl = document.getElementById('rainChance');
 
     const locationInput = document.getElementById('location-input');
     const saveLocationBtn = document.getElementById('save-location-btn');
@@ -173,7 +173,7 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
                     humidityEl.textContent = data.humidity.toFixed(0);
                     windSpeedEl.textContent = data.windSpeed.toFixed(1);
                     windUnitEl.textContent = data.windUnit;
-                    pressureEl.textContent = data.pressure.toFixed(0);
+                    rainChanceEl.textContent = data.rainChance;
 
                     weatherDisplay.classList.remove('d-none');
                     weatherError.classList.add('d-none');
@@ -220,7 +220,6 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
     
     // Refresh periodically
     setInterval(fetchWeather, 10000);
-
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

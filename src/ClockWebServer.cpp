@@ -178,12 +178,11 @@ void ClockWebServer::begin()
       doc["feelsLike"] = feelsLike;
       doc["humidity"] = data.humidity;
       doc["windSpeed"] = windSpeed;
-      doc["pressure"] = data.pressure;
+      doc["rainChance"] = data.rainChance;
       doc["condition"] = data.condition;
       doc["isValid"] = data.isValid;
       doc["unit"] = isMetric ? "C" : "F";
       doc["windUnit"] = isMetric ? "km/h" : "mph";
-      doc["pressureUnit"] = "hPa";
       
       String response;
       serializeJson(doc, response);
