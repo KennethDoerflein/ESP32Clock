@@ -384,12 +384,17 @@ bool ConfigManager::save()
   _preferences.putString("weaFcstClr", weatherForecastColor);
 
   // Save alarms
-  int oldNumAlarms = _preferences.getInt("numAlarms", 0);
+  int oldNumAlarms = _preferences.getInt("numAlarms", -1);
+  if (oldNumAlarms == -1)
+  {
+    oldNumAlarms = LEGACY_ALARMS_COUNT;
+  }
+
   _preferences.putInt("numAlarms", _alarms.size());
   _preferences.putInt("nextAlarmId", _nextAlarmId);
 
   // Clean up orphaned alarms if the number of alarms has decreased
-  if (_alarms.size() < oldNumAlarms)
+  if ((int)_alarms.size() < oldNumAlarms)
   {
     for (int i = _alarms.size(); i < oldNumAlarms; ++i)
     {
