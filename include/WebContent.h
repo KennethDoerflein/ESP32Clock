@@ -45,6 +45,14 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
     <div class="card shadow-sm">
       <div class="card-body">
         <h1 class="card-title text-center mb-4">Weather</h1>
+
+        <div class="mb-4">
+             <label for="location-input" class="form-label">Location</label>
+             <div class="input-group">
+                <input type="text" class="form-control" id="location-input" placeholder="e.g. New York, NY" value="%ADDRESS%">
+                <button class="btn btn-outline-primary" type="button" id="save-location-btn">Save Location</button>
+             </div>
+        </div>
         
         <div class="text-center mb-4">
             <div id="weather-display" class="d-none">
@@ -107,6 +115,50 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
     const windSpeedEl = document.getElementById('wind-speed');
     const windUnitEl = document.getElementById('wind-unit');
     const pressureEl = document.getElementById('pressure');
+
+    const locationInput = document.getElementById('location-input');
+    const saveLocationBtn = document.getElementById('save-location-btn');
+
+    saveLocationBtn.addEventListener('click', () => {
+        const address = locationInput.value;
+        saveLocationBtn.disabled = true;
+        saveLocationBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        
+        const formData = new FormData();
+        formData.append('address', address);
+
+        fetch('/api/weather/location', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                 if (data.success) {
+                     saveLocationBtn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Saved';
+                     saveLocationBtn.classList.remove('btn-outline-primary');
+                     saveLocationBtn.classList.add('btn-success');
+                     
+                     if (data.resolvedAddress) {
+                        locationInput.value = data.resolvedAddress;
+                     }
+                     
+                     
+                     setTimeout(() => {
+                        saveLocationBtn.disabled = false;
+                        saveLocationBtn.textContent = 'Save Location';
+                        saveLocationBtn.classList.remove('btn-success');
+                        saveLocationBtn.classList.add('btn-outline-primary');
+                        syncBtn.click(); // Trigger sync
+                     }, 1500);
+                 } else {
+                     alert(data.message || 'Failed to save location');
+                     saveLocationBtn.disabled = false;
+                     saveLocationBtn.textContent = 'Save Location';
+                 }
+            })
+            .catch(e => {
+                alert('Error: ' + e);
+                saveLocationBtn.disabled = false;
+                saveLocationBtn.textContent = 'Save Location';
+            });
+    });
 
     function fetchWeather() {
         fetch('/api/weather')
@@ -958,10 +1010,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   </select>
                 </div>
                 <div class="mb-3 p-3 border rounded">
-                  <label for="zip-code" class="form-label">Zip Code (for Weather)</label>
-                  <input type="text" class="form-control" id="zip-code" name="zipCode" placeholder="e.g. 10001" value="%ZIP_CODE%">
-                </div>
-                <div class="mb-3 p-3 border rounded">
                   <label class="form-label">Page Cycle Order</label>
                   <div class="text-muted small mb-2">
                     Check to enable. Use arrows to reorder.
@@ -1101,7 +1149,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const screenFlippedEl = document.getElementById("screen-flipped");
       const invertColorsEl = document.getElementById("invert-colors");
       const timezoneEl = document.getElementById("timezone-select");
-      const zipCodeEl = document.getElementById("zip-code");
       const defaultPageEl = document.getElementById("default-page");
       const pageOrderListEl = document.getElementById("page-order-list");
       const colorPickers = displaySettingsForm.querySelectorAll('input[type="color"]');
@@ -1291,7 +1338,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         screenFlippedEl.checked = settings.screenFlipped || false;
         invertColorsEl.checked = settings.invertColors || false;
         timezoneEl.value = settings.timezone || "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
-        zipCodeEl.value = settings.zipCode || "";
         defaultPageEl.value = settings.defaultPage || 0;
         document.getElementById('snooze-duration').value = settings.snoozeDuration || 9;
         document.getElementById('dismiss-duration').value = settings.dismissDuration || 3;
@@ -1373,7 +1419,6 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           screenFlipped: screenFlippedEl.checked,
           invertColors: invertColorsEl.checked,
           timezone: timezoneEl.value,
-          zipCode: zipCodeEl.value,
           defaultPage: parseInt(defaultPageEl.value),
           enabledPages: getEnabledPagesFromUI(),
           snoozeDuration: parseInt(document.getElementById('snooze-duration').value),

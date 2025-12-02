@@ -117,6 +117,46 @@ void ClockWebServer::begin()
                                 { return processor(var); }); });
 
     // --- API Handlers for Weather ---
+    server.on("/api/weather/location", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+        if (request->hasParam("address", true)) {
+            String address = request->getParam("address", true)->value();
+            
+            if (address.length() == 0) {
+               // Clear location
+               ConfigManager::getInstance().setAddress("");
+               ConfigManager::getInstance().setLat(0.0);
+               ConfigManager::getInstance().setLon(0.0);
+               request->send(200, "application/json", "{\"success\":true,\"resolvedAddress\":\"\",\"message\":\"Location cleared.\"}");
+               return;
+            }
+
+            String resolvedAddress;
+            float lat, lon;
+            
+            if (WeatherService::getInstance().resolveLocation(address, resolvedAddress, lat, lon)) {
+                ConfigManager::getInstance().setAddress(resolvedAddress);
+                ConfigManager::getInstance().setLat(lat);
+                ConfigManager::getInstance().setLon(lon);
+                
+                // Trigger weather update
+                WeatherService::getInstance().updateWeather();
+                
+                JsonDocument doc;
+                doc["success"] = true;
+                doc["resolvedAddress"] = resolvedAddress;
+                doc["message"] = "Location found: " + resolvedAddress;
+                
+                String response;
+                serializeJson(doc, response);
+                request->send(200, "application/json", response);
+            } else {
+                request->send(200, "application/json", "{\"success\":false,\"message\":\"Location not found.\"}");
+            }
+        } else {
+            request->send(400, "application/json", "{\"success\":false,\"message\":\"Missing address parameter.\"}");
+        } });
+
     server.on("/api/weather", HTTP_GET, [](AsyncWebServerRequest *request)
               {
       auto& weatherService = WeatherService::getInstance();
@@ -294,7 +334,7 @@ void ClockWebServer::begin()
       doc["screenFlipped"] = config.isScreenFlipped();
       doc["invertColors"] = config.isInvertColors();
       doc["timezone"] = config.getTimezone();
-      doc["zipCode"] = config.getZipCode();
+      doc["address"] = config.getAddress();
       
       JsonArray pagesArray = doc["enabledPages"].to<JsonArray>();
       for (int pageId : config.getEnabledPages()) {
@@ -351,7 +391,7 @@ void ClockWebServer::begin()
             {
               auto &config = ConfigManager::getInstance();
               String oldTimezone = config.getTimezone();
-              String oldZipCode = config.getZipCode();
+              String oldAddress = config.getAddress();
               bool oldScreenFlipped = config.isScreenFlipped();
               bool oldInvertColors = config.isInvertColors();
               float oldTempCorrection = config.getTempCorrection();
@@ -367,7 +407,6 @@ void ClockWebServer::begin()
               config.setScreenFlipped(doc["screenFlipped"]);
               config.setInvertColors(doc["invertColors"]);
               config.setTimezone(doc["timezone"]);
-              config.setZipCode(doc["zipCode"]);
 
               if (doc["enabledPages"].is<JsonArray>())
               {
@@ -405,11 +444,6 @@ void ClockWebServer::begin()
               if (oldTempCorrection != config.getTempCorrection() || oldTempCorrectionEnabled != config.isTempCorrectionEnabled())
               {
                 handleSensorUpdates(true);
-              }
-
-              if (oldZipCode != config.getZipCode())
-              {
-                WeatherService::getInstance().updateLocation();
               }
 
               request->send(200, "text/plain", "Settings saved!");
@@ -956,6 +990,10 @@ String ClockWebServer::processor(const String &var)
   {
     return SERIAL_LOG_SCRIPT_JS;
   }
+  if (var == "ADDRESS")
+  {
+    return ConfigManager::getInstance().getAddress();
+  }
 
   return String();
 }
@@ -1070,9 +1108,6 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.isTempCorrectionEnabled() ? "checked" : "";
   if (var == "TEMP_CORRECTION_CONTROLS_CLASS")
     return config.isTempCorrectionEnabled() ? "" : "d-none";
-
-  if (var == "ZIP_CODE")
-    return config.getZipCode();
 
   if (var == "DEFAULT_PAGE_SELECTED_0")
     return config.getDefaultPage() == 0 ? "selected" : "";
