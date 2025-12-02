@@ -79,6 +79,11 @@ public:
    */
   static const char *getLogFilePath() { return LOG_FILE_PATH; }
 
+  /**
+   * @brief Logs the reason for the last reset.
+   */
+  void logResetReason();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.

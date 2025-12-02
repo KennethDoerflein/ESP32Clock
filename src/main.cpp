@@ -32,6 +32,7 @@
 #include "ButtonManager.h"
 #include "WeatherService.h"
 #include "UpdateManager.h"
+#include <esp_task_wdt.h>
 #if __has_include("version.h")
 // This file exists, so we'll include it.
 #include "version.h"
@@ -186,6 +187,7 @@ void handleBootButton()
 void logicTask(void *pvParameters)
 {
   SerialLog::getInstance().print("Logic Task started on Core 0\n");
+  esp_task_wdt_add(NULL); // Add this task to the WDT
 
   auto &wifiManager = WiFiManager::getInstance();
   auto &timeManager = TimeManager::getInstance();
@@ -216,6 +218,7 @@ void logicTask(void *pvParameters)
 
     // Yield to prevent watchdog triggers
     vTaskDelay(pdMS_TO_TICKS(10));
+    esp_task_wdt_reset(); // Feed the watchdog
   }
 }
 
@@ -237,6 +240,14 @@ void setup()
   {
     Serial.println("LittleFS Mounted Successfully");
   }
+
+  // Log the reset reason immediately after FS mount
+  logger.logResetReason();
+
+  // Initialize Task Watchdog Timer (TWDT)
+  // 30 seconds timeout, true = panic (reset) on timeout
+  esp_task_wdt_init(30, true);
+  esp_task_wdt_add(NULL); // Add the main task (Core 1) to the WDT
 
   bool displayInitialized = false;
   // Initialize ConfigManager.
@@ -408,6 +419,8 @@ void setup()
  */
 void loop()
 {
+  esp_task_wdt_reset(); // Feed the watchdog
+
   // Implement a non-blocking delay to prevent watchdog timeouts.
   unsigned long currentMillis = millis();
   if (currentMillis - g_lastLoopTime < LOOP_INTERVAL)
