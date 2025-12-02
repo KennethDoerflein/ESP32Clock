@@ -180,6 +180,38 @@ void ClockWebServer::begin()
       doc["windSpeed"] = windSpeed;
       doc["rainChance"] = data.rainChance;
       doc["condition"] = data.condition;
+      
+      doc["uvIndex"] = data.uvIndex;
+      doc["cloudCover"] = data.cloudCover;
+      doc["pressure"] = data.pressure; // hPa
+      doc["visibility"] = data.visibility; // meters
+      doc["windDirection"] = data.windDirection;
+      doc["windGusts"] = isMetric ? (data.windGusts * 1.60934f) : data.windGusts; // Convert gusts if metric
+      
+      String sunrise = data.sunrise;
+      String sunset = data.sunset;
+
+      if (!ConfigManager::getInstance().is24HourFormat()) {
+          auto to12h = [](String time) -> String {
+              int sep = time.indexOf(':');
+              if (sep == -1) return time;
+              int h = time.substring(0, sep).toInt();
+              String m = time.substring(sep + 1);
+              String suffix = " AM";
+              if (h >= 12) {
+                  suffix = " PM";
+                  if (h > 12) h -= 12;
+              }
+              if (h == 0) h = 12;
+              return String(h) + ":" + m + suffix;
+          };
+          sunrise = to12h(sunrise);
+          sunset = to12h(sunset);
+      }
+
+      doc["sunrise"] = sunrise;
+      doc["sunset"] = sunset;
+
       doc["isValid"] = data.isValid;
       doc["unit"] = isMetric ? "C" : "F";
       doc["windUnit"] = isMetric ? "km/h" : "mph";

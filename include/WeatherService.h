@@ -12,6 +12,16 @@ struct WeatherData
   float windSpeed = 0.0;
   int rainChance = 0;
   String condition = "";
+
+  float uvIndex = 0.0;
+  int cloudCover = 0;
+  float pressure = 0.0;
+  float visibility = 0.0;
+  int windDirection = 0;
+  float windGusts = 0.0;
+  String sunrise = "";
+  String sunset = "";
+
   bool isValid = false;
 };
 

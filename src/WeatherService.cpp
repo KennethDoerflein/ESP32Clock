@@ -8,7 +8,7 @@
 #include <ArduinoJson.h>
 #include "LockGuard.h"
 
-static const unsigned long WEATHER_UPDATE_INTERVAL = 15 * 60 * 1000; // 15 minutes
+static const unsigned long WEATHER_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
 void weatherUpdateTask(void *parameter)
 {
@@ -399,8 +399,10 @@ void WeatherService::updateWeather()
 
   String url = "https://api.open-meteo.com/v1/forecast?latitude=" + String(lat, 4) +
                "&longitude=" + String(lon, 4) +
-               "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m" +
-               "&hourly=precipitation_probability" +
+               "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m," +
+               "cloud_cover,pressure_msl,wind_direction_10m,wind_gusts_10m," +
+               "uv_index,visibility,precipitation_probability" +
+               "&daily=sunrise,sunset" +
                "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch" +
                "&forecast_days=1&timezone=auto";
 
@@ -422,7 +424,18 @@ void WeatherService::updateWeather()
     filter["current"]["relative_humidity_2m"] = true;
     filter["current"]["wind_speed_10m"] = true;
     filter["current"]["weather_code"] = true;
-    filter["hourly"]["precipitation_probability"] = true;
+
+    filter["current"]["cloud_cover"] = true;
+    filter["current"]["pressure_msl"] = true;
+    filter["current"]["wind_direction_10m"] = true;
+    filter["current"]["wind_gusts_10m"] = true;
+
+    filter["current"]["uv_index"] = true;
+    filter["current"]["visibility"] = true;
+    filter["current"]["precipitation_probability"] = true;
+
+    filter["daily"]["sunrise"] = true;
+    filter["daily"]["sunset"] = true;
 
     DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
@@ -434,22 +447,34 @@ void WeatherService::updateWeather()
       float windSpeed = doc["current"]["wind_speed_10m"];
       int code = doc["current"]["weather_code"];
 
-      int rainChance = 0;
-      JsonArray hourlyPrecip = doc["hourly"]["precipitation_probability"];
+      int cloudCover = doc["current"]["cloud_cover"] | 0;
+      float pressure = doc["current"]["pressure_msl"] | 0.0;
+      int windDirection = doc["current"]["wind_direction_10m"] | 0;
+      float windGusts = doc["current"]["wind_gusts_10m"] | 0.0;
 
-      if (!hourlyPrecip.isNull() && hourlyPrecip.size() > 0)
+      int rainChance = doc["current"]["precipitation_probability"] | 0;
+      float uvIndex = doc["current"]["uv_index"] | 0.0;
+      float visibility = doc["current"]["visibility"] | 0.0;
+
+      String sunrise = "";
+      String sunset = "";
+      if (!doc["daily"]["sunrise"].isNull() && doc["daily"]["sunrise"].size() > 0)
       {
-        // Get the current hour to find the correct forecast
-        int currentHour = TimeManager::getInstance().getHour();
-
-        if (currentHour >= 0 && currentHour < hourlyPrecip.size())
-        {
-          rainChance = hourlyPrecip[currentHour].as<int>();
-        }
+        String raw = doc["daily"]["sunrise"][0].as<String>();
+        int tIndex = raw.indexOf('T');
+        if (tIndex != -1)
+          sunrise = raw.substring(tIndex + 1);
         else
-        {
-          SerialLog::getInstance().printf("Warning: Invalid hour (%d) for precip forecast.\n", currentHour);
-        }
+          sunrise = raw;
+      }
+      if (!doc["daily"]["sunset"].isNull() && doc["daily"]["sunset"].size() > 0)
+      {
+        String raw = doc["daily"]["sunset"][0].as<String>();
+        int tIndex = raw.indexOf('T');
+        if (tIndex != -1)
+          sunset = raw.substring(tIndex + 1);
+        else
+          sunset = raw;
       }
 
       {
@@ -460,6 +485,16 @@ void WeatherService::updateWeather()
         _currentWeather.windSpeed = windSpeed;
         _currentWeather.rainChance = rainChance;
         _currentWeather.condition = getConditionFromWMO(code);
+
+        _currentWeather.uvIndex = uvIndex;
+        _currentWeather.cloudCover = cloudCover;
+        _currentWeather.pressure = pressure;
+        _currentWeather.visibility = visibility;
+        _currentWeather.windDirection = windDirection;
+        _currentWeather.windGusts = windGusts;
+        _currentWeather.sunrise = sunrise;
+        _currentWeather.sunset = sunset;
+
         _currentWeather.isValid = true;
       }
 

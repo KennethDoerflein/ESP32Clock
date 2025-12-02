@@ -84,6 +84,56 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
                        <div class="h5 mb-0"><span id="rainChance">--</span>%%</div>
                      </div>
                   </div>
+                  
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-sun"></i> UV Index</div>
+                       <div class="h5 mb-0"><span id="uvIndex">--</span></div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-clouds"></i> Cloud Cover</div>
+                       <div class="h5 mb-0"><span id="cloudCover">--</span>%%</div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-eye"></i> Visibility</div>
+                       <div class="h5 mb-0"><span id="visibility">--</span> <small class="text-muted" style="font-size: 0.7em">mi</small></div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-speedometer2"></i> Pressure</div>
+                       <div class="h5 mb-0"><span id="pressure">--</span> <small class="text-muted" style="font-size: 0.7em">hPa</small></div>
+                     </div>
+                  </div>
+
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-compass"></i> Wind Dir</div>
+                       <div class="h5 mb-0"><span id="windDirection">--</span>&deg;</div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-wind"></i> Gusts</div>
+                       <div class="h5 mb-0"><span id="windGusts">--</span> <small id="gust-unit" class="text-muted" style="font-size: 0.7em"></small></div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-sunrise"></i> Sunrise</div>
+                       <div class="h5 mb-0"><span id="sunrise">--:--</span></div>
+                     </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                     <div class="p-2 border rounded bg-dark-subtle">
+                       <div class="small text-muted mb-1"><i class="bi bi-sunset"></i> Sunset</div>
+                       <div class="h5 mb-0"><span id="sunset">--:--</span></div>
+                     </div>
+                  </div>
                 </div>
 
             </div>
@@ -115,6 +165,16 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
     const windSpeedEl = document.getElementById('wind-speed');
     const windUnitEl = document.getElementById('wind-unit');
     const rainChanceEl = document.getElementById('rainChance');
+    
+    const uvIndexEl = document.getElementById('uvIndex');
+    const cloudCoverEl = document.getElementById('cloudCover');
+    const visibilityEl = document.getElementById('visibility');
+    const pressureEl = document.getElementById('pressure');
+    const windDirectionEl = document.getElementById('windDirection');
+    const windGustsEl = document.getElementById('windGusts');
+    const gustUnitEl = document.getElementById('gust-unit');
+    const sunriseEl = document.getElementById('sunrise');
+    const sunsetEl = document.getElementById('sunset');
 
     const locationInput = document.getElementById('location-input');
     const saveLocationBtn = document.getElementById('save-location-btn');
@@ -174,6 +234,22 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
                     windSpeedEl.textContent = data.windSpeed.toFixed(1);
                     windUnitEl.textContent = data.windUnit;
                     rainChanceEl.textContent = data.rainChance;
+                    
+                    uvIndexEl.textContent = data.uvIndex.toFixed(1);
+                    cloudCoverEl.textContent = data.cloudCover;
+                    
+                    // Convert visibility meters to miles
+                    // 1 meter = 0.000621371 miles
+                    const visMiles = data.visibility * 0.000621371;
+                    visibilityEl.textContent = visMiles.toFixed(1);
+                    
+                    pressureEl.textContent = data.pressure.toFixed(0);
+                    windDirectionEl.textContent = data.windDirection;
+                    windGustsEl.textContent = data.windGusts.toFixed(1);
+                    gustUnitEl.textContent = data.windUnit;
+                    
+                    sunriseEl.textContent = data.sunrise;
+                    sunsetEl.textContent = data.sunset;
 
                     weatherDisplay.classList.remove('d-none');
                     weatherError.classList.add('d-none');
