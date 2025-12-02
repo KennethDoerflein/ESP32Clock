@@ -7,7 +7,7 @@
 #include <ArduinoJson.h>
 #include "LockGuard.h"
 
-static const unsigned long WEATHER_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+static const unsigned long WEATHER_UPDATE_INTERVAL = 15 * 60 * 1000; // 15 minutes
 
 void weatherUpdateTask(void *parameter)
 {
