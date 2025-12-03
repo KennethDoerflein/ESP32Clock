@@ -160,6 +160,13 @@ void WeatherService::notifyTaskFinished()
   _weatherTaskHandle = NULL;
 }
 
+String WeatherService::getWindDirectionStr(int degrees)
+{
+  const char *directions[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+  int index = (int)((degrees + 22.5) / 45.0) % 8;
+  return directions[index];
+}
+
 WeatherData WeatherService::getCurrentWeather() const
 {
   LockGuard lock(_mutex);

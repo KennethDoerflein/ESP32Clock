@@ -185,7 +185,7 @@ void ClockWebServer::begin()
       doc["cloudCover"] = data.cloudCover;
       doc["pressure"] = data.pressure; // hPa
       doc["visibility"] = data.visibility; // meters
-      doc["windDirection"] = data.windDirection;
+      doc["windDirection"] = WeatherService::getWindDirectionStr(data.windDirection);
       doc["windGusts"] = isMetric ? (data.windGusts * 1.60934f) : data.windGusts; // Convert gusts if metric
       
       String sunrise = data.sunrise;
