@@ -139,8 +139,8 @@ void ClockWebServer::begin()
                 ConfigManager::getInstance().setLat(lat);
                 ConfigManager::getInstance().setLon(lon);
                 
-                // Trigger weather update
-                WeatherService::getInstance().updateWeather();
+                // Trigger weather update asynchronously
+                WeatherService::getInstance().forceUpdate();
                 
                 JsonDocument doc;
                 doc["success"] = true;
@@ -222,7 +222,7 @@ void ClockWebServer::begin()
 
     server.on("/api/weather/sync", HTTP_POST, [](AsyncWebServerRequest *request)
               {
-      WeatherService::getInstance().updateWeather();
+      WeatherService::getInstance().forceUpdate();
       request->send(200, "text/plain", "Weather sync started."); });
 
     // --- API Handlers for Alarms ---
