@@ -42,7 +42,7 @@ public:
   void updateWeather();
   void notifyTaskFinished();
   void updateLocation();
-  
+
   /**
    * @brief Signals the background task to perform an immediate weather update.
    * Thread-safe and non-blocking.
@@ -72,7 +72,6 @@ private:
 
   WeatherData _currentWeather;
   unsigned long _lastUpdate;
-  unsigned long _lastLocationUpdate;
 
   mutable SemaphoreHandle_t _mutex;
   TaskHandle_t _weatherTaskHandle;

@@ -109,7 +109,7 @@ String urlEncode(String str)
   return encodedString;
 }
 
-WeatherService::WeatherService() : _lastUpdate(0), _lastLocationUpdate(0), _weatherTaskHandle(NULL)
+WeatherService::WeatherService() : _lastUpdate(0), _weatherTaskHandle(NULL)
 {
   _mutex = xSemaphoreCreateMutex();
 }
@@ -126,22 +126,18 @@ void WeatherService::loop()
 
   unsigned long now = millis();
 
-  bool isTaskRunning = false;
-  {
-    LockGuard lock(_mutex);
-    isTaskRunning = (_weatherTaskHandle != NULL);
-  }
+  // Protect the entire check-and-spawn logic with the mutex
+  LockGuard lock(_mutex);
+  bool isTaskRunning = (_weatherTaskHandle != NULL);
 
   // Check if it's time to update and if a task isn't already running
   if ((now - _lastUpdate > WEATHER_UPDATE_INTERVAL || _lastUpdate == 0) && !isTaskRunning)
   {
     _lastUpdate = now;
 
+    // Log outside of the task creation but inside the lock (SerialLog has its own mutex, this is safe)
     SerialLog::getInstance().print("Starting Weather Update Task...\n");
 
-    // Create a FreeRTOS task pinned to Core 0
-    // We protect the handle assignment
-    LockGuard lock(_mutex);
     xTaskCreatePinnedToCore(
         weatherUpdateTask,   // Function to implement the task
         "WeatherUpdate",     // Name of the task

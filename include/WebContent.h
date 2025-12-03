@@ -113,7 +113,7 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
                   <div class="col-6 col-md-3">
                      <div class="p-2 border rounded bg-dark-subtle">
                        <div class="small text-muted mb-1"><i class="bi bi-compass"></i> Wind Dir</div>
-                       <div class="h5 mb-0"><span id="windDirection">--</span>&deg;</div>
+                       <div class="h5 mb-0"><span id="windDirection">--</span></div>
                      </div>
                   </div>
                   <div class="col-6 col-md-3">
