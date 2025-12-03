@@ -44,6 +44,13 @@ public:
   void updateLocation();
 
   /**
+   * @brief Converts wind direction in degrees to a cardinal direction string.
+   * @param degrees Wind direction in degrees (0-360).
+   * @return String representing the cardinal direction (e.g., "N", "NE").
+   */
+  static String getWindDirectionStr(int degrees);
+
+  /**
    * @brief Resolves an address string to coordinates and a formatted name.
    *
    * @param query The address/location to search for.
