@@ -154,6 +154,12 @@ void WeatherService::loop()
   }
 }
 
+void WeatherService::forceUpdate()
+{
+  LockGuard lock(_mutex);
+  _lastUpdate = 0; // Resets the timer, causing loop() to trigger update immediately
+}
+
 void WeatherService::notifyTaskFinished()
 {
   LockGuard lock(_mutex);

@@ -42,6 +42,12 @@ public:
   void updateWeather();
   void notifyTaskFinished();
   void updateLocation();
+  
+  /**
+   * @brief Signals the background task to perform an immediate weather update.
+   * Thread-safe and non-blocking.
+   */
+  void forceUpdate();
 
   /**
    * @brief Converts wind direction in degrees to a cardinal direction string.
