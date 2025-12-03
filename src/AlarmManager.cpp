@@ -13,6 +13,15 @@
 #include "SerialLog.h"
 #include "ConfigManager.h"
 #include "Constants.h"
+#include "LockGuard.h"
+
+/**
+ * @brief Private constructor to enforce the singleton pattern.
+ */
+AlarmManager::AlarmManager() : _isRinging(false), _activeAlarmId(-1)
+{
+  _mutex = xSemaphoreCreateRecursiveMutex();
+}
 
 /**
  * @brief Initializes the AlarmManager.
@@ -29,6 +38,7 @@ void AlarmManager::begin()
   int8_t ringingAlarmId = ConfigManager::getInstance().getRingingAlarmId();
   if (ringingAlarmId != -1)
   {
+    RecursiveLockGuard lock(_mutex);
     _resumeAlarmOnBoot = true;
     _pendingResumeAlarmId = ringingAlarmId;
     _pendingResumeTimestamp = ConfigManager::getInstance().getRingingAlarmStartTimestamp();
@@ -46,6 +56,8 @@ void AlarmManager::begin()
  */
 void AlarmManager::update()
 {
+  RecursiveLockGuard lock(_mutex);
+
   // --- Handle deferred resume first ---
   // To ensure the system is fully stable, especially the display driver,
   // the deferred resume operation is delayed for a few seconds after boot.
@@ -125,6 +137,7 @@ void AlarmManager::update()
  */
 void AlarmManager::stop()
 {
+  RecursiveLockGuard lock(_mutex);
   if (!_isRinging)
     return;
 
@@ -155,6 +168,7 @@ void AlarmManager::stop()
  */
 bool AlarmManager::isRinging() const
 {
+  RecursiveLockGuard lock(_mutex);
   return _isRinging;
 }
 
@@ -164,6 +178,7 @@ bool AlarmManager::isRinging() const
  */
 int AlarmManager::getActiveAlarmId() const
 {
+  RecursiveLockGuard lock(_mutex);
   return _activeAlarmId;
 }
 
@@ -178,6 +193,7 @@ int AlarmManager::getActiveAlarmId() const
  */
 void AlarmManager::trigger(uint8_t alarmId)
 {
+  RecursiveLockGuard lock(_mutex);
   if (_isRinging)
     return; // Don't trigger if another is already active
 
@@ -217,6 +233,7 @@ void AlarmManager::trigger(uint8_t alarmId)
  */
 void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
 {
+  RecursiveLockGuard lock(_mutex);
   if (_isRinging)
     return;
 

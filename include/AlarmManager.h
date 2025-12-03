@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include "Alarm.h"
 #include "TimeManager.h"
+#include <freertos/semphr.h>
 
 /**
  * @class AlarmManager
@@ -72,7 +73,7 @@ private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
    */
-  AlarmManager() : _isRinging(false), _activeAlarmId(-1) {}
+  AlarmManager();
 
   // --- Enums for the alarm state machine ---
   enum RampStage
@@ -99,4 +100,6 @@ private:
   bool _resumeAlarmOnBoot = false;
   uint8_t _pendingResumeAlarmId;
   uint32_t _pendingResumeTimestamp;
+
+  mutable SemaphoreHandle_t _mutex;
 };
