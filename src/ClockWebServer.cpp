@@ -232,8 +232,8 @@ void ClockWebServer::begin()
       JsonDocument doc;
       JsonArray alarmsArray = doc.to<JsonArray>();
 
-      for (int i = 0; i < config.getNumAlarms(); ++i) {
-        Alarm alarm = config.getAlarmByIndex(i);
+      std::vector<Alarm> alarms = config.getAllAlarms();
+      for (const auto &alarm : alarms) {
         JsonObject alarmObj = alarmsArray.add<JsonObject>();
         alarmObj["id"] = alarm.getId();
         alarmObj["enabled"] = alarm.isEnabled();

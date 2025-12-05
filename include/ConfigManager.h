@@ -135,6 +135,12 @@ public:
   Alarm getAlarmById(int id) const;
 
   /**
+   * @brief Gets a thread-safe copy of all alarms.
+   * @return A vector containing all alarms.
+   */
+  std::vector<Alarm> getAllAlarms() const;
+
+  /**
    * @brief Gets the total number of alarms.
    * @return The number of alarms.
    */

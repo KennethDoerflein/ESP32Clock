@@ -87,9 +87,10 @@ void updateAlarmState()
   else
   {
     bool anySnoozed = false;
-    for (int i = 0; i < config.getNumAlarms(); ++i)
+    std::vector<Alarm> alarms = config.getAllAlarms();
+    for (const auto &alarm : alarms)
     {
-      if (config.getAlarmByIndex(i).isSnoozed())
+      if (alarm.isSnoozed())
       {
         anySnoozed = true;
         break;
@@ -575,13 +576,13 @@ void loop()
       if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > SNOOZE_DISMISS_HOLD_TIME)
       { // 3-second hold
         SerialLog::getInstance().print("Snooze active: Button held. Ending snooze.\n");
-        for (int i = 0; i < config.getNumAlarms(); ++i)
+        std::vector<Alarm> alarms = config.getAllAlarms();
+        for (auto &alarm : alarms)
         {
-          Alarm alarm = config.getAlarmByIndex(i);
           if (alarm.isSnoozed())
           {
             alarm.dismiss(timeManager.getRTCTime());
-            config.setAlarmByIndex(i, alarm);
+            config.setAlarmById(alarm.getId(), alarm);
           }
         }
         config.save();
@@ -622,9 +623,9 @@ void loop()
   // --- Update Alarm Icon (Runs regardless of WiFi connection) ---
   bool anyAlarmEnabled = false;
   bool anyAlarmSnoozed = false;
-  for (int i = 0; i < config.getNumAlarms(); ++i)
+  std::vector<Alarm> alarms = config.getAllAlarms();
+  for (const auto &alarm : alarms)
   {
-    Alarm alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled())
     {
       anyAlarmEnabled = true;
