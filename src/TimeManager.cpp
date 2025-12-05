@@ -398,17 +398,18 @@ void TimeManager::updateSnoozeStates()
     return;
   }
   auto &config = ConfigManager::getInstance();
-  for (int i = 0; i < config.getNumAlarms(); ++i)
+  std::vector<Alarm> alarms = config.getAllAlarms();
+
+  for (auto &alarm : alarms)
   {
-    Alarm alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled() && alarm.isSnoozed())
     {
       if (alarm.updateSnooze())
       {
         // Snooze is over, re-trigger the alarm
         AlarmManager::getInstance().trigger(alarm.getId());
-        // Persist the unsnoozed state
-        config.setAlarmByIndex(i, alarm);
+        // Persist the unsnoozed state by ID, as index might have changed
+        config.setAlarmById(alarm.getId(), alarm);
         config.save();
         break; // Only trigger one alarm at a time
       }
@@ -453,12 +454,13 @@ void TimeManager::checkMissedAlarms()
   DateTime t = DateTime(startTime.unixtime());
   DateTime checkTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute());
 
+  // Get a snapshot of all alarms
+  std::vector<Alarm> alarms = config.getAllAlarms();
+
   for (; checkTime <= now; checkTime = checkTime + TimeSpan(0, 0, 1, 0))
   {
-    for (int i = 0; i < config.getNumAlarms(); ++i)
+    for (const auto &alarm : alarms)
     {
-      Alarm alarm = config.getAlarmByIndex(i);
-
       if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkTime))
       {
         // This alarm should have rung. We record it as the most recent candidate.
@@ -531,9 +533,9 @@ void TimeManager::updateNextAlarmsCache(const DateTime &now)
     _lastCacheUpdateMinute = now.minute();
   }
 
-  for (int i = 0; i < config.getNumAlarms(); ++i)
+  std::vector<Alarm> alarms = config.getAllAlarms();
+  for (const auto &alarm : alarms)
   {
-    Alarm alarm = config.getAlarmByIndex(i);
     if (alarm.isEnabled())
     {
       DateTime next = calculateNextRingTime(alarm, now);

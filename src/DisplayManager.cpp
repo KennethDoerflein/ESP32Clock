@@ -326,9 +326,9 @@ void DisplayManager::renderAlarmOverlay()
   else
   {
     // Check for snoozed alarms
-    for (int i = 0; i < config.getNumAlarms(); ++i)
+    std::vector<Alarm> alarms = config.getAllAlarms();
+    for (const auto &alarm : alarms)
     {
-      Alarm alarm = config.getAlarmByIndex(i);
       if (alarm.isSnoozed())
       {
         time_t snoozeUntil = alarm.getSnoozeUntil();

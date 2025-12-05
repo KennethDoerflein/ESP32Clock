@@ -481,6 +481,16 @@ Alarm ConfigManager::getAlarmById(int id) const
 }
 
 /**
+ * @brief Gets a thread-safe copy of all alarms.
+ * @return A vector containing all alarms.
+ */
+std::vector<Alarm> ConfigManager::getAllAlarms() const
+{
+  RecursiveLockGuard lock(_mutex);
+  return _alarms;
+}
+
+/**
  * @brief Gets the total number of alarms supported.
  * @return The number of alarms.
  */
