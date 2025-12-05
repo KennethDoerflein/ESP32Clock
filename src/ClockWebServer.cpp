@@ -972,6 +972,9 @@ String formatHour(int hour, bool is24Hour)
  */
 void ClockWebServer::setupMDNS()
 {
+  // Restart the mDNS responder to ensure a clean state
+  MDNS.end();
+
   // Start the mDNS responder for ESP32Clock_XXXXXX.local
   String hostname = WiFiManager::getInstance().getHostname();
   if (MDNS.begin(hostname.c_str()))
