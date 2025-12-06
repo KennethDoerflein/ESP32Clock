@@ -1,6 +1,6 @@
 # ESP32-S3 WiFi Clock
 
-This repository contains the firmware for a feature-rich, Wi-Fi connected smart clock powered by an ESP32-S3 microcontroller. It features a large 4" color IPS display, a web-based interface for easy configuration, automatic time synchronization, and environmental sensing.
+This repository contains the firmware for a feature-rich, Wi-Fi connected smart clock powered by an ESP32-S3 microcontroller. It features a large 4" color IPS display, a web-based interface for easy configuration, automatic time synchronization, environmental sensing, and detailed weather forecasts.
 
 ## Table of Contents
 
@@ -18,21 +18,24 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 - [Features and Settings in Detail](#features-and-settings-in-detail)
 - [Project Roadmap](#project-roadmap)
 
-## Features (V1.0.0)
+## Features
 
-- **Large Color Display**: A 4" 480x320 color IPS display provides a clear and vibrant user interface, showing time, date, day of the week, temperature, and humidity.
+- **Large Color Display**: A 4" 480x320 color IPS display provides a clear and vibrant user interface.
+- **Weather Forecast**: Accurate local weather data powered by Open-Meteo, including temperature, humidity, wind speed, rain chance, and current conditions.
 - **Web-Based Configuration**: A mobile-friendly web UI allows for easy setup and configuration without needing to re-flash the firmware.
-- **Customizable UI**: Change display colors, flip the screen orientation, and toggle between 12/24-hour format and Celsius/Fahrenheit from the web interface.
+- **Dynamic Alarms**: Configure up to 20 alarms. Add, delete, and modify alarms directly from the web interface.
+- **Customizable UI**: Change display colors, flip the screen orientation, and toggle between 12/24-hour format and Celsius/Fahrenheit.
+- **Page Management**: Enable, disable, and reorder display pages (Clock, Weather, Weather+Clock, Info) to suit your preference.
 - **WiFi & AP Mode**: Connects to your local WiFi network or starts its own Access Point (`Clock-Setup`) if credentials are not set.
 - **Automatic Time Sync**: An onboard Real-Time Clock (DS3231) with battery backup keeps accurate time, synchronized daily with NTP internet servers.
 - **Timezone Support**: Select your local timezone from a dropdown list.
-- **Alarm System**: Configure up to 5 alarms with snooze and dismiss functions, progressive volume, and on-screen indicators.
 - **Temperature Sensors**: A BME280 sensor for ambient temperature and humidity, and a sensor within the DS3231 for time-drift compensation.
 - **Smart Brightness Control**: The display backlight can be controlled manually via the web UI or set to an automatic day/night schedule.
-- **Over-the-Air (OTA) Updates**: Update the clock's firmware directly from the web interface, either by uploading a binary file or pulling the latest release directly from GitHub.
-- **Persistent Storage**: All settings (WiFi credentials, display preferences) are saved to the ESP32's internal flash storage using LittleFS.
-- **mDNS Support**: Access the clock's web interface using a human-readable name (e.g., `ESP32Clock_XXXXXX.local`) instead of an IP address.
-- **Physical Factory Reset**: Two hardware-based methods to reset the device to its default settings.
+- **System Logging**: Integrated logging system with file rotation (`system.log`) and a live WebSocket-based log viewer in the web UI.
+- **Over-the-Air (OTA) Updates**: Update the clock's firmware directly from the web interface.
+- **Persistent Storage**: All settings (WiFi credentials, display preferences, alarms) are saved to the ESP32's internal flash storage.
+- **mDNS Support**: Access the clock's web interface using a human-readable name (e.g., `ESP32Clock_XXXXXX.local`).
+- **Physical Factory Reset**: Hardware-based methods to reset the device to its default settings.
 
 ---
 
@@ -179,15 +182,18 @@ The firmware is organized into a collection of singleton manager classes, each r
 - **`AlarmManager`**: Manages the physical ringing of an alarm (buzzer and display).
 - **`ClockWebServer`**: Manages the ESP32's web server for configuration and updates.
 - **`ConfigManager`**: Manages the application's configuration settings.
-- **`DisplayManager`**: Manages the active display page and orchestrates rendering.
-- **`SerialLog`**: A singleton logger that mirrors Serial output to a WebSocket.
+- **`DisplayManager`**: Manages the active display page, alarm overlays, and orchestrates rendering.
+- **`SerialLog`**: A singleton logger that mirrors Serial output to a WebSocket and a rotating log file.
 - **`TimeManager`**: Manages timekeeping, NTP synchronization, and time formatting.
 - **`UpdateManager`**: Handles OTA (Over-the-Air) firmware updates.
+- **`WeatherService`**: Handles fetching weather data and resolving locations via Open-Meteo.
 - **`WiFiManager`**: Manages WiFi connectivity for the ESP32.
 - **`Display`**: Manages the low-level TFT display and backlight.
 - **`Page`**: An abstract base class for a single display page.
   - **`ClockPage`**: A page that displays the main clock face.
-  - **`InfoPage`**: A simple page that displays static information.
+  - **`WeatherPage`**: A page that displays detailed weather conditions.
+  - **`WeatherClockPage`**: A combined page showing both time and weather.
+  - **`InfoPage`**: A simple page that displays static system information.
 
 ---
 
@@ -203,18 +209,20 @@ The firmware is organized into a collection of singleton manager classes, each r
 
 The web interface provides access to all the clock's settings. Once connected to your WiFi network, you can access the web interface by navigating to the IP address shown on the clock's display or by using its mDNS address (e.g., `http://ESP32Clock_XXXXXX.local`).
 
-The web interface is organized into several pages, accessible from the main control panel:
+The web interface is organized into several sections:
 
 - **Configure WiFi**: For connecting to your local network and setting a hostname.
-- **Alarms**: For setting and managing up to 5 alarms.
-- **Settings**: For adjusting display, time, and brightness settings.
+- **Alarms**: For setting and managing up to 20 alarms.
+- **Weather**: For configuring the location and viewing weather status.
+- **Settings**: For adjusting display, time, brightness, and page configuration.
+- **Logs**: For viewing live logs and managing log files.
 - **System**: For system-level actions like updates, reboots, and viewing system information.
 
 ### Physical Button Functions
 
 The physical button (connected to GPIO 5) serves multiple purposes depending on the context:
 
-- **Normal Operation**: A short press cycles through the available display pages (e.g., Clock, Info).
+- **Normal Operation**: A short press cycles through the available display pages (e.g., Clock, Weather, Weather+Clock).
 - **Alarm Ringing**:
   - A **short press** will **snooze** the alarm for the duration specified in the web interface.
   - **Pressing and holding** the button will **dismiss** the alarm. The required hold time can be configured in the web interface.
@@ -244,18 +252,27 @@ This page allows you to connect the clock to your local WiFi network.
 
 - **Scan for Networks**: Click the "Scan" button to see a list of available WiFi networks. Clicking on a network name will automatically fill in the SSID field.
 - **SSID & Password**: Manually enter your network's name and password.
-
 - **Save & Reboot**: Click to save the credentials to the device's persistent memory. The clock will then automatically reboot and connect to the configured network.
 - **Hostname**: You can set a custom hostname for the device on your network. This also serves as the mDNS address (e.g., `http://your-hostname.local`).
 
 ### Alarms Page
 
-- **Alarm Management**: The clock supports up to 5 configurable alarms. For each alarm, you can:
+- **Dynamic Alarms**: You can add up to 20 alarms. Click "Add Alarm" to create a new one.
+- **Alarm Management**: For each alarm, you can:
   - **Enable/Disable**: Toggle the alarm on or off.
   - **Set Time**: Configure the hour and minute.
   - **Set Repeat Days**: Choose which days of the week the alarm should be active.
+  - **Delete**: Remove an alarm permanently.
 - **Snooze Duration**: Set the number of minutes the alarm will wait before ringing again after the snooze button is pressed.
 - **Dismiss Duration**: Configure how many seconds the physical button must be held down to dismiss a ringing alarm completely.
+
+### Weather Page
+
+This page allows you to configure the location for weather forecasts.
+
+- **Location Setup**: Enter your city or address in the input field (e.g., "New York, NY" or "Paris, France") and click "Save Location".
+- **Auto-Resolve**: The system will automatically resolve the address to coordinates using the Open-Meteo Geocoding API.
+- **Units**: Weather units (Celsius/Fahrenheit) follow the global system setting defined in the Settings page.
 
 ### Settings Page
 
@@ -263,6 +280,9 @@ This page is divided into two tabs: "General" and "Display".
 
 #### General Tab
 
+- **Page Configuration**:
+  - **Default Page**: Select which page the clock should show on startup.
+  - **Enabled Pages**: Drag and drop pages to reorder them or uncheck them to hide them from the rotation.
 - **Brightness Settings**:
   - **Auto Brightness**: Enables a schedule-based brightness adjustment, with configurable start/end times and day/night brightness levels.
   - **Manual Brightness**: When Auto Brightness is disabled, a single slider allows you to set a fixed brightness level.
@@ -276,8 +296,17 @@ This page is divided into two tabs: "General" and "Display".
 
 This tab provides a set of color pickers to customize the appearance of nearly every element on the clock face.
 
-- **Customizable Elements**: Background, Time, AM/PM, Seconds, Day of the Week, Date, Temperature, and Humidity.
+- **Customizable Elements**: Background, Time, AM/PM, Seconds, Day of the Week, Date, Temperature, Humidity, and Weather elements.
 - **Reset to Defaults**: A button is provided to revert all color settings to their original values.
+
+### Logs Page
+
+This page provides tools for monitoring and debugging the system.
+
+- **Live Log**: A real-time WebSocket view of the serial log output.
+- **System Log File**:
+  - **Download**: Download the persistent `system.log` file.
+  - **Rollover**: Manually force a log file rotation (renames current to `.old` and starts fresh).
 
 ### System Page
 
@@ -286,18 +315,13 @@ This page contains tools for firmware updates and system-level commands.
 #### Firmware Update
 
 - **Manual Upload**: Update the firmware by selecting a compiled `.bin` file from your computer and clicking "Upload."
-- **GitHub Update**: The clock can automatically check for the latest release on this GitHub repository and perform an update if a newer version is available. A status message will indicate if you are on the latest version or if an update is available.
+- **GitHub Update**: The clock can automatically check for the latest release on this GitHub repository and perform an update if a newer version is available.
 
 #### System Actions
 
 - **Reboot Device**: Safely restarts the clock.
 - **Factory Reset**: Erases all stored settings (including WiFi credentials, alarms, and display preferences) and reboots the device.
-- **Factory Reset (Keep WiFi)**: Erases all settings _except_ for the saved WiFi credentials, then reboots. This is useful for resetting display or alarm settings without needing to re-configure the network connection.
-
-#### Serial Log Viewer
-
-- **Availability**: This feature is only enabled in development builds of the firmware.
-- **Functionality**: Provides a real-time stream of the ESP32's serial output directly in the web browser, which is useful for debugging.
+- **Factory Reset (Keep WiFi)**: Erases all settings _except_ for the saved WiFi credentials.
 
 #### System Information
 
@@ -321,23 +345,25 @@ This project utilizes two temperature sensors:
 
 This project is broken down into phases to prioritize a functional base clock before implementing more complex features.
 
-### Future Plans
+### V1.1.0 (Completed - moved to V2.0.0)
 
-### V1.1.0
+- [x] **Alarm Management**
+  - [x] Add/Delete alarms (Dynamic alarms).
+  - [x] Increased limit (up to 20 alarms).
+- [x] **Logging**
+  - [x] Create a log file that is stored in LittleFS.
+  - [x] The log file should be appended to and automatically roll over.
+  - [x] Live Log Viewer in Web UI.
 
-- [ ] **Alarm Management**
-  - [ ] Add/Delete alarms to have more or less than 5.
-- [ ] **Logging**
-  - [ ] Create a log file that is stored in LittleFS.
-  - [ ] The log file should be appended to and automatically roll over.
+### V2.0.0 (Completed)
 
-### V2.0.0
+- [x] **Add Weather Page**
+  - [x] Get longitude and latitude from a zip code/address and store it in the filesystem.
+  - [x] Use location data to get weather from Open-Meteo.
+  - [x] Update weather information periodically.
+  - [x] Add a "Weather" page and a combined "Weather+Clock" page.
+- [x] **UI/UX Enhancements**
+  - [x] Allow users to set a default display page.
+  - [x] Enable/Disable and reorder pages.
 
-- [ ] **Add Weather Page**
-  - [ ] Get longitude and latitude from a zip code and store it in the filesystem.
-  - [ ] Use location data to get weather from NOAA.
-  - [ ] Update weather information every ~10 minutes.
-  - [ ] Add a "Good Morning" page that displays the weather after an alarm goes off.
-- [ ] **UI/UX Enhancements**
-  - [ ] Allow users to set a default display page.
 ---
