@@ -154,8 +154,29 @@ void WeatherPage::drawWeather(TFT_eSPI &tft)
   // Row 1: Feels Like & Humidity
   tft.setTextDatum(MC_DATUM);
   tft.drawString("Feels Like", leftColX, gridY, 4);
-  tft.drawString(String(feelsLike, 1) + unit, leftColX, gridY + 25, 4);
 
+  // Stylized "Feels Like" with separated unit
+  String feelsLikeStr = String(feelsLike, 1);
+  int valWidth = tft.textWidth(feelsLikeStr, 4);
+  int unitWidth = tft.textWidth(unit, 4);
+  int flCircleRadius = 2;
+  int space = 2;
+  int totalWidth = valWidth + space + (flCircleRadius * 2) + space + unitWidth;
+
+  int startX = leftColX - (totalWidth / 2);
+  int centerY = gridY + 25;
+  int topY = centerY - (tft.fontHeight(4) / 2);
+
+  tft.setTextDatum(TL_DATUM);
+  tft.drawString(feelsLikeStr, startX, topY, 4);
+
+  int flDegreeX = startX + valWidth + space + flCircleRadius;
+  int flDegreeY = topY + flCircleRadius;
+  tft.fillCircle(flDegreeX, flDegreeY, flCircleRadius, hexToRGB565(ConfigManager::getInstance().getWeatherForecastColor()));
+
+  tft.drawString(unit, flDegreeX + flCircleRadius + space, topY, 4);
+
+  tft.setTextDatum(MC_DATUM);
   tft.drawString("Humidity", rightColX, gridY, 4);
   tft.drawString(String(data.humidity, 0) + "%", rightColX, gridY + 25, 4);
 
