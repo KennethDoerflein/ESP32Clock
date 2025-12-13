@@ -209,118 +209,111 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
 
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+  http.useHTTP10(true); // Disable chunked transfer encoding for stream safety
 
   int httpCode = http.GET();
   bool success = false;
 
   if (httpCode == 200)
   {
-    String payload = http.getString();
-    if (payload.length() > 0)
+    // Create a filter to only deserialize what we need
+    JsonDocument filter;
+    filter["results"][0]["name"] = true;
+    filter["results"][0]["latitude"] = true;
+    filter["results"][0]["longitude"] = true;
+    filter["results"][0]["country"] = true;
+    filter["results"][0]["country_code"] = true;
+    filter["results"][0]["admin1"] = true;
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+
+    if (!error)
     {
-      // Create a filter to only deserialize what we need
-      JsonDocument filter;
-      filter["results"][0]["name"] = true;
-      filter["results"][0]["latitude"] = true;
-      filter["results"][0]["longitude"] = true;
-      filter["results"][0]["country"] = true;
-      filter["results"][0]["country_code"] = true;
-      filter["results"][0]["admin1"] = true;
-
-      JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
-
-      if (!error)
+      JsonArray results = doc["results"];
+      if (results.size() > 0)
       {
-        JsonArray results = doc["results"];
-        if (results.size() > 0)
+        int bestIndex = 0;
+
+        // If we have a context string (e.g. "Paris, Texas"), try to find the best scoring match
+        if (context.length() > 0)
         {
-          int bestIndex = 0;
+          String contextLower = context;
+          contextLower.toLowerCase();
+          int maxScore = -1;
 
-          // If we have a context string (e.g. "Paris, Texas"), try to find the best scoring match
-          if (context.length() > 0)
+          for (size_t i = 0; i < results.size(); i++)
           {
-            String contextLower = context;
-            contextLower.toLowerCase();
-            int maxScore = -1;
+            String country = results[i]["country"].as<String>();
+            String countryCode = results[i]["country_code"].as<String>();
+            String admin1 = results[i]["admin1"].as<String>();
+            country.toLowerCase();
+            admin1.toLowerCase();
 
-            for (size_t i = 0; i < results.size(); i++)
+            int score = 0;
+
+            // Direct matches
+            if (admin1.length() > 0 && contextLower.indexOf(admin1) != -1)
             {
-              String country = results[i]["country"].as<String>();
-              String countryCode = results[i]["country_code"].as<String>();
-              String admin1 = results[i]["admin1"].as<String>();
-              country.toLowerCase();
-              admin1.toLowerCase();
+              score += 10;
+            }
+            if (country.length() > 0 && contextLower.indexOf(country) != -1)
+            {
+              score += 1;
+            }
 
-              int score = 0;
-
-              // Direct matches
-              if (admin1.length() > 0 && contextLower.indexOf(admin1) != -1)
+            // Abbreviation match for US
+            if (countryCode == "US" && admin1.length() > 0)
+            {
+              for (const auto &state : US_STATES)
               {
-                score += 10;
-              }
-              if (country.length() > 0 && contextLower.indexOf(country) != -1)
-              {
-                score += 1;
-              }
-
-              // Abbreviation match for US
-              if (countryCode == "US" && admin1.length() > 0)
-              {
-                for (const auto &state : US_STATES)
+                if (admin1 == state.name)
                 {
-                  if (admin1 == state.name)
+                  if (checkWordPresence(contextLower, state.code))
                   {
-                    if (checkWordPresence(contextLower, state.code))
-                    {
-                      score += 10;
-                    }
-                    break;
+                    score += 10;
                   }
+                  break;
                 }
               }
-
-              if (score > maxScore)
-              {
-                maxScore = score;
-                bestIndex = i;
-              }
             }
-            if (maxScore > 0)
+
+            if (score > maxScore)
             {
-              SerialLog::getInstance().printf("Best context match at index %d (Score: %d)\n", bestIndex, maxScore);
+              maxScore = score;
+              bestIndex = i;
             }
           }
-
-          lat = results[bestIndex]["latitude"];
-          lon = results[bestIndex]["longitude"];
-
-          String name = results[bestIndex]["name"].as<String>();
-          String country = results[bestIndex]["country"].as<String>();
-          String admin1 = results[bestIndex]["admin1"].as<String>();
-
-          resolvedAddress = name;
-          if (admin1.length() > 0 && admin1 != name)
-            resolvedAddress += ", " + admin1;
-          if (country.length() > 0)
-            resolvedAddress += ", " + country;
-
-          success = true;
-          SerialLog::getInstance().printf("Found: %s (%.4f, %.4f)\n", resolvedAddress.c_str(), lat, lon);
+          if (maxScore > 0)
+          {
+            SerialLog::getInstance().printf("Best context match at index %d (Score: %d)\n", bestIndex, maxScore);
+          }
         }
-        else
-        {
-          SerialLog::getInstance().print("No results in Geocoding response.\n");
-        }
+
+        lat = results[bestIndex]["latitude"];
+        lon = results[bestIndex]["longitude"];
+
+        String name = results[bestIndex]["name"].as<String>();
+        String country = results[bestIndex]["country"].as<String>();
+        String admin1 = results[bestIndex]["admin1"].as<String>();
+
+        resolvedAddress = name;
+        if (admin1.length() > 0 && admin1 != name)
+          resolvedAddress += ", " + admin1;
+        if (country.length() > 0)
+          resolvedAddress += ", " + country;
+
+        success = true;
+        SerialLog::getInstance().printf("Found: %s (%.4f, %.4f)\n", resolvedAddress.c_str(), lat, lon);
       }
       else
       {
-        SerialLog::getInstance().printf("JSON Error: %s\n", error.c_str());
+        SerialLog::getInstance().print("No results in Geocoding response.\n");
       }
     }
     else
     {
-      SerialLog::getInstance().print("Empty payload received.\n");
+      SerialLog::getInstance().printf("JSON Error: %s\n", error.c_str());
     }
   }
   else
@@ -419,11 +412,11 @@ void WeatherService::updateWeather()
 
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS); // Good practice
+  http.useHTTP10(true);                                  // Disable chunked transfer encoding for stream safety
   int httpCode = http.GET();
 
   if (httpCode == 200)
   {
-    String payload = http.getString();
     JsonDocument doc;
 
     // Filter to reduce memory usage
@@ -446,7 +439,7 @@ void WeatherService::updateWeather()
     filter["daily"]["sunrise"] = true;
     filter["daily"]["sunset"] = true;
 
-    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
+    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
 
     if (!error)
     {
