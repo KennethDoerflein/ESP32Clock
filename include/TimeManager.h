@@ -202,7 +202,9 @@ private:
   unsigned long lastUpdate = 0;
 
   /// @brief The interval at which the `update` method runs its checks, in milliseconds.
-  static constexpr unsigned long UPDATE_INTERVAL = 1000; // 1 second
+  static constexpr unsigned long UPDATE_INTERVAL = 50; // 50 milliseconds
+
+  uint8_t _lastDecodedSecond = 61;
 
   /// @brief Timestamp of the last drift check.
   unsigned long lastDriftCheck = 0;
