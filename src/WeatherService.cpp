@@ -121,16 +121,25 @@ void WeatherService::begin()
 
 void WeatherService::loop()
 {
+  unsigned long now = millis();
+
+  // Check if update is needed before acquiring lock or checking WiFi.
+  // This prevents expensive mutex operations and WiFi status checks on every loop iteration.
+  // _lastUpdate is an aligned 32-bit integer, so reads are atomic on ESP32.
+  if (_lastUpdate != 0 && (now - _lastUpdate < WEATHER_UPDATE_INTERVAL))
+  {
+    return;
+  }
+
   if (WiFi.status() != WL_CONNECTED)
     return;
-
-  unsigned long now = millis();
 
   // Protect the entire check-and-spawn logic with the mutex
   LockGuard lock(_mutex);
   bool isTaskRunning = (_weatherTaskHandle != NULL);
 
   // Check if it's time to update and if a task isn't already running
+  // We re-check the time condition inside the lock to handle any race conditions
   if ((now - _lastUpdate > WEATHER_UPDATE_INTERVAL || _lastUpdate == 0) && !isTaskRunning)
   {
     _lastUpdate = now;
