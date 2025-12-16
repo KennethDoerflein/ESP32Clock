@@ -434,7 +434,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         </div>
       </div>
       <div class="card-footer text-center text-muted small">
-        IP: %IP_ADDRESS% &bull; Hostname: %HOSTNAME%
+        IP: %IP_ADDRESS% &bull; Hostname: %HOSTNAME%.local
       </div>
     </div>
   </div>
