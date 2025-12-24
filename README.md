@@ -34,7 +34,7 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 - **System Logging**: Integrated logging system with file rotation (`system.log`) and a live WebSocket-based log viewer in the web UI.
 - **Over-the-Air (OTA) Updates**: Update the clock's firmware directly from the web interface.
 - **Persistent Storage**: All settings (WiFi credentials, display preferences, alarms) are saved to the ESP32's internal flash storage.
-- **mDNS Support**: Access the clock's web interface using a human-readable name (e.g., `ESP32Clock_XXXXXX.local`).
+- **mDNS Support**: Access the clock's web interface using a human-readable name (e.g., `ESP32Clock-XXXXXX.local`).
 - **Physical Factory Reset**: Hardware-based methods to reset the device to its default settings.
 
 ---
@@ -207,7 +207,7 @@ The firmware is organized into a collection of singleton manager classes, each r
 
 ### Web Interface
 
-The web interface provides access to all the clock's settings. Once connected to your WiFi network, you can access the web interface by navigating to the IP address shown on the clock's display or by using its mDNS address (e.g., `http://ESP32Clock_XXXXXX.local`).
+The web interface provides access to all the clock's settings. Once connected to your WiFi network, you can access the web interface by navigating to the IP address shown on the clock's display or by using its mDNS address (e.g., `http://ESP32Clock-XXXXXX.local`).
 
 The web interface is organized into several sections:
 
@@ -367,3 +367,4 @@ This project is broken down into phases to prioritize a functional base clock be
   - [x] Enable/Disable and reorder pages.
 
 ---
+

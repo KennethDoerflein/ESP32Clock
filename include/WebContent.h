@@ -434,7 +434,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         </div>
       </div>
       <div class="card-footer text-center text-muted small">
-        IP: %IP_ADDRESS% &bull; Hostname: %HOSTNAME%
+        IP: %IP_ADDRESS% &bull; Hostname: %HOSTNAME%.local
       </div>
     </div>
   </div>
@@ -896,15 +896,19 @@ const char WIFI_CONFIG_HTML[] PROGMEM = R"rawliteral(
         method: 'POST',
         body: formData
       })
-      .then(response => {
+      .then(async response => {
         if (response.ok) {
           alert('Hostname saved. The device will now reboot.');
           setTimeout(() => {
             window.location.href = '/';
           }, 1000);
         } else {
-          alert('Error saving hostname.');
+          const text = await response.text();
+          alert('Error: ' + text);
         }
+      })
+      .catch(e => {
+        alert('Network error: ' + e);
       });
     });
   </script>

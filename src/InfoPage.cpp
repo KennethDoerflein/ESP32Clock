@@ -54,6 +54,7 @@ void InfoPage::onEnter(TFT_eSPI &tft)
   // Display Hostname
   String hostname = "Host: ";
   hostname += WiFi.getHostname();
+  hostname += ".local";
   tft.drawString(hostname, x_pos, y_pos);
 
   // Display IP Address

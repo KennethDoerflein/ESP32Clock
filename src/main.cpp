@@ -251,17 +251,63 @@ void setup()
   esp_task_wdt_add(NULL); // Add the main task (Core 1) to the WDT
 
   bool displayInitialized = false;
+
   // Initialize ConfigManager.
   logger.print("Initializing ConfigManager...\n");
   ConfigManager::getInstance().begin();
+
+  // Check for crash/panic reset and display warning in dev builds
+  esp_reset_reason_t reason = esp_reset_reason();
+  if (String(FIRMWARE_VERSION).startsWith("dev") && (reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT || reason == ESP_RST_TASK_WDT))
+  {
+    auto &display = Display::getInstance();
+    display.begin();
+    displayInitialized = true;
+    display.drawMultiLineStatusMessage("CRASH DETECTED", "SAFE MODE...");
+
+    // Init minimal systems for logs
+    SerialLog::getInstance().print("Entering Crash Safe Mode...\n");
+
+    // Init WiFi
+    WiFiManager::getInstance().begin();
+
+    // Init WebServer
+    ClockWebServer::getInstance().begin();
+
+    bool ipDisplayed = false;
+
+    // Loop indefinitely to keep WebServer alive but stop other logic
+    while (true)
+    {
+      WiFiManager::getInstance().handleConnection();
+      SerialLog::getInstance().loop();
+
+      if (WiFi.status() == WL_CONNECTED && !ipDisplayed)
+      {
+        display.drawMultiLineStatusMessage("CRASH DETECTED","CHECK LOGS");
+        ipDisplayed = true;
+      }
+      else if (WiFi.status() != WL_CONNECTED && ipDisplayed)
+      {
+        display.drawMultiLineStatusMessage("CRASH DETECTED", "CONNECTING...");
+        ipDisplayed = false;
+      }
+
+      esp_task_wdt_reset();
+      delay(10);
+    }
+  }
 
   // Check for factory reset request at boot using the Snooze button.
   // This avoids conflicts with the ESP32's hardware bootloader mode.
   if (digitalRead(SNOOZE_BUTTON_PIN) == LOW)
   {
     auto &display = Display::getInstance();
-    display.begin(); // Initialize display only when needed.
-    displayInitialized = true;
+    if (!displayInitialized)
+    {
+      display.begin(); // Initialize display only when needed.
+      displayInitialized = true;
+    }
 
     logger.print("Snooze button held. Checking for factory reset...\n");
     display.drawStatusMessage("Hold for factory reset");

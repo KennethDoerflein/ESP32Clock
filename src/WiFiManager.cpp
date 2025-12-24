@@ -233,8 +233,8 @@ bool WiFiManager::begin()
   {
     uint8_t mac[6];
     WiFi.macAddress(mac);
-    char hostname_cstr[18]; // "ESP32Clock_" + 6 hex chars + null terminator
-    sprintf(hostname_cstr, "ESP32Clock_%02X%02X%02X", mac[3], mac[4], mac[5]);
+    char hostname_cstr[18]; // "ESP32Clock-" + 6 hex chars + null terminator
+    sprintf(hostname_cstr, "ESP32Clock-%02X%02X%02X", mac[3], mac[4], mac[5]);
     _hostname = hostname_cstr;
   }
 

@@ -24,6 +24,7 @@
 #include "AlarmManager.h"
 #include "Constants.h"
 #include "WeatherService.h"
+#include "Utils.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -634,6 +635,12 @@ void ClockWebServer::begin()
               {
         if (request->hasParam("hostname", true)) {
             String hostname = request->getParam("hostname", true)->value();
+
+            if (!isValidHostname(hostname)) {
+                request->send(400, "text/plain", "Invalid hostname. Use 1-63 alphanumeric characters or hyphens (not at start/end).");
+                return;
+            }
+
             WiFiManager::getInstance().setHostname(hostname);
             request->send(200, "text/plain", "Hostname saved. Rebooting...");
             delay(100);
@@ -968,14 +975,14 @@ String formatHour(int hour, bool is24Hour)
  * @brief Sets up the mDNS responder.
  *
  * This allows the device to be accessed on the local network using a
- * hostname like "ESP32Clock_XXXXXX.local".
+ * hostname like "ESP32Clock-XXXXXX.local".
  */
 void ClockWebServer::setupMDNS()
 {
   // Restart the mDNS responder to ensure a clean state
   MDNS.end();
 
-  // Start the mDNS responder for ESP32Clock_XXXXXX.local
+  // Start the mDNS responder for ESP32Clock-XXXXXX.local
   String hostname = WiFiManager::getInstance().getHostname();
   if (MDNS.begin(hostname.c_str()))
   {

@@ -87,13 +87,22 @@ void TimeManager::begin()
  */
 bool TimeManager::update()
 {
-  // Use a non-blocking delay to run the update logic approximately once per second.
+  // Use a non-blocking delay to run the update logic frequently (50ms)
+  // to catch the second transition accurately.
   unsigned long currentMillis = millis();
   if (currentMillis - lastUpdate < UPDATE_INTERVAL)
   {
     return false; // No update occurred.
   }
   lastUpdate = currentMillis;
+
+  DateTime now = getRTCTime();
+  // Only trigger a full update if the second has actually changed.
+  if (now.second() == _lastDecodedSecond)
+  {
+    return false;
+  }
+  _lastDecodedSecond = now.second();
 
 #ifdef LOG_TICKS
   SerialLog::getInstance().print("TimeManager: Tick\n");
@@ -111,7 +120,7 @@ bool TimeManager::update()
   }
 
   // Update alarm cache if the minute has changed
-  DateTime now = getRTCTime(); // Thread safe access
+  // 'now' is already populated at the top of the function
   if (now.minute() != _lastCacheUpdateMinute)
   {
     updateNextAlarmsCache(now);

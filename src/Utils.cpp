@@ -24,3 +24,42 @@ uint16_t hexToRGB565(String hex)
   byte b = color & 0xFF;
   return ((r / 8) << 11) | ((g / 4) << 5) | (b / 8);
 }
+
+/**
+ * @brief Validates a hostname string.
+ *
+ * Checks if the hostname follows standard rules (RFC 1123).
+ * - Length between 1 and 63 characters.
+ * - Contains only alphanumeric characters and hyphens.
+ * - Cannot start or end with a hyphen.
+ *
+ * @param hostname The hostname string to validate.
+ * @return True if valid, false otherwise.
+ */
+bool isValidHostname(const String &hostname)
+{
+  if (hostname.length() < 1 || hostname.length() > 63)
+  {
+    return false;
+  }
+
+  // Check for leading or trailing hyphen
+  char first = hostname.charAt(0);
+  char last = hostname.charAt(hostname.length() - 1);
+  if (first == '-' || last == '-')
+  {
+    return false;
+  }
+
+  for (unsigned int i = 0; i < hostname.length(); i++)
+  {
+    char c = hostname.charAt(i);
+    // Allow A-Z, a-z, 0-9, and hyphen
+    if (!isalnum(c) && c != '-')
+    {
+      return false;
+    }
+  }
+
+  return true;
+}

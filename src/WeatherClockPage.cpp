@@ -229,7 +229,7 @@ void WeatherClockPage::drawWeather(TFT_eSPI &tft)
     if (startX < 0)
       startX = 0;
 
-    int centerY = _sprWeather.height() / 2;
+    int centerY = (_sprWeather.height() / 2) - 3;
 
     // Draw Temp
     _sprWeather.setTextColor(tempColor, _bgColor);
