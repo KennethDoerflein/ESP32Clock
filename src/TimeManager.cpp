@@ -104,6 +104,14 @@ bool TimeManager::update()
   }
   _lastDecodedSecond = now.second();
 
+  // Cache the time snapshot for consistent rendering within this frame.
+  // This prevents race conditions where the RTC may return a different
+  // second when queried again during the render phase.
+  {
+    RecursiveLockGuard lock(_mutex);
+    _cachedTime = now;
+  }
+
 #ifdef LOG_TICKS
   SerialLog::getInstance().print("TimeManager: Tick\n");
 #endif
@@ -209,7 +217,7 @@ String TimeManager::getFormattedTime() const
  */
 String TimeManager::getFormattedSeconds() const
 {
-  DateTime now = getRTCTime();
+  DateTime now = getCachedTime();
   char secondsStr[3];
   sprintf(secondsStr, "%02d", now.second());
   return String(secondsStr);
@@ -430,6 +438,17 @@ DateTime TimeManager::getRTCTime() const
 {
   RecursiveLockGuard lock(_mutex);
   return RTC.now();
+}
+
+DateTime TimeManager::getCachedTime() const
+{
+  RecursiveLockGuard lock(_mutex);
+  // If no time has been cached yet (before first update), return current RTC time
+  if (!_cachedTime.isValid() || _cachedTime.year() < 2000)
+  {
+    return RTC.now();
+  }
+  return _cachedTime;
 }
 
 bool TimeManager::isTimeSet() const
