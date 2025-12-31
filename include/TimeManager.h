@@ -110,6 +110,15 @@ public:
   String getFormattedSeconds() const;
 
   /**
+   * @brief Gets the cached time snapshot from the last update() call.
+   * @details This returns the time that was captured when the second changed,
+   *          ensuring consistent time data for rendering within the same frame.
+   *          Use this for display purposes to avoid timing inconsistencies.
+   * @return A DateTime object representing the cached time.
+   */
+  DateTime getCachedTime() const;
+
+  /**
    * @brief Gets the current hour in 24-hour format.
    * @return The current hour (0-23).
    */
@@ -205,6 +214,10 @@ private:
   static constexpr unsigned long UPDATE_INTERVAL = 50; // 50 milliseconds
 
   uint8_t _lastDecodedSecond = 61;
+
+  /// @brief Cached time snapshot from the last successful second transition.
+  /// This ensures consistent time data between update detection and rendering.
+  DateTime _cachedTime;
 
   /// @brief Timestamp of the last drift check.
   unsigned long lastDriftCheck = 0;
