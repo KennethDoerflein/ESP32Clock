@@ -380,31 +380,46 @@ void TimeManager::checkDST()
   t.tm_min = now.minute();
   t.tm_sec = now.second();
 
-  // Force mktime to use the LAST KNOWN DST state.
-  // This allows it to detect invalid times (Spring Forward gap)
-  // or ambiguous times (Fall Back overlap) correctly based on where we came from.
+  // Use the PREVIOUS DST state to help mktime resolve ambiguous times:
+  // - Spring Forward (2 AM gap): 2:00-2:59 doesn't exist, mktime needs context
+  // - Fall Back (2 AM overlap): 1:00-1:59 happens twice, mktime needs to know direction
+  // This is critical for correct DST transitions at 2 AM.
   t.tm_isdst = currentDstState ? 1 : 0;
 
-  mktime(&t); // This normalizes 't' and updates tm_isdst
+  mktime(&t); // This normalizes 't' and updates tm_isdst based on TZ rules
 
   bool newDstState = t.tm_isdst > 0;
 
   if (newDstState != currentDstState)
   {
-    SerialLog::getInstance().printf("DST Transition Detected: %d -> %d\n", currentDstState, newDstState);
-    ConfigManager::getInstance().setDST(newDstState);
+    SerialLog::getInstance().printf("DST Change Detected: %d -> %d\n", currentDstState, newDstState);
 
-    // Check if the time has shifted (which it should have)
-    // We compare the normalized 't' with the original 'now'.
-    // Note: t contains the corrected time.
-    DateTime correctedTime(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+    // Check if mktime shifted the time (this happens during real DST transitions)
+    DateTime normalizedTime(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+    bool timeShifted = (normalizedTime.hour() != now.hour() || normalizedTime.minute() != now.minute());
 
-    if (correctedTime.hour() != now.hour() || correctedTime.minute() != now.minute())
+    if (timeShifted)
     {
-      SerialLog::getInstance().print("Adjusting RTC for DST...\n");
+      // Real DST transition (2 AM Spring Forward or Fall Back)
+      // mktime corrected the time - apply it to RTC
+      SerialLog::getInstance().printf("Real DST transition at 2 AM. Adjusting RTC: %02d:%02d -> %02d:%02d\n",
+                                       now.hour(), now.minute(),
+                                       normalizedTime.hour(), normalizedTime.minute());
       RecursiveLockGuard lock(_mutex);
-      RTC.adjust(correctedTime);
+      RTC.adjust(normalizedTime);
     }
+    else
+    {
+      // The DST flag changed but the time didn't shift.
+      // This means the stored config was stale (e.g., isDst=true in January).
+      // Only update the config flag - do NOT adjust the RTC.
+      // The RTC time is assumed correct (from last NTP sync).
+      // If the time is actually wrong, the next NTP sync will fix it.
+      SerialLog::getInstance().print("Stale DST config detected. Updating flag only (RTC unchanged).\n");
+    }
+
+    // Always update the config to reflect the correct DST state
+    ConfigManager::getInstance().setDST(newDstState);
   }
 }
 
