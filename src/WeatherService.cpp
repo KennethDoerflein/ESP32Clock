@@ -141,7 +141,7 @@ void WeatherService::loop()
     xTaskCreatePinnedToCore(
         weatherUpdateTask,   // Function to implement the task
         "WeatherUpdate",     // Name of the task
-        20480,               // Stack size (20KB for HTTPS + JSON)
+        24576,               // Stack size (24KB for HTTPS + JSON)
         this,                // Task input parameter
         1,                   // Priority
         &_weatherTaskHandle, // Task handle
