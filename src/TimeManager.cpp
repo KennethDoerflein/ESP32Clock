@@ -384,6 +384,10 @@ void TimeManager::checkDST()
   // - Spring Forward (2 AM gap): 2:00-2:59 doesn't exist, mktime needs context
   // - Fall Back (2 AM overlap): 1:00-1:59 happens twice, mktime needs to know direction
   // This is critical for correct DST transitions at 2 AM.
+  // Use the PREVIOUS DST state to help mktime resolve ambiguous times:
+  // - Spring Forward (2 AM gap): 2:00-2:59 doesn't exist, mktime needs context
+  // - Fall Back (2 AM overlap): 1:00-1:59 happens twice, mktime needs to know direction
+  // This is critical for correct DST transitions at 2 AM.
   t.tm_isdst = currentDstState ? 1 : 0;
 
   mktime(&t); // This normalizes 't' and updates tm_isdst based on TZ rules
