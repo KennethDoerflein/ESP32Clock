@@ -217,6 +217,14 @@ void logicTask(void *pvParameters)
     // Handle Serial Log (WebSocket updates etc)
     SerialLog::getInstance().loop();
 
+    // Log heap every minute to track stability
+    static unsigned long lastHeapLog = 0;
+    if (millis() - lastHeapLog > 60000)
+    {
+      SerialLog::getInstance().printf("Logic Task Heartbeat - Free Heap: %u\n", ESP.getFreeHeap());
+      lastHeapLog = millis();
+    }
+
     // Yield to prevent watchdog triggers
     vTaskDelay(pdMS_TO_TICKS(10));
     esp_task_wdt_reset(); // Feed the watchdog
