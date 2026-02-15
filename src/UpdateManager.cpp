@@ -13,8 +13,7 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
-#include "github_ca.h"
-#include "github_cdn_ca.h"
+#include "NtpSync.h"
 #include "SerialLog.h"
 #if __has_include("version.h")
 #include "version.h"
@@ -140,9 +139,26 @@ String UpdateManager::handleGithubUpdate()
         return "An update is already in progress.";
     }
 
+    // Ensure system time is set for TLS verification
+    time_t now = time(nullptr);
+    if (now < 1000000000) // Approx year 2001
+    {
+        SerialLog::getInstance().print("Time not set. Attempting NTP sync...\n");
+        if (!syncTime())
+        {
+            return "Failed to synchronize time. Cannot verify certificates.";
+        }
+        now = time(nullptr);
+    }
+    
+    char timeStr[64];
+    strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    SerialLog::getInstance().printf("System time: %s\n", timeStr);
+
     HTTPClient http;
     WiFiClientSecure client;
-    client.setCACert(GITHUB_ROOT_CA);
+    client.setInsecure();
+    client.setTimeout(10000);
 
     String url = "https://api.github.com/repos/" + String(GITHUB_REPO) + "/releases/latest";
     http.begin(client, url);
@@ -215,6 +231,9 @@ String UpdateManager::handleGithubUpdate()
         return "SECURITY: Update rejected - no signature file (firmware.sig) found.";
     }
 
+    // Set flag before creating task so UI locks immediately
+    _updateInProgress = true;
+
     BaseType_t taskCreated = xTaskCreate(
         &UpdateManager::runGithubUpdateTask,
         "github_update_task",
@@ -227,6 +246,7 @@ String UpdateManager::handleGithubUpdate()
     {
         SerialLog::getInstance().print("Failed to create update task.\n");
         delete updateInfo;
+        _updateInProgress = false;
         return "Failed to start update process.";
     }
 
@@ -243,42 +263,22 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
     getInstance()._updateInProgress = true;
     getInstance()._lastError = "";
 
-    HTTPClient http;
-    WiFiClientSecure client;
-
     // Download signature file first (if OTA key is configured)
     uint8_t signature[FirmwareVerifier::ED25519_SIGNATURE_SIZE];
     bool hasSignature = false;
 
     if (OTA_KEY_CONFIGURED && !updateInfo->signatureUrl.isEmpty())
     {
-        SerialLog::getInstance().print("Downloading signature file...\n");
-
-        // Use CDN CA for redirect destinations
-        client.setCACert(GITHUB_CDN_ROOT_CA);
+        HTTPClient http;
+        WiFiClientSecure client;
+        client.setInsecure();
+        client.setTimeout(10000);
+        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+        SerialLog::getInstance().printf("Connecting to: %s\n", updateInfo->signatureUrl.c_str());
         http.begin(client, updateInfo->signatureUrl);
 
-        const char *headerKeys[] = {"Location"};
-        http.collectHeaders(headerKeys, 1);
-
         int httpCode = http.GET();
-
-        // Handle redirects with proper TLS (NO setInsecure!)
-        if (httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_FOUND ||
-            httpCode == HTTP_CODE_TEMPORARY_REDIRECT)
-        {
-            String newUrl = http.header("Location");
-            if (!newUrl.isEmpty())
-            {
-                SerialLog::getInstance().print("Redirecting signature download...\n");
-                http.end();
-                client.stop();
-                // Use CDN CA certificate instead of setInsecure()
-                client.setCACert(GITHUB_CDN_ROOT_CA);
-                http.begin(client, newUrl);
-                httpCode = http.GET();
-            }
-        }
+        SerialLog::getInstance().printf("HTTP Response: %d\n", httpCode);
 
         if (httpCode == HTTP_CODE_OK)
         {
@@ -297,7 +297,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
         }
         else
         {
-            SerialLog::getInstance().printf("Failed to download signature: HTTP %d\n", httpCode);
+            SerialLog::getInstance().printf("Failed to download signature: HTTP %d (%s)\n", httpCode, http.errorToString(httpCode).c_str());
         }
         http.end();
 
@@ -312,39 +312,25 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
         }
     }
 
-    // Download firmware
-    SerialLog::getInstance().print("Downloading firmware...\n");
-    client.setCACert(GITHUB_CDN_ROOT_CA);
-    http.begin(client, updateInfo->firmwareUrl);
+    // Create fresh client objects for firmware download
+    WiFiClientSecure firmwareClient;
+    HTTPClient firmwareHttp;
+    
+    firmwareClient.setInsecure();
+    firmwareClient.setTimeout(10000);
+    firmwareHttp.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    SerialLog::getInstance().printf("Connecting to: %s\n", updateInfo->firmwareUrl.c_str());
+    firmwareHttp.begin(firmwareClient, updateInfo->firmwareUrl);
 
-    const char *headerKeys[] = {"Location"};
-    http.collectHeaders(headerKeys, 1);
-
-    int httpCode = http.GET();
-
-    // Handle redirects with proper TLS
-    if (httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_FOUND ||
-        httpCode == HTTP_CODE_TEMPORARY_REDIRECT)
-    {
-        String newUrl = http.header("Location");
-        SerialLog::getInstance().print("Redirecting firmware download...\n");
-        if (!newUrl.isEmpty())
-        {
-            http.end();
-            client.stop();
-            // Use CDN CA certificate instead of setInsecure()
-            client.setCACert(GITHUB_CDN_ROOT_CA);
-            http.begin(client, newUrl);
-            httpCode = http.GET();
-        }
-    }
+    int httpCode = firmwareHttp.GET();
+    SerialLog::getInstance().printf("HTTP Response: %d\n", httpCode);
 
     if (httpCode == HTTP_CODE_OK)
     {
-        int contentLength = http.getSize();
+        int contentLength = firmwareHttp.getSize();
         SerialLog::getInstance().printf("Firmware size: %d bytes\n", contentLength);
 
-        WiFiClient *stream = http.getStreamPtr();
+        WiFiClient *stream = firmwareHttp.getStreamPtr();
 
         // Allocate buffer for firmware (we need it for signature verification)
         // For large firmware, we'd use streaming hash, but this is simpler for now
@@ -359,7 +345,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             {
                 SerialLog::getInstance().print("Failed to allocate firmware buffer\n");
                 getInstance()._lastError = "Out of memory for firmware buffer";
-                http.end();
+                firmwareHttp.end();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
                 vTaskDelete(NULL);
@@ -368,7 +354,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
 
             // Read entire firmware into buffer
             size_t bytesRead = 0;
-            while (bytesRead < (size_t)contentLength && http.connected())
+            while (bytesRead < (size_t)contentLength && firmwareHttp.connected())
             {
                 size_t available = stream->available();
                 if (available > 0)
@@ -392,7 +378,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             {
                 SerialLog::getInstance().print("Failed to compute firmware hash\n");
                 free(firmwareBuffer);
-                http.end();
+                firmwareHttp.end();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
                 vTaskDelete(NULL);
@@ -408,7 +394,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 SerialLog::getInstance().print("Firmware may have been tampered with. Update rejected.\n");
                 getInstance()._lastError = "Signature verification failed";
                 free(firmwareBuffer);
-                http.end();
+                firmwareHttp.end();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
                 vTaskDelete(NULL);
@@ -422,7 +408,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             {
                 Update.printError(Serial);
                 free(firmwareBuffer);
-                http.end();
+                firmwareHttp.end();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
                 vTaskDelete(NULL);
@@ -436,7 +422,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             {
                 SerialLog::getInstance().printf("Write failed: wrote %d of %d\n", written, firmwareLen);
                 Update.abort();
-                http.end();
+                firmwareHttp.end();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
                 vTaskDelete(NULL);
@@ -451,7 +437,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             if (!Update.begin(contentLength))
             {
                 Update.printError(Serial);
-                http.end();
+                firmwareHttp.end();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
                 vTaskDelete(NULL);
@@ -470,27 +456,32 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             if (Update.isFinished())
             {
                 SerialLog::getInstance().print("Update successful! Rebooting...\n");
-                http.end();
+                firmwareHttp.end();
                 delete updateInfo;
+                delay(1000); // Give system time to flush logs before restart
                 ESP.restart();
+                // Never reached, but include for safety
+                vTaskDelete(NULL);
             }
             else
             {
                 SerialLog::getInstance().print("Update not finished. Something went wrong.\n");
+                getInstance()._updateInProgress = false;
             }
         }
         else
         {
             Update.printError(Serial);
+            getInstance()._updateInProgress = false;
         }
     }
     else
     {
-        SerialLog::getInstance().printf("HTTP GET failed, error: %s\n", http.errorToString(httpCode).c_str());
+        SerialLog::getInstance().printf("HTTP GET failed, error: %s\n", firmwareHttp.errorToString(httpCode).c_str());
+        getInstance()._updateInProgress = false;
     }
 
-    http.end();
+    firmwareHttp.end();
     delete updateInfo;
-    getInstance()._updateInProgress = false;
     vTaskDelete(NULL);
 }

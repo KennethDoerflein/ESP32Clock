@@ -2343,7 +2343,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
       .then(response => response.text()) // Server always sends 200 OK
       .then(text => {
         // Now analyze the text response from our server
-        if (text.includes('Starting update')) {
+        if (text.includes('Starting')) {
           showStatus(text, 'info'); // Blue spinner, update is starting
           startPollingStatus();
         } else if (text.toLowerCase().includes('error') || text.toLowerCase().includes('failed')) {
