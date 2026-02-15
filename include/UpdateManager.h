@@ -45,12 +45,6 @@ public:
      */
     void handleFileUpload(uint8_t *data, size_t len, size_t index, size_t total);
 
-    /**
-     * @brief Sets the signature for verifying the uploaded firmware.
-     * @param signatureHex Hex-encoded Ed25519 signature (128 chars).
-     * @return True if signature was parsed successfully.
-     */
-    bool setUploadSignature(const char *signatureHex);
 
     /**
      * @brief Finalizes the update process with verification.
@@ -88,11 +82,6 @@ private:
     bool _updateInProgress = false;
     String _lastError;
 
-    // Signature verification for uploads
-    uint8_t _uploadSignature[FirmwareVerifier::ED25519_SIGNATURE_SIZE];
-    bool _hasUploadSignature = false;
-    FirmwareVerifier::SHA256Context _uploadHashCtx;
-    uint8_t _uploadHash[FirmwareVerifier::SHA256_HASH_SIZE];
 
     // GitHub update data structure
     struct GithubUpdateInfo

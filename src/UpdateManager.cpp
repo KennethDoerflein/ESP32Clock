@@ -63,14 +63,6 @@ void UpdateManager::handleFileUpload(uint8_t *data, size_t len, size_t index, si
         _updateFailed = false;
         _lastError = "";
 
-        // Initialize hash context for signature verification
-        if (!_uploadHashCtx.begin())
-        {
-            SerialLog::getInstance().print("Failed to initialize hash context\n");
-            _updateFailed = true;
-            _lastError = "Hash initialization failed";
-            return;
-        }
 
         if (!Update.begin(UPDATE_SIZE_UNKNOWN))
         {
@@ -85,14 +77,6 @@ void UpdateManager::handleFileUpload(uint8_t *data, size_t len, size_t index, si
         return;
     }
 
-    // Update hash as data comes in
-    if (!_uploadHashCtx.update(data, len))
-    {
-        SerialLog::getInstance().print("Hash update failed\n");
-        _updateFailed = true;
-        _lastError = "Hash update failed";
-        return;
-    }
 
     if (Update.write(data, len) != len)
     {
@@ -102,28 +86,6 @@ void UpdateManager::handleFileUpload(uint8_t *data, size_t len, size_t index, si
     }
 }
 
-/**
- * @brief Sets the signature for verifying the uploaded firmware.
- * @param signatureHex Hex-encoded Ed25519 signature (128 chars).
- * @return True if signature was parsed successfully.
- */
-bool UpdateManager::setUploadSignature(const char *signatureHex)
-{
-    if (!signatureHex)
-    {
-        _lastError = "No signature provided";
-        return false;
-    }
-
-    if (!FirmwareVerifier::parseHexSignature(signatureHex, _uploadSignature))
-    {
-        _lastError = "Invalid signature format";
-        return false;
-    }
-
-    _hasUploadSignature = true;
-    return true;
-}
 
 /**
  * @brief Finalizes the update process with verification.
@@ -140,48 +102,6 @@ bool UpdateManager::endUpdate()
         goto cleanup;
     }
 
-    // Check if OTA key is configured
-    if (!OTA_KEY_CONFIGURED)
-    {
-        SerialLog::getInstance().print("WARNING: OTA signing key not configured. Skipping verification.\n");
-        SerialLog::getInstance().print("To enable secure updates, generate keys using scripts/generate_ota_keys.py\n");
-        // Allow update without verification if key not configured (for initial setup)
-    }
-    else
-    {
-        // Verify signature
-        if (!_hasUploadSignature)
-        {
-            SerialLog::getInstance().print("Update rejected: No signature provided\n");
-            _lastError = "Signature required for firmware updates";
-            Update.abort();
-            goto cleanup;
-        }
-
-        // Finalize hash
-        if (!_uploadHashCtx.finish(_uploadHash))
-        {
-            SerialLog::getInstance().print("Failed to finalize hash\n");
-            _lastError = "Hash finalization failed";
-            Update.abort();
-            goto cleanup;
-        }
-
-        // Log the computed hash for debugging
-        String hashHex = FirmwareVerifier::toHexString(_uploadHash, FirmwareVerifier::SHA256_HASH_SIZE);
-        SerialLog::getInstance().printf("Firmware SHA-256: %s\n", hashHex.c_str());
-
-        // Verify Ed25519 signature
-        if (!FirmwareVerifier::verifySignature(_uploadHash, _uploadSignature, OTA_PUBLIC_KEY))
-        {
-            SerialLog::getInstance().print("SECURITY: Signature verification FAILED - rejecting update\n");
-            _lastError = "Signature verification failed - firmware may have been tampered with";
-            Update.abort();
-            goto cleanup;
-        }
-
-        SerialLog::getInstance().print("Signature verification passed\n");
-    }
 
     if (Update.end(true))
     {
@@ -197,9 +117,6 @@ bool UpdateManager::endUpdate()
 cleanup:
     _updateFailed = false;
     _updateInProgress = false;
-    _hasUploadSignature = false;
-    memset(_uploadSignature, 0, sizeof(_uploadSignature));
-    memset(_uploadHash, 0, sizeof(_uploadHash));
     return success;
 }
 
