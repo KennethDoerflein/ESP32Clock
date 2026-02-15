@@ -259,6 +259,12 @@ void ClockWebServer::begin()
           // A new request has started. Create a buffer to hold the JSON data.
           // We allocate it on the heap because it can be large.
           request->_tempObject = new std::vector<uint8_t>();
+          request->onDisconnect([request]() {
+            if (request->_tempObject) {
+              delete (std::vector<uint8_t>*)request->_tempObject;
+              request->_tempObject = nullptr;
+            }
+          });
         }
 
         if (!request->_tempObject) return;
@@ -398,6 +404,12 @@ void ClockWebServer::begin()
           if (index == 0)
           {
             request->_tempObject = new std::vector<uint8_t>();
+            request->onDisconnect([request]() {
+              if (request->_tempObject) {
+                delete (std::vector<uint8_t>*)request->_tempObject;
+                request->_tempObject = nullptr;
+              }
+            });
           }
 
           if (!request->_tempObject)
@@ -569,6 +581,12 @@ void ClockWebServer::begin()
           if (index == 0)
           {
             request->_tempObject = new std::vector<uint8_t>();
+            request->onDisconnect([request]() {
+              if (request->_tempObject) {
+                delete (std::vector<uint8_t>*)request->_tempObject;
+                request->_tempObject = nullptr;
+              }
+            });
           }
 
           if (!request->_tempObject)
