@@ -1,0 +1,3 @@
+# ESP-IDF Component Configuration
+# Enable libsodium for cryptographic operations
+CONFIG_LIBSODIUM_USE_MBEDTLS_SHA=y
