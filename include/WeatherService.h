@@ -57,6 +57,13 @@ public:
   static String getWindDirectionStr(int degrees);
 
   /**
+   * @brief Converts WMO Weather Code to string logic.
+   * @param code The WMO weather code.
+   * @return A const string describing the condition.
+   */
+  static const char *getConditionFromWMO(int code);
+
+  /**
    * @brief Resolves an address string to coordinates and a formatted name.
    *
    * @param query The address/location to search for.

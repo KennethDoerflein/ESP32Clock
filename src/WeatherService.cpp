@@ -19,7 +19,7 @@ void weatherUpdateTask(void *parameter)
 }
 
 // Helper to convert WMO Weather Codes to String Condition
-String getConditionFromWMO(int code)
+const char *WeatherService::getConditionFromWMO(int code)
 {
   switch (code)
   {
@@ -141,7 +141,7 @@ void WeatherService::loop()
     xTaskCreatePinnedToCore(
         weatherUpdateTask,   // Function to implement the task
         "WeatherUpdate",     // Name of the task
-        24576,               // Stack size (24KB for HTTPS + JSON)
+        32768,               // Stack size (32KB for HTTPS + JSON)
         this,                // Task input parameter
         1,                   // Priority
         &_weatherTaskHandle, // Task handle
@@ -399,16 +399,18 @@ void WeatherService::updateWeather()
   WiFiClientSecure client;
   client.setInsecure();
 
-  String url = "https://api.open-meteo.com/v1/forecast?latitude=" + String(lat, 4) +
-               "&longitude=" + String(lon, 4) +
-               "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m," +
-               "cloud_cover,pressure_msl,wind_direction_10m,wind_gusts_10m," +
-               "uv_index,visibility,precipitation_probability" +
-               "&daily=sunrise,sunset" +
-               "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch" +
-               "&forecast_days=1&timezone=auto";
+  // Use reserve to prevent reallocations
+  String url;
+  url.reserve(400); 
+
+  url = "https://api.open-meteo.com/v1/forecast?latitude=";
+  url += String(lat, 4);
+  url += "&longitude=";;
+  url += String(lon, 4);
+  url += "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,cloud_cover,pressure_msl,wind_direction_10m,wind_gusts_10m,uv_index,visibility,precipitation_probability&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&forecast_days=1&timezone=auto";
 
   SerialLog::getInstance().printf("Fetching Weather: %s\n", url.c_str());
+  SerialLog::getInstance().printf("Free Heap before Weather Update: %u\n", ESP.getFreeHeap());
 
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS); // Good practice
@@ -501,6 +503,7 @@ void WeatherService::updateWeather()
       }
 
       SerialLog::getInstance().printf("Weather Updated: %.1fF, %s\n", temp, _currentWeather.condition.c_str());
+      SerialLog::getInstance().printf("Free Heap after Weather Update: %u\n", ESP.getFreeHeap());
     }
     else
     {
