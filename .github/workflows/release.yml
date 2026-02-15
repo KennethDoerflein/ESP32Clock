@@ -1,6 +1,6 @@
 # .github/workflows/release.yml
 
-name: Create Release and Upload Firmware
+name: Create Release and Upload Signed Firmware
 
 # This action runs on every push to a tag that starts with "v" (e.g., v1.0.0, v2.1.3)
 on:
@@ -20,34 +20,96 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # 2. Set up Python, which is a dependency for PlatformIO
+      # 2. Set up Python, which is a dependency for PlatformIO and signing
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
 
-      # 3. Install PlatformIO Core
-      - name: Install PlatformIO
-        run: pip install -U platformio
+      # 3. Install PlatformIO Core and cryptography library for signing
+      - name: Install dependencies
+        run: |
+          pip install -U platformio
+          pip install pynacl
 
       # 4. Compile the project. This will generate the .bin file.
       - name: Build PlatformIO Project
         run: pio run
 
-      # 5. Create a GitHub Release and upload the firmware.bin as an asset
+      # 5. Sign the firmware binary
+      - name: Sign Firmware
+        env:
+          OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
+        run: |
+          if [ -z "$OTA_SIGNING_KEY" ]; then
+            echo "WARNING: OTA_SIGNING_KEY secret not configured. Skipping signature generation."
+            echo "To enable secure OTA updates, add your Ed25519 private key as a repository secret."
+            exit 0
+          fi
+          
+          FIRMWARE_PATH=".pio/build/esp32s3_n16r8/firmware.bin"
+          
+          # Generate SHA-256 checksum
+          sha256sum "$FIRMWARE_PATH" | cut -d' ' -f1 > "${FIRMWARE_PATH%.bin}.sha256"
+          echo "SHA-256: $(cat ${FIRMWARE_PATH%.bin}.sha256)"
+          
+          # Sign firmware using Python with PyNaCl
+          python3 << 'EOF'
+          import sys
+          import nacl.signing
+          import nacl.encoding
+          import hashlib
+          import os
+
+          # Read private key from environment (hex-encoded)
+          key_hex = os.environ.get('OTA_SIGNING_KEY', '')
+          if not key_hex:
+              print("ERROR: OTA_SIGNING_KEY is empty")
+              sys.exit(1)
+
+          try:
+              # Decode hex key (64 hex chars = 32 bytes)
+              key_bytes = bytes.fromhex(key_hex)
+              if len(key_bytes) != 32:
+                  print(f"ERROR: Key must be 32 bytes, got {len(key_bytes)}")
+                  sys.exit(1)
+                  
+              signing_key = nacl.signing.SigningKey(key_bytes)
+          except Exception as e:
+              print(f"ERROR: Failed to parse signing key: {e}")
+              sys.exit(1)
+
+          # Read firmware and compute SHA-256
+          firmware_path = ".pio/build/esp32s3_n16r8/firmware.bin"
+          with open(firmware_path, "rb") as f:
+              firmware_data = f.read()
+
+          firmware_hash = hashlib.sha256(firmware_data).digest()
+          print(f"Firmware SHA-256: {firmware_hash.hex()}")
+
+          # Sign the hash
+          signed = signing_key.sign(firmware_hash)
+          signature = signed.signature
+
+          print(f"Signature: {signature.hex()}")
+
+          # Write signature file
+          sig_path = firmware_path.replace(".bin", ".sig")
+          with open(sig_path, "w") as f:
+              f.write(signature.hex())
+
+          print(f"Signature written to {sig_path}")
+          EOF
+
+      # 6. Create a GitHub Release and upload firmware with signature
       - name: Create Release and Upload Firmware
         uses: softprops/action-gh-release@v2
         with:
-          # The files to upload as release assets.
-          # IMPORTANT: Change 'esp32s3_n16r8' to your specific PlatformIO environment name.
-          # You can find this name in your platformio.ini file (e.g., [env:esp32s3_n16r8])
-          files: .pio/build/esp32s3_n16r8/firmware.bin
-
-          # This creates a release with the same name as the tag pushed
+          files: |
+            .pio/build/esp32s3_n16r8/firmware.bin
+            .pio/build/esp32s3_n16r8/firmware.sig
+            .pio/build/esp32s3_n16r8/firmware.sha256
           name: Release ${{ github.ref_name }}
-
-          # This will create a "draft" release, so you can manually edit release notes before publishing
           draft: true
-
-          # This will mark the release as "pre-release" if you want
           prerelease: false
+          fail_on_unmatched_files: false
