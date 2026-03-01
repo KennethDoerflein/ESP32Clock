@@ -1267,6 +1267,8 @@ void ConfigManager::setTimezone(const String &tz)
     if (timezone != tz)
     {
       timezone = tz;
+      setenv("TZ", timezone.c_str(), 1);
+      tzset();
       _isDirty = true;
     }
   }
