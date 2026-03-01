@@ -113,11 +113,10 @@ void ClockPage::render(TFT_eSPI &tft)
   DisplayData currentData;
   updateDisplayData(currentData);
 
-  if (currentData.seconds != _lastData.seconds)
-  {
-    drawSeconds(tft);
-    _lastData.seconds = currentData.seconds;
-  }
+  // Render shared clock elements (seconds, time/tod, date, dayOfWeek)
+  renderClockElements(tft, currentData, _lastData);
+
+  // ClockPage-specific elements
   if (fabs(currentData.temp - _lastData.temp) > 0.1)
   {
     drawTemperature(tft);
@@ -128,27 +127,11 @@ void ClockPage::render(TFT_eSPI &tft)
     drawHumidity(tft);
     _lastData.humidity = currentData.humidity;
   }
-  if (currentData.time != _lastData.time || currentData.tod != _lastData.tod)
-  {
-    drawClock(tft);
-    _lastData.time = currentData.time;
-    _lastData.tod = currentData.tod;
-  }
-  if (currentData.date != _lastData.date)
-  {
-    drawDate(tft);
-    _lastData.date = currentData.date;
-  }
-  if (currentData.dayOfWeek != _lastData.dayOfWeek)
-  {
-    drawDayOfWeek(tft);
-    _lastData.dayOfWeek = currentData.dayOfWeek;
-  }
-  if (currentData.nextAlarm1 != _lastData.nextAlarm1 || currentData.nextAlarm2 != _lastData.nextAlarm2)
+  if (strcmp(currentData.nextAlarm1, _lastData.nextAlarm1) != 0 || strcmp(currentData.nextAlarm2, _lastData.nextAlarm2) != 0)
   {
     drawNextAlarms(tft, currentData.nextAlarm1, currentData.nextAlarm2);
-    _lastData.nextAlarm1 = currentData.nextAlarm1;
-    _lastData.nextAlarm2 = currentData.nextAlarm2;
+    strncpy(_lastData.nextAlarm1, currentData.nextAlarm1, sizeof(_lastData.nextAlarm1));
+    strncpy(_lastData.nextAlarm2, currentData.nextAlarm2, sizeof(_lastData.nextAlarm2));
   }
 }
 
@@ -321,11 +304,13 @@ void ClockPage::drawClock(TFT_eSPI &tft)
 {
   auto &timeManager = TimeManager::getInstance();
   bool is24Hour = timeManager.is24HourFormat();
-  String timeStr = timeManager.getFormattedTime();
-  String todStr = timeManager.getTOD();
+  char timeStr[8];
+  char todStr[4];
+  timeManager.getFormattedTime(timeStr, sizeof(timeStr));
+  timeManager.getTOD(todStr, sizeof(todStr));
 
   _sprClock.fillSprite(_bgColor);
-  _sprClock.drawString(timeStr.c_str(), _sprClock.width(), _sprClock.height() / 2);
+  _sprClock.drawString(timeStr, _sprClock.width(), _sprClock.height() / 2);
 #ifdef DEBUG_BORDERS
   _sprClock.drawRect(0, 0, _sprClock.width(), _sprClock.height(), TFT_RED);
 #endif
@@ -334,7 +319,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   if (!is24Hour)
   {
     _sprTOD.fillSprite(_bgColor);
-    _sprTOD.drawString(todStr.c_str(), _sprTOD.width(), 0);
+    _sprTOD.drawString(todStr, _sprTOD.width(), 0);
 #ifdef DEBUG_BORDERS
     _sprTOD.drawRect(0, 0, _sprTOD.width(), _sprTOD.height(), TFT_GREEN);
 #endif
@@ -348,9 +333,10 @@ void ClockPage::drawClock(TFT_eSPI &tft)
  */
 void ClockPage::drawSeconds(TFT_eSPI &tft)
 {
-  String secondsStr = TimeManager::getInstance().getFormattedSeconds();
+  char secondsStr[4];
+  TimeManager::getInstance().getFormattedSeconds(secondsStr, sizeof(secondsStr));
   _sprSeconds.fillSprite(_bgColor);
-  _sprSeconds.drawString(secondsStr.c_str(), _sprSeconds.width(), 0);
+  _sprSeconds.drawString(secondsStr, _sprSeconds.width(), 0);
 #ifdef DEBUG_BORDERS
   _sprSeconds.drawRect(0, 0, _sprSeconds.width(), _sprSeconds.height(), TFT_MAGENTA);
 #endif
@@ -363,9 +349,10 @@ void ClockPage::drawSeconds(TFT_eSPI &tft)
  */
 void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
 {
-  String dayStr = TimeManager::getInstance().getDayOfWeek();
+  char dayStr[4];
+  TimeManager::getInstance().getDayOfWeek(dayStr, sizeof(dayStr));
   _sprDayOfWeek.fillSprite(_bgColor);
-  _sprDayOfWeek.drawString(dayStr.c_str(), 0, _sprDayOfWeek.height() / 2);
+  _sprDayOfWeek.drawString(dayStr, 0, _sprDayOfWeek.height() / 2);
 #ifdef DEBUG_BORDERS
   _sprDayOfWeek.drawRect(0, 0, _sprDayOfWeek.width(), _sprDayOfWeek.height(), TFT_BLUE);
 #endif
@@ -378,28 +365,29 @@ void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
  */
 void ClockPage::drawDate(TFT_eSPI &tft)
 {
-  String dateStr = TimeManager::getInstance().getFormattedDate();
+  char dateStr[12];
+  TimeManager::getInstance().getFormattedDate(dateStr, sizeof(dateStr));
   _sprDate.fillSprite(_bgColor);
-  _sprDate.drawString(dateStr.c_str(), _sprDate.width(), _sprDate.height() / 2);
+  _sprDate.drawString(dateStr, _sprDate.width(), _sprDate.height() / 2);
 #ifdef DEBUG_BORDERS
   _sprDate.drawRect(0, 0, _sprDate.width(), _sprDate.height(), TFT_YELLOW);
 #endif
   _sprDate.pushSprite(tft.width() / 2, _dateY);
 }
 
-void ClockPage::drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String &alarm2)
+void ClockPage::drawNextAlarms(TFT_eSPI &tft, const char *alarm1, const char *alarm2)
 {
   _sprNextAlarm1.fillSprite(_bgColor);
-  if (alarm1.length() > 0)
+  if (alarm1[0] != '\0')
   {
-    _sprNextAlarm1.drawString(alarm1.c_str(), 0, _sprNextAlarm1.height() / 2);
+    _sprNextAlarm1.drawString(alarm1, 0, _sprNextAlarm1.height() / 2);
   }
   _sprNextAlarm1.pushSprite(MARGIN, _alarmRowY);
 
   _sprNextAlarm2.fillSprite(_bgColor);
-  if (alarm2.length() > 0)
+  if (alarm2[0] != '\0')
   {
-    _sprNextAlarm2.drawString(alarm2.c_str(), _sprNextAlarm2.width(), _sprNextAlarm2.height() / 2);
+    _sprNextAlarm2.drawString(alarm2, _sprNextAlarm2.width(), _sprNextAlarm2.height() / 2);
   }
   _sprNextAlarm2.pushSprite(tft.width() / 2, _alarmRowY);
 }
@@ -415,8 +403,6 @@ void ClockPage::drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String
 void ClockPage::drawTemperature(TFT_eSPI &tft)
 {
   float temp = getTemperature();
-  auto &config = ConfigManager::getInstance();
-  uint16_t tempColor = hexToRGB565(config.getTempColor());
 
   _sprTemp.fillSprite(_bgColor);
   _sprTemp.loadFont(DSEG14ModernBold48);
@@ -430,11 +416,11 @@ void ClockPage::drawTemperature(TFT_eSPI &tft)
   int circleRadius = max(2, fontHeight / 14);
   int circleX = tempWidth + circleRadius + 2;
   int circleY = (_sprTemp.height() / 2) - (fontHeight / 2) + circleRadius;
-  _sprTemp.fillCircle(circleX, circleY, circleRadius, tempColor);
+  _sprTemp.fillCircle(circleX, circleY, circleRadius, _sprTemp.textcolor);
 
   _sprTemp.loadFont(DSEG14ModernBold32);
   _sprTemp.setTextDatum(TL_DATUM);
-  char unit = config.isCelsius() ? 'C' : 'F';
+  char unit = ConfigManager::getInstance().isCelsius() ? 'C' : 'F';
   char unitBuf[2] = {unit, '\0'};
   int unitX = circleX + circleRadius + 2;
   int unitY = (_sprTemp.height() / 2) - (fontHeight / 2);
@@ -487,24 +473,19 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
  */
 void ClockPage::updateDisplayData(DisplayData &data)
 {
-  auto &timeManager = TimeManager::getInstance();
-  data.time = timeManager.getFormattedTime();
-  data.date = timeManager.getFormattedDate();
-  data.dayOfWeek = timeManager.getDayOfWeek();
+  fillClockDisplayBase(data);
   data.temp = getTemperature();
   data.humidity = getHumidity();
-  data.tod = timeManager.getTOD();
-  data.seconds = timeManager.getFormattedSeconds();
 
+  auto &timeManager = TimeManager::getInstance();
   std::vector<NextAlarmTime> alarms = timeManager.getNextAlarms(2);
   bool is24Hour = timeManager.is24HourFormat();
 
   if (alarms.size() > 0)
   {
-    char timeStr[16];
     if (is24Hour)
     {
-      sprintf(timeStr, "%02d:%02d", alarms[0].time.hour(), alarms[0].time.minute());
+      snprintf(data.nextAlarm1, sizeof(data.nextAlarm1), "%02d:%02d", alarms[0].time.hour(), alarms[0].time.minute());
     }
     else
     {
@@ -512,21 +493,19 @@ void ClockPage::updateDisplayData(DisplayData &data)
       if (hour12 == 0)
         hour12 = 12;
       const char *suffix = (alarms[0].time.hour() < 12) ? "AM" : "PM";
-      sprintf(timeStr, "%d:%02d%s", hour12, alarms[0].time.minute(), suffix);
+      snprintf(data.nextAlarm1, sizeof(data.nextAlarm1), "%d:%02d%s", hour12, alarms[0].time.minute(), suffix);
     }
-    data.nextAlarm1 = String(timeStr);
   }
   else
   {
-    data.nextAlarm1 = "";
+    data.nextAlarm1[0] = '\0';
   }
 
   if (alarms.size() > 1)
   {
-    char timeStr[16];
     if (is24Hour)
     {
-      sprintf(timeStr, "%02d:%02d", alarms[1].time.hour(), alarms[1].time.minute());
+      snprintf(data.nextAlarm2, sizeof(data.nextAlarm2), "%02d:%02d", alarms[1].time.hour(), alarms[1].time.minute());
     }
     else
     {
@@ -534,13 +513,12 @@ void ClockPage::updateDisplayData(DisplayData &data)
       if (hour12 == 0)
         hour12 = 12;
       const char *suffix = (alarms[1].time.hour() < 12) ? "AM" : "PM";
-      sprintf(timeStr, "%d:%02d%s", hour12, alarms[1].time.minute(), suffix);
+      snprintf(data.nextAlarm2, sizeof(data.nextAlarm2), "%d:%02d%s", hour12, alarms[1].time.minute(), suffix);
     }
-    data.nextAlarm2 = String(timeStr);
   }
   else
   {
-    data.nextAlarm2 = "";
+    data.nextAlarm2[0] = '\0';
   }
 }
 
@@ -571,15 +549,58 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
     _sprTOD.pushSprite(_todX, _todY);
   }
 
-  // Force a redraw of all elements by setting their last known values to something invalid.
-  // We use a space for strings to ensure they differ from empty strings (which might be the new state).
-  _lastData.time = " ";
-  _lastData.date = " ";
-  _lastData.dayOfWeek = " ";
+  // Force a redraw of all common clock elements
+  resetClockFields(_lastData);
+
+  // ClockPage-specific fields
   _lastData.temp = -999.0;
   _lastData.humidity = -999.0;
-  _lastData.tod = " ";
-  _lastData.seconds = " ";
-  _lastData.nextAlarm1 = " ";
-  _lastData.nextAlarm2 = " ";
+  strncpy(_lastData.nextAlarm1, " ", sizeof(_lastData.nextAlarm1));
+  strncpy(_lastData.nextAlarm2, " ", sizeof(_lastData.nextAlarm2));
+}
+
+// --- Shared helpers for subclasses ---
+
+void ClockPage::fillClockDisplayBase(ClockDisplayBase &base) const
+{
+  auto &timeManager = TimeManager::getInstance();
+  timeManager.getFormattedTime(base.time, sizeof(base.time));
+  timeManager.getFormattedDate(base.date, sizeof(base.date));
+  timeManager.getDayOfWeek(base.dayOfWeek, sizeof(base.dayOfWeek));
+  timeManager.getTOD(base.tod, sizeof(base.tod));
+  timeManager.getFormattedSeconds(base.seconds, sizeof(base.seconds));
+}
+
+void ClockPage::renderClockElements(TFT_eSPI &tft, const ClockDisplayBase &current, ClockDisplayBase &last)
+{
+  if (strcmp(current.seconds, last.seconds) != 0)
+  {
+    drawSeconds(tft);
+    strncpy(last.seconds, current.seconds, sizeof(last.seconds));
+  }
+  if (strcmp(current.time, last.time) != 0 || strcmp(current.tod, last.tod) != 0)
+  {
+    drawClock(tft);
+    strncpy(last.time, current.time, sizeof(last.time));
+    strncpy(last.tod, current.tod, sizeof(last.tod));
+  }
+  if (strcmp(current.date, last.date) != 0)
+  {
+    drawDate(tft);
+    strncpy(last.date, current.date, sizeof(last.date));
+  }
+  if (strcmp(current.dayOfWeek, last.dayOfWeek) != 0)
+  {
+    drawDayOfWeek(tft);
+    strncpy(last.dayOfWeek, current.dayOfWeek, sizeof(last.dayOfWeek));
+  }
+}
+
+void ClockPage::resetClockFields(ClockDisplayBase &base)
+{
+  strncpy(base.time, " ", sizeof(base.time));
+  strncpy(base.date, " ", sizeof(base.date));
+  strncpy(base.dayOfWeek, " ", sizeof(base.dayOfWeek));
+  strncpy(base.tod, " ", sizeof(base.tod));
+  strncpy(base.seconds, " ", sizeof(base.seconds));
 }

@@ -71,10 +71,9 @@ TaskHandle_t g_logicTaskHandle = NULL;
  * should be in the IDLE, RINGING, or SNOOZED state. It checks the
  * AlarmManager and the configuration to make the decision.
  */
-void updateAlarmState()
+void updateAlarmState(const std::vector<Alarm> &alarms)
 {
   auto &alarmManager = AlarmManager::getInstance();
-  auto &config = ConfigManager::getInstance();
   AlarmState oldState = g_alarmState;
 
   // Determine the new state based on current conditions.
@@ -87,7 +86,6 @@ void updateAlarmState()
   else
   {
     bool anySnoozed = false;
-    std::vector<Alarm> alarms = config.getAllAlarms();
     for (const auto &alarm : alarms)
     {
       if (alarm.isSnoozed())
@@ -217,11 +215,13 @@ void logicTask(void *pvParameters)
     // Handle Serial Log (WebSocket updates etc)
     SerialLog::getInstance().loop();
 
-    // Log heap every minute to track stability
+    // Log heap every minute to track stability and fragmentation
     static unsigned long lastHeapLog = 0;
     if (millis() - lastHeapLog > 60000)
     {
-      SerialLog::getInstance().printf("Logic Task Heartbeat - Free Heap: %u\n", ESP.getFreeHeap());
+      SerialLog::getInstance().printf(
+          "Logic Task Heartbeat - Free: %u | Min: %u | MaxAlloc: %u\n",
+          ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
       lastHeapLog = millis();
     }
 
@@ -458,7 +458,7 @@ void setup()
   xTaskCreatePinnedToCore(
       logicTask,
       "LogicTask",
-      8192,
+      12288,
       NULL,
       1,
       &g_logicTaskHandle,
@@ -524,8 +524,11 @@ void loop()
     displayManager.update();
   }
 
+  // --- Cache alarm state once per loop to avoid redundant heap copies ---
+  std::vector<Alarm> alarms = config.getAllAlarms();
+
   // --- Alarm State Machine ---
-  updateAlarmState();
+  updateAlarmState(alarms);
 
   // State actions
   switch (g_alarmState)
@@ -630,8 +633,9 @@ void loop()
       if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > SNOOZE_DISMISS_HOLD_TIME)
       { // 3-second hold
         SerialLog::getInstance().print("Snooze active: Button held. Ending snooze.\n");
-        std::vector<Alarm> alarms = config.getAllAlarms();
-        for (auto &alarm : alarms)
+        // Use a fresh copy here since we need to mutate and save
+        std::vector<Alarm> snoozedAlarms = config.getAllAlarms();
+        for (auto &alarm : snoozedAlarms)
         {
           if (alarm.isSnoozed())
           {
@@ -674,10 +678,9 @@ void loop()
     break;
   }
 
-  // --- Update Alarm Icon (Runs regardless of WiFi connection) ---
+  // --- Update Alarm Icon (reuses cached alarms vector) ---
   bool anyAlarmEnabled = false;
   bool anyAlarmSnoozed = false;
-  std::vector<Alarm> alarms = config.getAllAlarms();
   for (const auto &alarm : alarms)
   {
     if (alarm.isEnabled())

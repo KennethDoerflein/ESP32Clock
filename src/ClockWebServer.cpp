@@ -505,10 +505,6 @@ void ClockWebServer::begin()
         Display::getInstance().updateRotation();
       }
       DisplayManager::getInstance().requestFullRefresh();
-      
-      // Give the main loop time to process the new default settings
-      // and update the Display singleton's actualBrightness.
-      delay(100); 
 
       request->send(200, "text/plain", "General settings reset!"); });
 
@@ -643,9 +639,6 @@ void ClockWebServer::begin()
       auto &config = ConfigManager::getInstance();
       config.resetDisplayToDefaults();
       DisplayManager::getInstance().requestFullRefresh();
-      
-      // Give the main loop time to process the new default settings.
-      delay(100); 
 
       request->send(200, "text/plain", "Display settings reset!"); });
 
@@ -661,8 +654,7 @@ void ClockWebServer::begin()
 
             WiFiManager::getInstance().setHostname(hostname);
             request->send(200, "text/plain", "Hostname saved. Rebooting...");
-            delay(100);
-            ESP.restart();
+            request->onDisconnect([](){ ESP.restart(); });
         } else {
             request->send(400, "text/plain", "Hostname not provided.");
         } });
@@ -670,8 +662,7 @@ void ClockWebServer::begin()
     server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
               {
       request->send(200, "text/plain", "Rebooting...");
-      delay(100);
-      ESP.restart(); });
+      request->onDisconnect([](){ ESP.restart(); }); });
 
     server.on("/factory-reset", HTTP_GET, [](AsyncWebServerRequest *request)
               {
@@ -681,9 +672,10 @@ void ClockWebServer::begin()
         return;
       }
       request->send(200, "text/plain", "Performing factory reset...");
-      ConfigManager::getInstance().factoryReset();
-      delay(100);
-      ESP.restart(); });
+      request->onDisconnect([](){ 
+        ConfigManager::getInstance().factoryReset();
+        ESP.restart(); 
+      }); });
 
     server.on("/factory-reset-except-wifi", HTTP_GET, [](AsyncWebServerRequest *request)
               {
@@ -693,9 +685,10 @@ void ClockWebServer::begin()
         return;
       }
       request->send(200, "text/plain", "Performing factory reset and keeping WiFi credentials...");
-      ConfigManager::getInstance().factoryResetExceptWiFi();
-      delay(100);
-      ESP.restart(); });
+      request->onDisconnect([](){ 
+        ConfigManager::getInstance().factoryResetExceptWiFi();
+        ESP.restart(); 
+      }); });
 
     server.on("/system", HTTP_GET, [this](AsyncWebServerRequest *request)
               { request->send_P(200, "text/html", SYSTEM_PAGE_HTML, [this](const String &var)

@@ -190,85 +190,106 @@ bool TimeManager::updateNtp()
  *
  * @return The formatted time string (e.g., "14:30" or "2:30").
  */
-String TimeManager::getFormattedTime() const
+void TimeManager::getFormattedTime(char *buf, size_t bufSize) const
 {
   DateTime now = getRTCTime();
-  char timeStr[6]; // Buffer for "HH:MM"
-
-  // Format the time based on the user's preference (12/24 hour).
   if (is24HourFormat())
   {
-    sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
+    snprintf(buf, bufSize, "%02d:%02d", now.hour(), now.minute());
   }
   else
   {
-    // Convert 24-hour time to 12-hour format.
     int hour12 = now.hour() % 12;
     if (hour12 == 0)
-      hour12 = 12; // 0 o'clock is 12 AM.
-    sprintf(timeStr, "%d:%02d", hour12, now.minute());
+      hour12 = 12;
+    snprintf(buf, bufSize, "%d:%02d", hour12, now.minute());
   }
-  return String(timeStr);
+}
+
+String TimeManager::getFormattedTime() const
+{
+  char buf[8];
+  getFormattedTime(buf, sizeof(buf));
+  return String(buf);
 }
 
 /**
  * @brief Gets the seconds part of the current time, zero-padded.
  * @return The formatted seconds string (e.g., "05").
  */
-String TimeManager::getFormattedSeconds() const
+void TimeManager::getFormattedSeconds(char *buf, size_t bufSize) const
 {
   DateTime now = getCachedTime();
-  char secondsStr[3];
-  sprintf(secondsStr, "%02d", now.second());
-  return String(secondsStr);
+  snprintf(buf, bufSize, "%02d", now.second());
+}
+
+String TimeManager::getFormattedSeconds() const
+{
+  char buf[4];
+  getFormattedSeconds(buf, sizeof(buf));
+  return String(buf);
 }
 
 /**
  * @brief Gets the current date formatted as "MON DAY".
  * @return The formatted date string (e.g., "OCT 26").
  */
-String TimeManager::getFormattedDate() const
+void TimeManager::getFormattedDate(char *buf, size_t bufSize) const
 {
   DateTime now = getRTCTime();
-  // Array of month abbreviations for a compact date format.
   static const char *monthNames[] = {
       "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
       "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
-  char dateStr[12];
-  // Format as "MON DAY" (e.g., "OCT 26").
-  snprintf(dateStr, sizeof(dateStr), "%s %d", monthNames[now.month() - 1], now.day());
-  return String(dateStr);
+  snprintf(buf, bufSize, "%s %d", monthNames[now.month() - 1], now.day());
+}
+
+String TimeManager::getFormattedDate() const
+{
+  char buf[12];
+  getFormattedDate(buf, sizeof(buf));
+  return String(buf);
 }
 
 /**
  * @brief Gets the time-of-day indicator (AM/PM).
  * @return "AM", "PM", or an empty string if in 24-hour format.
  */
-String TimeManager::getTOD() const
+void TimeManager::getTOD(char *buf, size_t bufSize) const
 {
-  // Return an empty string if in 24-hour mode, as AM/PM is not needed.
   if (is24HourFormat())
   {
-    return "";
+    buf[0] = '\0';
+    return;
   }
   DateTime now = getRTCTime();
-  // Determine AM or PM based on the hour.
-  return (now.hour() < 12) ? "AM" : "PM";
+  snprintf(buf, bufSize, "%s", (now.hour() < 12) ? "AM" : "PM");
+}
+
+String TimeManager::getTOD() const
+{
+  char buf[4];
+  getTOD(buf, sizeof(buf));
+  return String(buf);
 }
 
 /**
  * @brief Gets the day of the week as a three-letter abbreviation.
  * @return The abbreviated day of the week (e.g., "SUN").
  */
-String TimeManager::getDayOfWeek() const
+void TimeManager::getDayOfWeek(char *buf, size_t bufSize) const
 {
   DateTime now = getRTCTime();
-  // Array of day abbreviations.
   static const char *dayNames[] = {
       "SUN", "MON", "TUE", "WED",
       "THU", "FRI", "SAT"};
-  // The dayOfTheWeek() method returns an index (0=Sun, 1=Mon, etc.).
-  return String(dayNames[now.dayOfTheWeek()]);
+  snprintf(buf, bufSize, "%s", dayNames[now.dayOfTheWeek()]);
+}
+
+String TimeManager::getDayOfWeek() const
+{
+  char buf[4];
+  getDayOfWeek(buf, sizeof(buf));
+  return String(buf);
 }
 
 /**

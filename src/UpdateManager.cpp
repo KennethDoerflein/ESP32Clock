@@ -340,7 +340,8 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
         if (OTA_KEY_CONFIGURED && hasSignature)
         {
             // Need to buffer firmware for signature verification
-            firmwareBuffer = (uint8_t *)malloc(contentLength);
+            // Use PSRAM for the large firmware buffer to avoid fragmenting internal heap
+            firmwareBuffer = (uint8_t *)ps_malloc(contentLength);
             if (!firmwareBuffer)
             {
                 SerialLog::getInstance().print("Failed to allocate firmware buffer\n");

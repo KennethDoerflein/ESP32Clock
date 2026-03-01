@@ -147,6 +147,13 @@ public:
   int getNumAlarms() const;
 
   /**
+   * @brief Gets the snooze-until timestamp of the first snoozed alarm.
+   * @details Zero-allocation alternative to getAllAlarms() for snooze countdown display.
+   * @return The snooze-until unix timestamp, or 0 if no alarm is snoozed.
+   */
+  time_t getFirstSnoozedUntil() const;
+
+  /**
    * @brief Replaces the current list of alarms with a new one.
    * Assigns new IDs to alarms with ID -1.
    * @param newAlarms The new vector of alarms.

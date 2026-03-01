@@ -7,16 +7,9 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "LockGuard.h"
+#include <esp_task_wdt.h>
 
 static const unsigned long WEATHER_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
-
-void weatherUpdateTask(void *parameter)
-{
-  WeatherService *service = static_cast<WeatherService *>(parameter);
-  service->updateWeather();
-  service->notifyTaskFinished();
-  vTaskDelete(NULL); // Delete self when done
-}
 
 // Helper to convert WMO Weather Codes to String Condition
 const char *WeatherService::getConditionFromWMO(int code)
@@ -73,7 +66,8 @@ const char *WeatherService::getConditionFromWMO(int code)
 // Helper to URL encode a string
 String urlEncode(String str)
 {
-  String encodedString = "";
+  String encodedString;
+  encodedString.reserve(str.length() * 3); // Worst case: every char encoded
   char c;
   char code0;
   char code1;
@@ -112,13 +106,66 @@ String urlEncode(String str)
 WeatherService::WeatherService() : _lastUpdate(0), _weatherTaskHandle(NULL)
 {
   _mutex = xSemaphoreCreateMutex();
+  _wakeSignal = xSemaphoreCreateBinary();
 }
 
+/**
+ * @brief Creates the persistent weather task. Called once at boot.
+ *
+ * The task runs forever on Core 0, sleeping on a binary semaphore between
+ * updates. This avoids the heap fragmentation caused by repeatedly creating
+ * and destroying a 32KB task every 10 minutes.
+ */
 void WeatherService::begin()
 {
-  // Initial check handled in loop or triggered by events
+  xTaskCreatePinnedToCore(
+      weatherTaskEntry,    // Persistent task entry point
+      "WeatherUpdate",     // Name of the task
+      32768,               // Stack size (32KB for HTTPS + JSON)
+      this,                // Task input parameter
+      1,                   // Priority
+      &_weatherTaskHandle, // Task handle
+      0                    // Core 0
+  );
+  SerialLog::getInstance().print("Weather task created (persistent).\n");
 }
 
+/**
+ * @brief Persistent weather task entry point. Runs forever.
+ *
+ * Enrolls in WDT, waits on a binary semaphore, performs the update, then
+ * sleeps again. The semaphore is given by loop() on a timer or by forceUpdate().
+ */
+void WeatherService::weatherTaskEntry(void *parameter)
+{
+  WeatherService *service = static_cast<WeatherService *>(parameter);
+
+  for (;;)
+  {
+    // Sleep until signaled to update (with a timeout as a safety net).
+    // WDT is NOT active here — the task sleeps for minutes at a time.
+    xSemaphoreTake(service->_wakeSignal, pdMS_TO_TICKS(WEATHER_UPDATE_INTERVAL + 30000));
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      // Enroll in WDT only for the duration of the HTTP work
+      esp_task_wdt_add(NULL);
+
+      SerialLog::getInstance().print("Weather task: starting update...\n");
+      service->updateWeather();
+
+      esp_task_wdt_delete(NULL);
+    }
+
+    // Small yield to prevent tight looping on rapid semaphore gives
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
+/**
+ * @brief Called periodically from logicTask. Signals the persistent weather
+ *        task to wake up when the update interval has elapsed.
+ */
 void WeatherService::loop()
 {
   if (WiFi.status() != WL_CONNECTED)
@@ -126,40 +173,19 @@ void WeatherService::loop()
 
   unsigned long now = millis();
 
-  // Protect the entire check-and-spawn logic with the mutex
   LockGuard lock(_mutex);
-  bool isTaskRunning = (_weatherTaskHandle != NULL);
-
-  // Check if it's time to update and if a task isn't already running
-  if ((now - _lastUpdate > WEATHER_UPDATE_INTERVAL || _lastUpdate == 0) && !isTaskRunning)
+  if (now - _lastUpdate > WEATHER_UPDATE_INTERVAL || _lastUpdate == 0)
   {
     _lastUpdate = now;
-
-    // Log outside of the task creation but inside the lock (SerialLog has its own mutex, this is safe)
-    SerialLog::getInstance().print("Starting Weather Update Task...\n");
-
-    xTaskCreatePinnedToCore(
-        weatherUpdateTask,   // Function to implement the task
-        "WeatherUpdate",     // Name of the task
-        32768,               // Stack size (32KB for HTTPS + JSON)
-        this,                // Task input parameter
-        1,                   // Priority
-        &_weatherTaskHandle, // Task handle
-        0                    // Core 0
-    );
+    xSemaphoreGive(_wakeSignal); // Wake the persistent task
   }
 }
 
 void WeatherService::forceUpdate()
 {
   LockGuard lock(_mutex);
-  _lastUpdate = 0; // Resets the timer, causing loop() to trigger update immediately
-}
-
-void WeatherService::notifyTaskFinished()
-{
-  LockGuard lock(_mutex);
-  _weatherTaskHandle = NULL;
+  _lastUpdate = 0;
+  xSemaphoreGive(_wakeSignal); // Wake the persistent task immediately
 }
 
 String WeatherService::getWindDirectionStr(int degrees)

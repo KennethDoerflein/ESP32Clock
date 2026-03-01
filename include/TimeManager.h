@@ -86,10 +86,24 @@ public:
   String getFormattedTime() const;
 
   /**
+   * @brief Zero-allocation version: writes formatted time into caller buffer.
+   * @param buf Output buffer (must be >= 6 bytes for "HH:MM" + null).
+   * @param bufSize Size of the buffer.
+   */
+  void getFormattedTime(char *buf, size_t bufSize) const;
+
+  /**
    * @brief Gets the current date, formatted for display.
    * @return A String containing the formatted date (e.g., "JAN 1").
    */
   String getFormattedDate() const;
+
+  /**
+   * @brief Zero-allocation version: writes formatted date into caller buffer.
+   * @param buf Output buffer (must be >= 12 bytes).
+   * @param bufSize Size of the buffer.
+   */
+  void getFormattedDate(char *buf, size_t bufSize) const;
 
   /**
    * @brief Gets the current day of the week.
@@ -98,16 +112,37 @@ public:
   String getDayOfWeek() const;
 
   /**
+   * @brief Zero-allocation version: writes day abbreviation into caller buffer.
+   * @param buf Output buffer (must be >= 4 bytes for "SUN" + null).
+   * @param bufSize Size of the buffer.
+   */
+  void getDayOfWeek(char *buf, size_t bufSize) const;
+
+  /**
    * @brief Gets the time of day period (AM/PM).
    * @return "AM", "PM", or an empty string if in 24-hour format.
    */
   String getTOD() const;
 
   /**
+   * @brief Zero-allocation version: writes AM/PM into caller buffer.
+   * @param buf Output buffer (must be >= 3 bytes for "PM" + null).
+   * @param bufSize Size of the buffer.
+   */
+  void getTOD(char *buf, size_t bufSize) const;
+
+  /**
    * @brief Gets the seconds of the current time, formatted for display.
    * @return A String containing the formatted seconds (e.g., "59").
    */
   String getFormattedSeconds() const;
+
+  /**
+   * @brief Zero-allocation version: writes formatted seconds into caller buffer.
+   * @param buf Output buffer (must be >= 3 bytes for "59" + null).
+   * @param bufSize Size of the buffer.
+   */
+  void getFormattedSeconds(char *buf, size_t bufSize) const;
 
   /**
    * @brief Gets the cached time snapshot from the last update() call.

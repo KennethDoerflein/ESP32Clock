@@ -325,26 +325,21 @@ void DisplayManager::renderAlarmOverlay()
   }
   else
   {
-    // Check for snoozed alarms
-    std::vector<Alarm> alarms = config.getAllAlarms();
-    for (const auto &alarm : alarms)
+    // Check for snoozed alarms using zero-allocation getter
+    time_t snoozeUntil = config.getFirstSnoozedUntil();
+    if (snoozeUntil > 0)
     {
-      if (alarm.isSnoozed())
+      time_t now = TimeManager::getInstance().getRTCTime().unixtime();
+      long remaining = snoozeUntil - now;
+      if (remaining < 0)
       {
-        time_t snoozeUntil = alarm.getSnoozeUntil();
-        time_t now = TimeManager::getInstance().getRTCTime().unixtime();
-        long remaining = snoozeUntil - now;
-        if (remaining < 0)
-        {
-          remaining = 0;
-        }
-
-        char buf[10];
-        snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
-        text = String(buf);
-        showButton = true;
-        break;
+        remaining = 0;
       }
+
+      char buf[10];
+      snprintf(buf, sizeof(buf), "%ld:%02ld", remaining / 60, remaining % 60);
+      text = String(buf);
+      showButton = true;
     }
   }
 

@@ -38,9 +38,8 @@ public:
   void loop();
   WeatherData getCurrentWeather() const;
 
-  // Called by the background task
+  // Called by the persistent background task
   void updateWeather();
-  void notifyTaskFinished();
   void updateLocation();
 
   /**
@@ -77,9 +76,13 @@ public:
 private:
   WeatherService();
 
+  /// @brief Entry point for the persistent weather task. Runs forever.
+  static void weatherTaskEntry(void *parameter);
+
   WeatherData _currentWeather;
   unsigned long _lastUpdate;
 
   mutable SemaphoreHandle_t _mutex;
   TaskHandle_t _weatherTaskHandle;
+  SemaphoreHandle_t _wakeSignal; ///< Binary semaphore to wake the persistent task
 };

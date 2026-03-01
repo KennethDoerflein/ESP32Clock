@@ -43,11 +43,11 @@ void WeatherClockPage::onEnter(TFT_eSPI &tft)
   setupLayout(tft); // Calculate layout after sprites are created
 
   // Force a redraw of all elements
-  _lastData = {};
-  _lastData.indoorTemp = -999.0;
-  _lastData.indoorHumidity = -999.0;
-  _lastData.outdoorTemp = -999.0;
-  _lastData.time = " ";
+  _lastWeatherData = {};
+  _lastWeatherData.indoorTemp = -999.0;
+  _lastWeatherData.indoorHumidity = -999.0;
+  _lastWeatherData.outdoorTemp = -999.0;
+  resetClockFields(_lastWeatherData);
 }
 
 void WeatherClockPage::onExit()
@@ -64,55 +64,34 @@ void WeatherClockPage::render(TFT_eSPI &tft)
   WeatherClockDisplayData currentData;
   updateDisplayData(currentData);
 
-  if (currentData.seconds != _lastData.seconds)
-  {
-    drawSeconds(tft);
-    _lastData.seconds = currentData.seconds;
-  }
+  // Render shared clock elements (seconds, time/tod, date, dayOfWeek)
+  renderClockElements(tft, currentData, _lastWeatherData);
 
-  // Draw Weather (Outdoor) if changed
-  if (fabs(currentData.outdoorTemp - _lastData.outdoorTemp) > 0.1 ||
-      currentData.outdoorCondition != _lastData.outdoorCondition)
+  // Weather-specific elements
+  if (fabs(currentData.outdoorTemp - _lastWeatherData.outdoorTemp) > 0.1 ||
+      currentData.outdoorCondition != _lastWeatherData.outdoorCondition)
   {
     drawWeather(tft);
-    _lastData.outdoorTemp = currentData.outdoorTemp;
-    _lastData.outdoorCondition = currentData.outdoorCondition;
+    _lastWeatherData.outdoorTemp = currentData.outdoorTemp;
+    _lastWeatherData.outdoorCondition = currentData.outdoorCondition;
   }
 
-  // Draw Bottom Row Elements
-  if (fabs(currentData.indoorTemp - _lastData.indoorTemp) > 0.1)
+  if (fabs(currentData.indoorTemp - _lastWeatherData.indoorTemp) > 0.1)
   {
     drawIndoorTemp(tft);
-    _lastData.indoorTemp = currentData.indoorTemp;
+    _lastWeatherData.indoorTemp = currentData.indoorTemp;
   }
 
-  if (currentData.nextAlarm != _lastData.nextAlarm)
+  if (strcmp(currentData.nextAlarm, _lastWeatherData.nextAlarm) != 0)
   {
-    drawBottomAlarm(tft);
-    _lastData.nextAlarm = currentData.nextAlarm;
+    drawBottomAlarm(tft, currentData.nextAlarm);
+    strncpy(_lastWeatherData.nextAlarm, currentData.nextAlarm, sizeof(_lastWeatherData.nextAlarm));
   }
 
-  if (fabs(currentData.indoorHumidity - _lastData.indoorHumidity) > 0.1)
+  if (fabs(currentData.indoorHumidity - _lastWeatherData.indoorHumidity) > 0.1)
   {
     drawIndoorHumidity(tft);
-    _lastData.indoorHumidity = currentData.indoorHumidity;
-  }
-
-  if (currentData.time != _lastData.time || currentData.tod != _lastData.tod)
-  {
-    drawClock(tft);
-    _lastData.time = currentData.time;
-    _lastData.tod = currentData.tod;
-  }
-  if (currentData.date != _lastData.date)
-  {
-    drawDate(tft);
-    _lastData.date = currentData.date;
-  }
-  if (currentData.dayOfWeek != _lastData.dayOfWeek)
-  {
-    drawDayOfWeek(tft);
-    _lastData.dayOfWeek = currentData.dayOfWeek;
+    _lastWeatherData.indoorHumidity = currentData.indoorHumidity;
   }
 }
 
@@ -303,38 +282,13 @@ void WeatherClockPage::drawIndoorTemp(TFT_eSPI &tft)
   _sprIndoorTemp.pushSprite(MARGIN, _sensorY);
 }
 
-void WeatherClockPage::drawBottomAlarm(TFT_eSPI &tft)
+void WeatherClockPage::drawBottomAlarm(TFT_eSPI &tft, const char *alarmText)
 {
-  auto &config = ConfigManager::getInstance();
-
   _sprBottomAlarm.fillSprite(_bgColor);
 
-  std::vector<NextAlarmTime> alarms = TimeManager::getInstance().getNextAlarms(1);
-  String alarmStr = "";
-  if (alarms.size() > 0)
+  if (alarmText[0] != '\0')
   {
-    bool is24Hour = TimeManager::getInstance().is24HourFormat();
-    char timeStr[16];
-    if (is24Hour)
-    {
-      sprintf(timeStr, "%02d:%02d", alarms[0].time.hour(), alarms[0].time.minute());
-    }
-    else
-    {
-      int hour12 = alarms[0].time.hour() % 12;
-      if (hour12 == 0)
-        hour12 = 12;
-      const char *suffix = (alarms[0].time.hour() < 12) ? "AM" : "PM";
-      sprintf(timeStr, "%d:%02d%s", hour12, alarms[0].time.minute(), suffix);
-    }
-    alarmStr = String(timeStr);
-  }
-
-  if (alarmStr.length() > 0)
-  {
-    _sprBottomAlarm.loadFont(DSEG14ModernBold32);
-    _sprBottomAlarm.setTextColor(hexToRGB565(config.getAlarmTextColor().c_str()), _bgColor);
-    _sprBottomAlarm.drawString(alarmStr, _sprBottomAlarm.width() / 2, _sprBottomAlarm.height() / 2);
+    _sprBottomAlarm.drawString(alarmText, _sprBottomAlarm.width() / 2, _sprBottomAlarm.height() / 2);
   }
 
   _sprBottomAlarm.pushSprite(MARGIN + _sensorWidth, _sensorY);
@@ -361,10 +315,7 @@ void WeatherClockPage::drawIndoorHumidity(TFT_eSPI &tft)
 
 void WeatherClockPage::updateDisplayData(WeatherClockDisplayData &data)
 {
-  auto &timeManager = TimeManager::getInstance();
-  data.time = timeManager.getFormattedTime();
-  data.date = timeManager.getFormattedDate();
-  data.dayOfWeek = timeManager.getDayOfWeek();
+  fillClockDisplayBase(data);
 
   data.indoorTemp = getTemperature();
   data.indoorHumidity = getHumidity();
@@ -373,18 +324,15 @@ void WeatherClockPage::updateDisplayData(WeatherClockDisplayData &data)
   data.outdoorTemp = wd.temp;
   data.outdoorCondition = wd.condition;
 
-  data.tod = timeManager.getTOD();
-  data.seconds = timeManager.getFormattedSeconds();
-
+  auto &timeManager = TimeManager::getInstance();
   std::vector<NextAlarmTime> alarms = timeManager.getNextAlarms(1);
   bool is24Hour = timeManager.is24HourFormat();
 
   if (alarms.size() > 0)
   {
-    char timeStr[16];
     if (is24Hour)
     {
-      sprintf(timeStr, "%02d:%02d", alarms[0].time.hour(), alarms[0].time.minute());
+      snprintf(data.nextAlarm, sizeof(data.nextAlarm), "%02d:%02d", alarms[0].time.hour(), alarms[0].time.minute());
     }
     else
     {
@@ -392,13 +340,12 @@ void WeatherClockPage::updateDisplayData(WeatherClockDisplayData &data)
       if (hour12 == 0)
         hour12 = 12;
       const char *suffix = (alarms[0].time.hour() < 12) ? "AM" : "PM";
-      sprintf(timeStr, "%d:%02d%s", hour12, alarms[0].time.minute(), suffix);
+      snprintf(data.nextAlarm, sizeof(data.nextAlarm), "%d:%02d%s", hour12, alarms[0].time.minute(), suffix);
     }
-    data.nextAlarm = String(timeStr);
   }
   else
   {
-    data.nextAlarm = "";
+    data.nextAlarm[0] = '\0';
   }
 }
 
@@ -418,15 +365,13 @@ void WeatherClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
     _sprTOD.pushSprite(_todX, _todY);
   }
 
-  // Force a redraw of all elements by setting their last known values to something invalid.
-  _lastData.time = " ";
-  _lastData.date = " ";
-  _lastData.dayOfWeek = " ";
-  _lastData.indoorTemp = -999.0;
-  _lastData.indoorHumidity = -999.0;
-  _lastData.outdoorTemp = -999.0;
-  _lastData.outdoorCondition = " ";
-  _lastData.tod = " ";
-  _lastData.seconds = " ";
-  _lastData.nextAlarm = "REFRESH";
+  // Force a redraw of all elements
+  resetClockFields(_lastWeatherData);
+
+  // WeatherClockPage-specific fields
+  _lastWeatherData.indoorTemp = -999.0;
+  _lastWeatherData.indoorHumidity = -999.0;
+  _lastWeatherData.outdoorTemp = -999.0;
+  _lastWeatherData.outdoorCondition = " ";
+  strncpy(_lastWeatherData.nextAlarm, "REFRESH", sizeof(_lastWeatherData.nextAlarm));
 }

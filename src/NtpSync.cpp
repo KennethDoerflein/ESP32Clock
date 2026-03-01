@@ -10,6 +10,7 @@
 #include "SensorModule.h"
 #include "SerialLog.h"
 #include "ConfigManager.h"
+#include "LockGuard.h"
 #include <Arduino.h>
 
 // --- Common NTP Constants ---
@@ -30,6 +31,8 @@ const unsigned long maxDelayMs = 30000;
 const int jitterMaxMs = 1000;
 
 // --- Non-Blocking NTP Sync State ---
+/// @brief Mutex protecting all NTP sync state (accessed from async web task and Core 0 logicTask).
+static SemaphoreHandle_t ntpMutex = xSemaphoreCreateMutex();
 /// @brief Current state of the non-blocking synchronization process.
 static NtpSyncState ntpState = NTP_SYNC_IDLE;
 /// @brief Counter for the number of retries in the current non-blocking sync.
@@ -115,6 +118,7 @@ bool getNTPData(struct tm &timeinfo)
  */
 void startNtpSync()
 {
+  LockGuard lock(ntpMutex);
   if (ntpState == NTP_SYNC_IN_PROGRESS)
   {
     return;
@@ -132,6 +136,7 @@ void startNtpSync()
  */
 NtpSyncState updateNtpSync()
 {
+  LockGuard lock(ntpMutex);
   if (ntpState != NTP_SYNC_IN_PROGRESS)
   {
     return ntpState;
@@ -230,6 +235,7 @@ bool syncTime()
  */
 void resetNtpSync()
 {
+  LockGuard lock(ntpMutex);
   ntpState = NTP_SYNC_IDLE;
   SerialLog::getInstance().print("NTP sync state reset to IDLE.");
 }

@@ -4,18 +4,18 @@
 #include <TFT_eSPI.h>
 #include <cstdint>
 
-struct WeatherClockDisplayData
+/**
+ * @brief Display data for the WeatherClockPage.
+ *
+ * Extends ClockDisplayBase with weather and indoor sensor fields.
+ */
+struct WeatherClockDisplayData : public ClockDisplayBase
 {
-  String time;
-  String date;
-  String dayOfWeek;
   float indoorTemp;
   float indoorHumidity;
   float outdoorTemp;
   String outdoorCondition;
-  String tod;
-  String seconds;
-  String nextAlarm;
+  char nextAlarm[16];
 };
 
 /**
@@ -42,7 +42,7 @@ private:
 
   // New drawing functions for the bottom row
   void drawIndoorTemp(TFT_eSPI &tft);
-  void drawBottomAlarm(TFT_eSPI &tft);
+  void drawBottomAlarm(TFT_eSPI &tft, const char *alarmText);
   void drawIndoorHumidity(TFT_eSPI &tft);
 
   void updateSpriteColors() override;
@@ -55,7 +55,7 @@ private:
   TFT_eSprite _sprIndoorHumidity; // Row 4 Right
 
   // Cached values
-  WeatherClockDisplayData _lastData;
+  WeatherClockDisplayData _lastWeatherData;
 
   // Layout position variables
   int _weatherY;

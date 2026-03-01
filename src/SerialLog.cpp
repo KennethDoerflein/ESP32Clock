@@ -282,10 +282,9 @@ void SerialLog::flush()
   }
   else
   {
-    // If file open fails, we might want to clear the buffer to prevent indefinite growth
-    // or keep it to try again?
-    // For safety against OOM, if buffer gets too huge, clear it.
-    if (_logBuffer.length() > 2048)
+    // If file open fails, clear the buffer early to prevent OOM.
+    // 1024 bytes is enough to hold recent context without risking heap exhaustion.
+    if (_logBuffer.length() > 1024)
     {
       _logBuffer = "";
     }

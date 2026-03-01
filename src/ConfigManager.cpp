@@ -278,16 +278,23 @@ void ConfigManager::load()
     for (int i = 0; i < LEGACY_ALARMS_COUNT; ++i)
     {
       Alarm alarm;
-      String prefix = "a_" + String(i) + "_";
+      char key[16];
       alarm.setId(i);
-      alarm.setEnabled(_preferences.getBool((prefix + "en").c_str(), false));
-      alarm.setHour(_preferences.getUChar((prefix + "hr").c_str(), 6));
-      alarm.setMinute(_preferences.getUChar((prefix + "min").c_str(), 0));
-      alarm.setDays(_preferences.getUChar((prefix + "days").c_str(), 0));
-      bool snoozed = _preferences.getBool((prefix + "snz").c_str(), false);
-      uint32_t snoozeUntil = _preferences.getUInt((prefix + "snzUntil").c_str(), 0);
+      snprintf(key, sizeof(key), "a_%d_en", i);
+      alarm.setEnabled(_preferences.getBool(key, false));
+      snprintf(key, sizeof(key), "a_%d_hr", i);
+      alarm.setHour(_preferences.getUChar(key, 6));
+      snprintf(key, sizeof(key), "a_%d_min", i);
+      alarm.setMinute(_preferences.getUChar(key, 0));
+      snprintf(key, sizeof(key), "a_%d_days", i);
+      alarm.setDays(_preferences.getUChar(key, 0));
+      snprintf(key, sizeof(key), "a_%d_snz", i);
+      bool snoozed = _preferences.getBool(key, false);
+      snprintf(key, sizeof(key), "a_%d_snzUntil", i);
+      uint32_t snoozeUntil = _preferences.getUInt(key, 0);
       alarm.setSnoozeState(snoozed, snoozeUntil);
-      alarm.setLastDismissedDay(_preferences.getUChar((prefix + "lastDis").c_str(), 8));
+      snprintf(key, sizeof(key), "a_%d_lastDis", i);
+      alarm.setLastDismissedDay(_preferences.getUChar(key, 8));
       _alarms.push_back(alarm);
     }
     _nextAlarmId = LEGACY_ALARMS_COUNT;
@@ -299,16 +306,24 @@ void ConfigManager::load()
     for (int i = 0; i < numAlarms; ++i)
     {
       Alarm alarm;
-      String prefix = "a_" + String(i) + "_";
-      alarm.setId(_preferences.getUChar((prefix + "id").c_str(), 0));
-      alarm.setEnabled(_preferences.getBool((prefix + "en").c_str(), false));
-      alarm.setHour(_preferences.getUChar((prefix + "hr").c_str(), 6));
-      alarm.setMinute(_preferences.getUChar((prefix + "min").c_str(), 0));
-      alarm.setDays(_preferences.getUChar((prefix + "days").c_str(), 0));
-      bool snoozed = _preferences.getBool((prefix + "snz").c_str(), false);
-      uint32_t snoozeUntil = _preferences.getUInt((prefix + "snzUntil").c_str(), 0);
+      char key[16];
+      snprintf(key, sizeof(key), "a_%d_id", i);
+      alarm.setId(_preferences.getUChar(key, 0));
+      snprintf(key, sizeof(key), "a_%d_en", i);
+      alarm.setEnabled(_preferences.getBool(key, false));
+      snprintf(key, sizeof(key), "a_%d_hr", i);
+      alarm.setHour(_preferences.getUChar(key, 6));
+      snprintf(key, sizeof(key), "a_%d_min", i);
+      alarm.setMinute(_preferences.getUChar(key, 0));
+      snprintf(key, sizeof(key), "a_%d_days", i);
+      alarm.setDays(_preferences.getUChar(key, 0));
+      snprintf(key, sizeof(key), "a_%d_snz", i);
+      bool snoozed = _preferences.getBool(key, false);
+      snprintf(key, sizeof(key), "a_%d_snzUntil", i);
+      uint32_t snoozeUntil = _preferences.getUInt(key, 0);
       alarm.setSnoozeState(snoozed, snoozeUntil);
-      alarm.setLastDismissedDay(_preferences.getUChar((prefix + "lastDis").c_str(), 8));
+      snprintf(key, sizeof(key), "a_%d_lastDis", i);
+      alarm.setLastDismissedDay(_preferences.getUChar(key, 8));
       _alarms.push_back(alarm);
     }
   }
@@ -398,29 +413,45 @@ bool ConfigManager::save()
   {
     for (int i = _alarms.size(); i < oldNumAlarms; ++i)
     {
-      String prefix = "a_" + String(i) + "_";
-      _preferences.remove((prefix + "id").c_str());
-      _preferences.remove((prefix + "en").c_str());
-      _preferences.remove((prefix + "hr").c_str());
-      _preferences.remove((prefix + "min").c_str());
-      _preferences.remove((prefix + "days").c_str());
-      _preferences.remove((prefix + "snz").c_str());
-      _preferences.remove((prefix + "snzUntil").c_str());
-      _preferences.remove((prefix + "lastDis").c_str());
+      char key[16];
+      snprintf(key, sizeof(key), "a_%d_id", i);
+      _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_en", i);
+      _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_hr", i);
+      _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_min", i);
+      _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_days", i);
+      _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_snz", i);
+      _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_snzUntil", i);
+      _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_lastDis", i);
+      _preferences.remove(key);
     }
   }
 
   for (size_t i = 0; i < _alarms.size(); ++i)
   {
-    String prefix = "a_" + String(i) + "_";
-    _preferences.putUChar((prefix + "id").c_str(), _alarms[i].getId());
-    _preferences.putBool((prefix + "en").c_str(), _alarms[i].isEnabled());
-    _preferences.putUChar((prefix + "hr").c_str(), _alarms[i].getHour());
-    _preferences.putUChar((prefix + "min").c_str(), _alarms[i].getMinute());
-    _preferences.putUChar((prefix + "days").c_str(), _alarms[i].getDays());
-    _preferences.putBool((prefix + "snz").c_str(), _alarms[i].isSnoozed());
-    _preferences.putUInt((prefix + "snzUntil").c_str(), _alarms[i].getSnoozeUntil());
-    _preferences.putUChar((prefix + "lastDis").c_str(), _alarms[i].getLastDismissedDay());
+    char key[16];
+    snprintf(key, sizeof(key), "a_%zu_id", i);
+    _preferences.putUChar(key, _alarms[i].getId());
+    snprintf(key, sizeof(key), "a_%zu_en", i);
+    _preferences.putBool(key, _alarms[i].isEnabled());
+    snprintf(key, sizeof(key), "a_%zu_hr", i);
+    _preferences.putUChar(key, _alarms[i].getHour());
+    snprintf(key, sizeof(key), "a_%zu_min", i);
+    _preferences.putUChar(key, _alarms[i].getMinute());
+    snprintf(key, sizeof(key), "a_%zu_days", i);
+    _preferences.putUChar(key, _alarms[i].getDays());
+    snprintf(key, sizeof(key), "a_%zu_snz", i);
+    _preferences.putBool(key, _alarms[i].isSnoozed());
+    snprintf(key, sizeof(key), "a_%zu_snzUntil", i);
+    _preferences.putUInt(key, _alarms[i].getSnoozeUntil());
+    snprintf(key, sizeof(key), "a_%zu_lastDis", i);
+    _preferences.putUChar(key, _alarms[i].getLastDismissedDay());
   }
 
   SerialLog::getInstance().print("Configuration saved.");
@@ -719,6 +750,19 @@ bool ConfigManager::isAnyAlarmSnoozed() const
     }
   }
   return false;
+}
+
+time_t ConfigManager::getFirstSnoozedUntil() const
+{
+  RecursiveLockGuard lock(_mutex);
+  for (const auto &alarm : _alarms)
+  {
+    if (alarm.isSnoozed())
+    {
+      return alarm.getSnoozeUntil();
+    }
+  }
+  return 0;
 }
 
 // Getters

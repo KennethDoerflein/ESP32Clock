@@ -3,18 +3,32 @@
 #include "Page.h"
 #include <TFT_eSPI.h>
 #include <cstdint>
+#include <cstring>
 
-struct DisplayData
+/**
+ * @brief Common clock display fields shared by ClockPage and WeatherClockPage.
+ *
+ * Contains the time, date, day-of-week, AM/PM, and seconds data that is
+ * populated and compared identically on both pages.
+ */
+struct ClockDisplayBase
 {
-  String time;
-  String date;
-  String dayOfWeek;
+  char time[8];
+  char date[12];
+  char dayOfWeek[4];
+  char tod[4];
+  char seconds[4];
+};
+
+/**
+ * @brief Full display data for the ClockPage (extends base with sensors + alarms).
+ */
+struct DisplayData : public ClockDisplayBase
+{
   float temp;
   float humidity;
-  String tod;
-  String seconds;
-  String nextAlarm1;
-  String nextAlarm2;
+  char nextAlarm1[16];
+  char nextAlarm2[16];
 };
 
 /**
@@ -52,10 +66,22 @@ protected:
   virtual void drawTemperature(TFT_eSPI &tft);
   virtual void drawHumidity(TFT_eSPI &tft);
   virtual void drawSeconds(TFT_eSPI &tft);
-  virtual void drawNextAlarms(TFT_eSPI &tft, const String &alarm1, const String &alarm2);
+  virtual void drawNextAlarms(TFT_eSPI &tft, const char *alarm1, const char *alarm2);
 
   virtual void updateSpriteColors();
   void updateDisplayData(DisplayData &data);
+
+  // --- Shared helpers for subclasses ---
+
+  /// @brief Fills the common clock fields (time, date, dow, tod, seconds) into a ClockDisplayBase.
+  void fillClockDisplayBase(ClockDisplayBase &base) const;
+
+  /// @brief Renders the common clock elements (seconds, time/tod, date, dayOfWeek) if changed.
+  /// @return void. Updates lastBase in-place for changed fields.
+  void renderClockElements(TFT_eSPI &tft, const ClockDisplayBase &current, ClockDisplayBase &last);
+
+  /// @brief Resets the common clock fields to force a full redraw on next render.
+  void resetClockFields(ClockDisplayBase &base);
 
   // Flag to track sprite creation
   bool _spritesCreated = false;
