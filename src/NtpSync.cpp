@@ -12,6 +12,7 @@
 #include "ConfigManager.h"
 #include "LockGuard.h"
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 
 // --- Common NTP Constants ---
 /// @brief Primary NTP server address.
@@ -80,7 +81,7 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo, uint32_t rtt, u
   // Busy-wait for the precise moment
   while (millis() < target_millis)
   {
-    // Actively wait
+    esp_task_wdt_reset(); // Feed the watchdog during busy-wait
   }
 
   // Update the hardware RTC with the adjusted time.
@@ -202,6 +203,7 @@ bool syncTime()
     SerialLog::getInstance().printf("Fetching NTP time (Attempt %d/%d)...\n", i, maxRetries);
 
     uint32_t start = millis();
+    esp_task_wdt_reset(); // Feed before the potentially blocking getNTPData
     if (getNTPData(timeinfo))
     {
       uint32_t end = millis();
@@ -216,7 +218,13 @@ bool syncTime()
       unsigned long totalDelay = delayForNextAttempt + jitter;
 
       SerialLog::getInstance().printf("Failed to obtain time. Retrying in %.2f seconds...\n", totalDelay / 1000.0);
-      delay(totalDelay);
+      
+      // Use a loop for the delay to keep the watchdog fed if the delay is long
+      unsigned long startDelay = millis();
+      while (millis() - startDelay < totalDelay) {
+        esp_task_wdt_reset();
+        delay(10);
+      }
 
       delayForNextAttempt *= 2;
       if (delayForNextAttempt > maxDelayMs)
