@@ -230,12 +230,14 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
   HTTPClient http;
   WiFiClientSecure client;
   client.setInsecure();
+  client.setTimeout(15);  // 15s cap on TLS handshake (seconds)
 
   SerialLog::getInstance().printf("Resolving Location: %s\n", url.c_str());
 
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-  http.useHTTP10(true); // Disable chunked transfer encoding for stream safety
+  http.useHTTP10(true);    // Disable chunked transfer encoding for stream safety
+  http.setTimeout(15000);  // 15s HTTP timeout — well under the 30s WDT
 
   int httpCode = http.GET();
   bool success = false;
@@ -424,6 +426,7 @@ void WeatherService::updateWeather()
   HTTPClient http;
   WiFiClientSecure client;
   client.setInsecure();
+  client.setTimeout(15);  // 15s cap on TLS handshake (seconds)
 
   // Use reserve to prevent reallocations
   String url;
@@ -441,6 +444,7 @@ void WeatherService::updateWeather()
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS); // Good practice
   http.useHTTP10(true);                                  // Disable chunked transfer encoding for stream safety
+  http.setTimeout(15000);                                // 15s HTTP timeout — well under the 30s WDT
   int httpCode = http.GET();
 
   if (httpCode == 200)
