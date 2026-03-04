@@ -14,6 +14,21 @@
 #include <Arduino.h>
 #include <esp_task_wdt.h>
 
+/**
+ * @brief One-time initialization of the SNTP client.
+ * @details Configures the NTP servers and timezone. This should be called
+ * once at startup. The SNTP daemon runs in the background and keeps the
+ * ESP32's system clock accurate; subsequent calls to getLocalTime() will
+ * return the compensated time directly.
+ */
+void initNtp()
+{
+  configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
+  setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
+  tzset();
+  SerialLog::getInstance().print("NTP: SNTP client initialized.\n");
+}
+
 // --- Common NTP Constants ---
 /// @brief Primary NTP server address.
 const char *NTP_SERVER = "time.nist.gov";
@@ -45,16 +60,15 @@ static unsigned long currentRetryDelay = 0;
 
 /**
  * @brief Processes the time data received from an NTP server.
- * @details This helper function converts the tm struct, compensates for delay,
- * adjusts the RTC, and prints a success message.
- * @param timeinfo The tm struct populated by a successful NTP call.
- * @param rtt The round-trip time of the NTP request in milliseconds.
- * @param reception_time The value of `millis()` when the NTP response was received.
+ * @details Converts the tm struct to a DateTime and sets the hardware RTC.
+ *          The ESP-IDF SNTP daemon already handles RTT compensation internally,
+ *          so the time in `timeinfo` (from `getLocalTime`) is already accurate.
+ * @param timeinfo The tm struct populated by a successful getLocalTime() call.
  */
-static void _processSuccessfulNtpSync(const struct tm &timeinfo, uint32_t rtt, uint32_t reception_time)
+static void _processSuccessfulNtpSync(const struct tm &timeinfo)
 {
   // Convert the C `tm` struct to an `RTClib::DateTime` object.
-  DateTime receivedTime(
+  DateTime time_to_set(
       timeinfo.tm_year + 1900,
       timeinfo.tm_mon + 1,
       timeinfo.tm_mday,
@@ -62,35 +76,14 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo, uint32_t rtt, u
       timeinfo.tm_min,
       timeinfo.tm_sec);
 
-  // Compensate for 1/2 RTT
-  uint32_t compensation_ms = rtt / 2;
-  SerialLog::getInstance().printf("NTP RTT: %u ms, compensation: %u ms\n", rtt, compensation_ms);
-
-  // Calculate future time to set
-  // We add +2 seconds: +1 to round up to the next second, and another +1
-  // to compensate for the fact that the NTP library seems to return the time
-  // for the *previous* second.
-  uint16_t ms_into_second = compensation_ms % 1000;
-  uint16_t seconds_to_add = (compensation_ms / 1000) + 2;
-  DateTime time_to_set = receivedTime + TimeSpan(seconds_to_add);
-
-  // Calculate how long to wait to align with the start of the next second
-  uint16_t delay_until_next_second_ms = 1000 - ms_into_second;
-  uint32_t target_millis = reception_time + delay_until_next_second_ms;
-
-  // Busy-wait for the precise moment
-  while (millis() < target_millis)
-  {
-    esp_task_wdt_reset(); // Feed the watchdog during busy-wait
-  }
-
-  // Update the hardware RTC with the adjusted time.
+  // Update the hardware RTC directly. No manual RTT compensation needed;
+  // the SNTP daemon has already applied it to the system clock.
   RTC.adjust(time_to_set);
 
   // Update DST status in configuration
   ConfigManager::getInstance().setDST(timeinfo.tm_isdst > 0);
 
-  SerialLog::getInstance().print("RTC synchronized with NTP time (compensated): ");
+  SerialLog::getInstance().print("RTC synchronized with NTP time: ");
   char timeStr[20];
   sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
           time_to_set.year(),
@@ -104,13 +97,15 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo, uint32_t rtt, u
 
 /**
  * @brief Fetches time data from the configured NTP servers.
+ * @details Reads the current system time (kept accurate by the SNTP daemon
+ *          initialized via initNtp()). Refreshes the timezone in case the
+ *          user changed it since the last call.
  */
 bool getNTPData(struct tm &timeinfo)
 {
-  configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
+  // Refresh timezone in case user changed it
   setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
   tzset();
-  // The getLocalTime function expects a pointer to the tm struct
   return getLocalTime(&timeinfo);
 }
 
@@ -156,12 +151,9 @@ NtpSyncState updateNtpSync()
   SerialLog::getInstance().printf("Fetching NTP time (Attempt %d/%d)...\n", retryCount, maxRetries);
 
   struct tm timeinfo;
-  // Pass the struct directly as the function expects a reference
-  uint32_t start = millis();
   if (getNTPData(timeinfo))
   {
-    uint32_t end = millis();
-    _processSuccessfulNtpSync(timeinfo, end - start, end);
+    _processSuccessfulNtpSync(timeinfo);
     ntpState = NTP_SYNC_SUCCESS; // Update state to success
     return ntpState;
   }
@@ -202,12 +194,10 @@ bool syncTime()
   {
     SerialLog::getInstance().printf("Fetching NTP time (Attempt %d/%d)...\n", i, maxRetries);
 
-    uint32_t start = millis();
     esp_task_wdt_reset(); // Feed before the potentially blocking getNTPData
     if (getNTPData(timeinfo))
     {
-      uint32_t end = millis();
-      _processSuccessfulNtpSync(timeinfo, end - start, end);
+      _processSuccessfulNtpSync(timeinfo);
       return true;
     }
 

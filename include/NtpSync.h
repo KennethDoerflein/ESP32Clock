@@ -18,11 +18,18 @@ extern const char *BACKUP2_NTP_SERVER;
 extern const char *TZ_INFO;
 
 /**
+ * @brief One-time initialization of the SNTP client.
+ *
+ * Configures NTP servers and timezone. Must be called once at startup,
+ * before any calls to getNTPData() or syncTime().
+ */
+void initNtp();
+
+/**
  * @brief Fetches time data from the configured NTP servers.
  *
- * This is a low-level function that configures the ESP32's time client
- * and attempts to retrieve the current time. It populates a `tm` struct
- * with the results. This function can block while waiting for a network response.
+ * Reads the current system time (kept accurate by the SNTP daemon
+ * initialized via initNtp()). Populates a `tm` struct with the results.
  *
  * @param timeinfo A reference to a `tm` struct to be populated with the time data.
  * @return true if the time was successfully obtained.
@@ -49,8 +56,6 @@ enum NtpSyncState
   NTP_SYNC_SUCCESS,     ///< The last NTP synchronization attempt was successful.
   NTP_SYNC_FAILED       ///< The last NTP synchronization attempt failed after all retries.
 };
-
-bool getNTPData(struct tm &timeinfo);
 
 /**
  * @brief Starts the non-blocking NTP synchronization process.

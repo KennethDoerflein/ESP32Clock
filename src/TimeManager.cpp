@@ -73,6 +73,10 @@ void TimeManager::begin()
 {
   // Note: RTC hardware initialization is handled externally in setupSensors()
   // to group all I2C device setups together.
+
+  // Initialize the SNTP daemon once (configures NTP servers and timezone).
+  initNtp();
+
   // Perform an initial NTP sync attempt at startup.
   SerialLog::getInstance().print("TimeManager: Performing initial NTP sync...\n");
   syncWithNTP();
