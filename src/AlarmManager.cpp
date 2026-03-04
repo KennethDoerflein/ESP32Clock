@@ -74,7 +74,13 @@ void AlarmManager::update()
 
   // --- Stage Progression Logic ---
   uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();
-  uint32_t alarmElapsedSeconds = now - _alarmStartTimestamp;
+  
+  // Guard against unsigned underflow if RTC loses power and returns epoch 0.
+  // If now < _alarmStartTimestamp the subtraction wraps to ~4B, triggering an
+  // immediate auto-off or infinite ring. Treat any such state as elapsed = 0.
+  uint32_t alarmElapsedSeconds = (now >= _alarmStartTimestamp)
+      ? (now - _alarmStartTimestamp)
+      : 0;
 
   // --- Auto-off Logic ---
   if (alarmElapsedSeconds >= ALARM_AUTO_OFF_SECONDS)
@@ -249,19 +255,28 @@ void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
 
   // Re-evaluate the ramp stage based on how long it's been ringing.
   uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();
-  uint32_t alarmElapsedSeconds = now - _alarmStartTimestamp;
-
-  if (alarmElapsedSeconds >= ((STAGE1_DURATION_MS + STAGE2_DURATION_MS) / 1000))
-  {
-    _rampStage = STAGE_CONTINUOUS;
-  }
-  else if (alarmElapsedSeconds >= (STAGE1_DURATION_MS / 1000))
-  {
-    _rampStage = STAGE_FAST_BEEP;
-  }
-  else
-  {
+  
+  // Guard: if RTC lost power and returned epoch 0, elapsed time wraps.
+  // In this case, start fresh from STAGE_SLOW_BEEP to be safe.
+  uint32_t alarmElapsedSeconds = 0;
+  if (!TimeManager::getInstance().isTimeSet() || now < _alarmStartTimestamp) {
+    SerialLog::getInstance().print("AlarmManager: RTC time invalid at resume, starting from STAGE_SLOW_BEEP.\n");
     _rampStage = STAGE_SLOW_BEEP;
+  } else {
+    alarmElapsedSeconds = now - _alarmStartTimestamp;
+
+    if (alarmElapsedSeconds >= ((STAGE1_DURATION_MS + STAGE2_DURATION_MS) / 1000))
+    {
+      _rampStage = STAGE_CONTINUOUS;
+    }
+    else if (alarmElapsedSeconds >= (STAGE1_DURATION_MS / 1000))
+    {
+      _rampStage = STAGE_FAST_BEEP;
+    }
+    else
+    {
+      _rampStage = STAGE_SLOW_BEEP;
+    }
   }
   SerialLog::getInstance().printf("Resumed at ramp stage %d\n", _rampStage);
 

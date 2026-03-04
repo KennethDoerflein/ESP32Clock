@@ -16,6 +16,8 @@
 #include "AlarmManager.h"
 #include "SerialLog.h"
 #include "LockGuard.h"
+#include <esp_task_wdt.h>
+#include <WiFi.h>
 
 #include <vector>
 #include <algorithm>
@@ -360,11 +362,18 @@ void TimeManager::checkDriftAndResync()
   {
     return; // Not time for a drift check yet.
   }
+  
+  if (WiFi.status() != WL_CONNECTED) {
+    return; // Can't check drift without WiFi
+  }
+
   lastDriftCheck = currentMillis;
 
   SerialLog::getInstance().print("Performing periodic clock drift check...\n");
 
   // Get the current time from the NTP server without adjusting the RTC.
+  // Feed WDT before potentially blocking call
+  esp_task_wdt_reset();
   DateTime ntpTime = getNtpTime();
   if (!ntpTime.isValid())
   {
@@ -471,6 +480,13 @@ void TimeManager::updateSnoozeStates()
 
 DateTime TimeManager::getRTCTime() const
 {
+  // Guard against calling RTC.now() before the I2C bus and RTC hardware are
+  // initialized. Without this, an early call (e.g. from AlarmManager::update
+  // before setupSensors() completes) talks to uninitialized hardware.
+  if (!isRtcFound())
+  {
+    return DateTime(); // Returns an invalid DateTime (year < 2000)
+  }
   RecursiveLockGuard lock(_mutex);
   return RTC.now();
 }

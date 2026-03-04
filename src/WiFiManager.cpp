@@ -70,11 +70,10 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
 
       if (instance._saveOnSuccess)
       {
-        auto &config = ConfigManager::getInstance();
-        config.setWifiSSID(instance._testSsid);
-        config.setWifiPassword(instance._testPassword);
-        config.save();
-        instance._pendingReboot = true;
+        // Do NOT call config.save() here — the WiFi event callback runs in the
+        // WiFi stack task context; NVS writes from there can corrupt flash.
+        // Set a flag and flush it in handleConnection() (main loop context).
+        instance._pendingCredentialSave = true;
       }
     }
     return; // Do not fall through to standard handling during a test.
@@ -125,6 +124,24 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
  */
 void WiFiManager::handleConnection()
 {
+  // Flush credential save deferred from the event handler (safe to write NVS here)
+  bool doCredentialSave = false;
+  {
+    LockGuard lock(_mutex);
+    if (_pendingCredentialSave) {
+      _pendingCredentialSave = false;
+      doCredentialSave = true;
+    }
+  }
+  if (doCredentialSave) {
+    auto &config = ConfigManager::getInstance();
+    config.setWifiSSID(_testSsid);
+    config.setWifiPassword(_testPassword);
+    config.save();
+    LockGuard lock(_mutex);
+    _pendingReboot = true;
+  }
+
   if (isCaptivePortal())
   {
     return;

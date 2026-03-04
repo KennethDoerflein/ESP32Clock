@@ -132,31 +132,35 @@ void ClockWebServer::begin()
                return;
             }
 
-            String resolvedAddress;
-            float lat, lon;
-            
-            if (WeatherService::getInstance().resolveLocation(address, resolvedAddress, lat, lon)) {
-                ConfigManager::getInstance().setAddress(resolvedAddress);
-                ConfigManager::getInstance().setLat(lat);
-                ConfigManager::getInstance().setLon(lon);
-                
-                // Trigger weather update asynchronously
-                WeatherService::getInstance().forceUpdate();
-                
-                JsonDocument doc;
-                doc["success"] = true;
-                doc["resolvedAddress"] = resolvedAddress;
-                doc["message"] = "Location found: " + resolvedAddress;
-                
-                String response;
-                serializeJson(doc, response);
-                request->send(200, "application/json", response);
+            if (WeatherService::getInstance().resolveLocationAsync(address)) {
+                request->send(200, "application/json", "{\"success\":true,\"message\":\"Search started.\",\"pending\":true}");
             } else {
-                request->send(200, "application/json", "{\"success\":false,\"message\":\"Location not found.\"}");
+                request->send(200, "application/json", "{\"success\":false,\"message\":\"Search already in progress or system busy.\"}");
             }
         } else {
             request->send(400, "application/json", "{\"success\":false,\"message\":\"Missing address parameter.\"}");
         } });
+
+    server.on("/api/weather/geocoding-status", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        // Read-only: config is already written by the background weather task.
+        // This endpoint only reports the result so the UI can react.
+        auto result = WeatherService::getInstance().getGeocodingResult();
+
+        JsonDocument doc;
+        doc["pending"] = result.pending;
+        doc["success"] = result.success;
+
+        if (!result.pending && result.success) {
+            doc["resolvedAddress"] = result.resolvedAddress;
+            doc["lat"] = result.lat;
+            doc["lon"] = result.lon;
+        }
+
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
 
     server.on("/api/weather", HTTP_GET, [](AsyncWebServerRequest *request)
               {
@@ -256,8 +260,13 @@ void ClockWebServer::begin()
               {
         
         if (index == 0) {
-          // A new request has started. Create a buffer to hold the JSON data.
-          // We allocate it on the heap because it can be large.
+          // Early-reject if Content-Length is known. If total == 0, client is using
+          // chunked transfer — the cumulative check below is the backstop.
+          if (total > 0 && total > 8192) {
+            request->send(413, "text/plain", "Payload too large");
+            return;
+          }
+          
           request->_tempObject = new std::vector<uint8_t>();
           request->onDisconnect([request]() {
             if (request->_tempObject) {
@@ -270,6 +279,15 @@ void ClockWebServer::begin()
         if (!request->_tempObject) return;
 
         std::vector<uint8_t>* buffer = (std::vector<uint8_t>*)request->_tempObject;
+        
+        // Safety check for cumulative size
+        if (buffer->size() + len > 8192) {
+             delete buffer;
+             request->_tempObject = nullptr;
+             request->send(413, "text/plain", "Payload too large");
+             return;
+        }
+        
         buffer->insert(buffer->end(), data, data + len);
 
         if (index + len == total) {
@@ -403,6 +421,10 @@ void ClockWebServer::begin()
         {
           if (index == 0)
           {
+            if (total > 0 && total > 4096) {
+              request->send(413, "text/plain", "Payload too large");
+              return;
+            }
             request->_tempObject = new std::vector<uint8_t>();
             request->onDisconnect([request]() {
               if (request->_tempObject) {
@@ -417,6 +439,14 @@ void ClockWebServer::begin()
 
           std::vector<uint8_t> *buffer =
               (std::vector<uint8_t> *)request->_tempObject;
+
+          if (buffer->size() + len > 4096) {
+              delete buffer;
+              request->_tempObject = nullptr;
+              request->send(413, "text/plain", "Payload too large");
+              return;
+          }
+
           buffer->insert(buffer->end(), data, data + len);
 
           if (index + len == total)
@@ -576,6 +606,11 @@ void ClockWebServer::begin()
         {
           if (index == 0)
           {
+            // Early-reject on known Content-Length; chunked fallback handled cumulatively below.
+            if (total > 0 && total > 4096) {
+              request->send(413, "text/plain", "Payload too large");
+              return;
+            }
             request->_tempObject = new std::vector<uint8_t>();
             request->onDisconnect([request]() {
               if (request->_tempObject) {
@@ -590,6 +625,14 @@ void ClockWebServer::begin()
 
           std::vector<uint8_t> *buffer =
               (std::vector<uint8_t> *)request->_tempObject;
+
+          if (buffer->size() + len > 4096) {
+              delete buffer;
+              request->_tempObject = nullptr;
+              request->send(413, "text/plain", "Payload too large");
+              return;
+          }
+
           buffer->insert(buffer->end(), data, data + len);
 
           if (index + len == total)

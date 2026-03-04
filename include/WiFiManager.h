@@ -145,6 +145,7 @@ private:
   bool _saveOnSuccess = false;
   bool _pendingReboot = false;
   volatile bool _ignoreDisconnectEvent = false;
+  bool _pendingCredentialSave = false; // Set by event handler; flushed in handleConnection()
 
   // Static event handler for WiFi events
   static void wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info);

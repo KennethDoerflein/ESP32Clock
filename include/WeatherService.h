@@ -64,14 +64,22 @@ public:
 
   /**
    * @brief Resolves an address string to coordinates and a formatted name.
+   * This is a non-blocking request. The actual resolution happens in the background.
    *
    * @param query The address/location to search for.
-   * @param resolvedAddress Output: The formatted address found (e.g., "Paris, France").
-   * @param lat Output: Latitude.
-   * @param lon Output: Longitude.
-   * @return true if location found, false otherwise.
+   * @return true if the request was successfully queued, false otherwise.
    */
-  bool resolveLocation(const String &query, String &resolvedAddress, float &lat, float &lon);
+  bool resolveLocationAsync(const String &query);
+
+  struct GeocodingResult {
+      bool success = false;
+      String resolvedAddress;
+      float lat = 0.0;
+      float lon = 0.0;
+      bool pending = false;
+  };
+
+  GeocodingResult getGeocodingResult();
 
 private:
   WeatherService();
@@ -79,10 +87,17 @@ private:
   /// @brief Entry point for the persistent weather task. Runs forever.
   static void weatherTaskEntry(void *parameter);
 
+  /// @brief Blocking geocoding helper. Called only from weatherTaskEntry.
+  bool resolveLocation(const String &query, String &resolvedAddress, float &lat, float &lon);
+
   WeatherData _currentWeather;
   unsigned long _lastUpdate;
 
   mutable SemaphoreHandle_t _mutex;
   TaskHandle_t _weatherTaskHandle;
   SemaphoreHandle_t _wakeSignal; ///< Binary semaphore to wake the persistent task
+
+  // Geocoding request state
+  String _geocodingQuery;
+  GeocodingResult _geocodingResult;
 };
