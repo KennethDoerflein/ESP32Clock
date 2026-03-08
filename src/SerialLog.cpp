@@ -153,7 +153,7 @@ static String getTimestamp()
 {
   time_t now = time(nullptr);
   struct tm t;
-  gmtime_r(&now, &t);
+  localtime_r(&now, &t);
 
   char buf[28];
   // If year is before 2021 the clock hasn't been synced yet — show uptime.
