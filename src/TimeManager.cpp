@@ -16,6 +16,9 @@
 #include "AlarmManager.h"
 #include "SerialLog.h"
 #include "LockGuard.h"
+#include <ctime>
+#include <esp_task_wdt.h>
+#include <WiFi.h>
 
 #include <vector>
 #include <algorithm>
@@ -71,6 +74,10 @@ void TimeManager::begin()
 {
   // Note: RTC hardware initialization is handled externally in setupSensors()
   // to group all I2C device setups together.
+
+  // Initialize the SNTP daemon once (configures NTP servers and timezone).
+  initNtp();
+
   // Perform an initial NTP sync attempt at startup.
   SerialLog::getInstance().print("TimeManager: Performing initial NTP sync...\n");
   syncWithNTP();
@@ -360,11 +367,18 @@ void TimeManager::checkDriftAndResync()
   {
     return; // Not time for a drift check yet.
   }
+  
+  if (WiFi.status() != WL_CONNECTED) {
+    return; // Can't check drift without WiFi
+  }
+
   lastDriftCheck = currentMillis;
 
   SerialLog::getInstance().print("Performing periodic clock drift check...\n");
 
   // Get the current time from the NTP server without adjusting the RTC.
+  // Feed WDT before potentially blocking call
+  esp_task_wdt_reset();
   DateTime ntpTime = getNtpTime();
   if (!ntpTime.isValid())
   {
@@ -389,56 +403,51 @@ void TimeManager::checkDriftAndResync()
 
 void TimeManager::checkDST()
 {
-  // Get current DST state from config
   bool currentDstState = ConfigManager::getInstance().isDST();
 
   DateTime now = getRTCTime();
-  struct tm t;
+  
+  // To robustly detect DST transitions without relying on mktime's mutation format
+  // (which varies in newlib/esp-idf), we explicitly convert the RTC local time
+  // into an Epoch (UTC) using our CURRENT knowledge of the DST state.
+  struct tm t = {};
   t.tm_year = now.year() - 1900;
   t.tm_mon = now.month() - 1;
   t.tm_mday = now.day();
   t.tm_hour = now.hour();
   t.tm_min = now.minute();
   t.tm_sec = now.second();
-
-  // Use the PREVIOUS DST state to help mktime resolve ambiguous times:
-  // - Spring Forward (2 AM gap): 2:00-2:59 doesn't exist, mktime needs context
-  // - Fall Back (2 AM overlap): 1:00-1:59 happens twice, mktime needs to know direction
-  // This is critical for correct DST transitions at 2 AM.
   t.tm_isdst = currentDstState ? 1 : 0;
 
-  mktime(&t); // This normalizes 't' and updates tm_isdst based on TZ rules
+  time_t epoch = mktime(&t);
+  if (epoch == -1) {
+    return; // mktime failed to parse, safety abort
+  }
 
-  bool newDstState = t.tm_isdst > 0;
+  // Then, we convert that exact UTC epoch back to a local time using the system's
+  // current timezone rules. localtime_r is authoritative.
+  struct tm resolved;
+  localtime_r(&epoch, &resolved);
 
+  bool newDstState = resolved.tm_isdst > 0;
+
+  // If the true DST state for this UTC moment differs from our recorded state, or 
+  // mktime/localtime_r found a discrepancy, we apply the resolved time.
   if (newDstState != currentDstState)
   {
     SerialLog::getInstance().printf("DST Change Detected: %d -> %d\n", currentDstState, newDstState);
 
-    // Check if mktime shifted the time (this happens during real DST transitions)
-    DateTime normalizedTime(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
-    bool timeShifted = (normalizedTime.hour() != now.hour() || normalizedTime.minute() != now.minute());
+    DateTime adjustedTime(resolved.tm_year + 1900, resolved.tm_mon + 1, resolved.tm_mday,
+                          resolved.tm_hour, resolved.tm_min, resolved.tm_sec);
 
-    if (timeShifted)
+    SerialLog::getInstance().printf("DST transition. Adjusting RTC: %02d:%02d -> %02d:%02d\n",
+                                     now.hour(), now.minute(),
+                                     adjustedTime.hour(), adjustedTime.minute());
     {
-      // Real DST transition (2 AM Spring Forward or Fall Back)
-      // mktime corrected the time - apply it to RTC
-      SerialLog::getInstance().printf("Real DST transition at 2 AM. Adjusting RTC: %02d:%02d -> %02d:%02d\n",
-                                       now.hour(), now.minute(),
-                                       normalizedTime.hour(), normalizedTime.minute());
       RecursiveLockGuard lock(_mutex);
-      RTC.adjust(normalizedTime);
-    }
-    else
-    {
-      // The DST flag changed but the time didn't shift.
-      // This means the stored config was stale (e.g., isDst=true in January).
-      // Trigger an NTP resync to verify and correct the RTC time if needed.
-      SerialLog::getInstance().print("Stale DST config detected. Triggering NTP resync to verify time.\n");
-      startNtpSync();
+      RTC.adjust(adjustedTime);
     }
 
-    // Always update the config to reflect the correct DST state
     ConfigManager::getInstance().setDST(newDstState);
   }
 }
@@ -471,6 +480,13 @@ void TimeManager::updateSnoozeStates()
 
 DateTime TimeManager::getRTCTime() const
 {
+  // Guard against calling RTC.now() before the I2C bus and RTC hardware are
+  // initialized. Without this, an early call (e.g. from AlarmManager::update
+  // before setupSensors() completes) talks to uninitialized hardware.
+  if (!isRtcFound())
+  {
+    return DateTime(); // Returns an invalid DateTime (year < 2000)
+  }
   RecursiveLockGuard lock(_mutex);
   return RTC.now();
 }

@@ -118,6 +118,9 @@ WeatherService::WeatherService() : _lastUpdate(0), _weatherTaskHandle(NULL)
  */
 void WeatherService::begin()
 {
+  _geocodingResult.pending = false;
+  _geocodingResult.success = false;
+  
   xTaskCreatePinnedToCore(
       weatherTaskEntry,    // Persistent task entry point
       "WeatherUpdate",     // Name of the task
@@ -143,19 +146,83 @@ void WeatherService::weatherTaskEntry(void *parameter)
   for (;;)
   {
     // Sleep until signaled to update (with a timeout as a safety net).
-    // WDT is NOT active here — the task sleeps for minutes at a time.
+    // WDT is enrolled unconditionally around each wake cycle so that any
+    // code path that runs network I/O is covered without leaving orphaned
+    // enrollments if WiFi state changes mid-execution.
     xSemaphoreTake(service->_wakeSignal, pdMS_TO_TICKS(WEATHER_UPDATE_INTERVAL + 30000));
 
-    if (WiFi.status() == WL_CONNECTED)
+    esp_task_wdt_add(NULL);
+
+    // Wait for WiFi to be available, retrying up to ~30 s in 5 s increments.
+    // This handles the boot-time race where the wake signal fires before the
+    // WiFi stack has finished associating.
+    static const int WIFI_RETRY_COUNT = 6;
+    static const TickType_t WIFI_RETRY_DELAY = pdMS_TO_TICKS(5000);
+    bool wifiReady = false;
+    for (int attempt = 0; attempt < WIFI_RETRY_COUNT; ++attempt)
     {
-      // Enroll in WDT only for the duration of the HTTP work
-      esp_task_wdt_add(NULL);
-
-      SerialLog::getInstance().print("Weather task: starting update...\n");
-      service->updateWeather();
-
-      esp_task_wdt_delete(NULL);
+      if (WiFi.status() == WL_CONNECTED)
+      {
+        wifiReady = true;
+        break;
+      }
+      if (attempt == 0)
+      {
+        SerialLog::getInstance().print("Weather task: WiFi not ready, waiting...\n");
+      }
+      vTaskDelay(WIFI_RETRY_DELAY);
+      esp_task_wdt_reset(); // Keep WDT happy during the wait
     }
+
+    if (wifiReady)
+    {
+      // 1. Check for pending geocoding request
+      String query;
+      bool hasGeocoding = false;
+      {
+          LockGuard lock(service->_mutex);
+          if (service->_geocodingResult.pending) {
+              query = service->_geocodingQuery;
+              hasGeocoding = true;
+          }
+      }
+
+      if (hasGeocoding) {
+          SerialLog::getInstance().printf("Weather task: processing geocoding for '%s'\n", query.c_str());
+          String resolved;
+          float lat = 0.0f, lon = 0.0f;
+          bool success = service->resolveLocation(query, resolved, lat, lon);
+
+          if (success) {
+              ConfigManager::getInstance().setAddress(resolved);
+              ConfigManager::getInstance().setLat(lat);
+              ConfigManager::getInstance().setLon(lon);
+              SerialLog::getInstance().printf("Weather task: location saved: %s (%.4f, %.4f)\n", resolved.c_str(), lat, lon);
+          }
+
+          {
+              LockGuard lock(service->_mutex);
+              service->_geocodingResult.success = success;
+              service->_geocodingResult.resolvedAddress = resolved;
+              service->_geocodingResult.lat = lat;
+              service->_geocodingResult.lon = lon;
+              service->_geocodingResult.pending = false;
+          }
+          SerialLog::getInstance().printf("Weather task: geocoding %s\n", success ? "succeeded" : "failed");
+      }
+
+      // 2. Regular weather update
+      SerialLog::getInstance().print("Weather task: starting weather update...\n");
+      service->updateWeather();
+    }
+    else
+    {
+      SerialLog::getInstance().print("Weather task: WiFi unavailable after retries, skipping update.\n");
+    }
+
+    // Always unenroll from WDT before going back to sleep — the task may sleep
+    // for up to WEATHER_UPDATE_INTERVAL minutes and must not hold a WDT slot.
+    esp_task_wdt_delete(NULL);
 
     // Small yield to prevent tight looping on rapid semaphore gives
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -191,6 +258,8 @@ void WeatherService::forceUpdate()
 String WeatherService::getWindDirectionStr(int degrees)
 {
   const char *directions[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+  // Clamp to [0, 360) to prevent negative modulo giving a negative array index.
+  degrees = ((degrees % 360) + 360) % 360;
   int index = (int)((degrees + 22.5) / 45.0) % 8;
   return directions[index];
 }
@@ -352,6 +421,31 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
   return success;
 }
 
+bool WeatherService::resolveLocationAsync(const String &query)
+{
+  if (WiFi.status() != WL_CONNECTED || query.length() == 0)
+    return false;
+
+  LockGuard lock(_mutex);
+  if (_geocodingResult.pending)
+    return false; // Already pending
+
+  _geocodingQuery = query;
+  _geocodingResult.pending = true;
+  _geocodingResult.success = false;
+
+  // Wake the background task
+  xSemaphoreGive(_wakeSignal);
+  return true;
+}
+
+WeatherService::GeocodingResult WeatherService::getGeocodingResult()
+{
+  LockGuard lock(_mutex);
+  return _geocodingResult;
+}
+
+// Internal worker called by updateLocation() or geocoding task logic
 bool WeatherService::resolveLocation(const String &query, String &resolvedAddress, float &lat, float &lon)
 {
   if (WiFi.status() != WL_CONNECTED || query.length() == 0)

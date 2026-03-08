@@ -79,7 +79,8 @@ float calculateCorrectedHumidity(float temp_c, float humidity, float offset_c)
 
   return new_humidity;
 }
-static bool rtc_found = false; // Track RTC status
+static bool rtc_found = false;        // Track RTC status
+static bool core_temp_started = false; // Track whether temp_sensor_start() was called
 
 /// @brief Stores the timestamp of the last sensor update for interval timing.
 static unsigned long prevSensorMillis = 0;
@@ -126,6 +127,7 @@ void setupSensors()
   temp_sensor_config_t temp_sensor = TSENS_CONFIG_DEFAULT();
   temp_sensor_set_config(temp_sensor);
   temp_sensor_start();
+  core_temp_started = true;
 
   // Perform an initial sensor read to populate cached values.
   handleSensorUpdates(true);
@@ -295,6 +297,12 @@ void handleSensorUpdates(bool force)
     {
       cached_rtc_temp_c = RTC.getTemperature();
     }
-    temp_sensor_read_celsius(&cached_core_temp_c);
+    
+    // Only read the core temp sensor if it was successfully started.
+    // If RTC init failed, setupSensors() returned early before temp_sensor_start().
+    if (core_temp_started)
+    {
+      temp_sensor_read_celsius(&cached_core_temp_c);
+    }
   }
 }

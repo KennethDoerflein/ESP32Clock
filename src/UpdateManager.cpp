@@ -7,6 +7,7 @@
  * Updates are verified using Ed25519 signatures before being applied.
  */
 #include "UpdateManager.h"
+#include <esp_task_wdt.h>
 #include "FirmwareVerifier.h"
 #include "ota_public_key.h"
 #include <Update.h>
@@ -144,6 +145,7 @@ String UpdateManager::handleGithubUpdate()
     if (now < 1000000000) // Approx year 2001
     {
         SerialLog::getInstance().print("Time not set. Attempting NTP sync...\n");
+        // Use a local ntp sync helper to avoid recursion if syncTime calls getNTPData which calls configTime
         if (!syncTime())
         {
             return "Failed to synchronize time. Cannot verify certificates.";
@@ -259,6 +261,9 @@ String UpdateManager::handleGithubUpdate()
  */
 void UpdateManager::runGithubUpdateTask(void *pvParameters)
 {
+    // Enroll in Task Watchdog
+    esp_task_wdt_add(NULL);
+    
     GithubUpdateInfo *updateInfo = (GithubUpdateInfo *)pvParameters;
     getInstance()._updateInProgress = true;
     getInstance()._lastError = "";
@@ -357,6 +362,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             size_t bytesRead = 0;
             while (bytesRead < (size_t)contentLength && firmwareHttp.connected())
             {
+                esp_task_wdt_reset(); // Feed watchdog during download
                 size_t available = stream->available();
                 if (available > 0)
                 {
@@ -484,5 +490,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
 
     firmwareHttp.end();
     delete updateInfo;
+    
+    esp_task_wdt_delete(NULL); // Remove from watchdog before deleting task
     vTaskDelete(NULL);
 }

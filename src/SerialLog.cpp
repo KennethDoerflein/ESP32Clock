@@ -11,6 +11,7 @@
 #include "UpdateManager.h"
 #include "LockGuard.h"
 #include <esp_attr.h>
+#include <time.h>
 
 // RTC Memory for Crash Logging
 #define CRASH_LOG_MAGIC 0xDEADBEEF
@@ -146,26 +147,52 @@ void SerialLog::setLoggingEnabled(bool enabled)
  * @brief Prints a message to the Serial port and sends it to all WebSocket clients.
  * @param message The message to be logged.
  */
+// Returns a timestamp prefix string, e.g. "[2026-03-03 21:02:54] " or "[+12345ms] ".
+// Uses POSIX time() so it reflects NTP/RTC-synced time automatically.
+static String getTimestamp()
+{
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+
+  char buf[28];
+  // If year is before 2021 the clock hasn't been synced yet — show uptime.
+  if (t.tm_year + 1900 < 2021)
+  {
+    snprintf(buf, sizeof(buf), "[+%lums] ", (unsigned long)millis());
+  }
+  else
+  {
+    snprintf(buf, sizeof(buf), "[%04d-%02d-%02d %02d:%02d:%02d] ",
+             t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
+             t.tm_hour, t.tm_min, t.tm_sec);
+  }
+  return String(buf);
+}
+
 void SerialLog::print(const String &message)
 {
   RecursiveLockGuard lock(_mutex);
 
+  String ts = getTimestamp();
+  String prefixed = ts + message;
+
   if (_consoleLoggingEnabled)
   {
-    if (message.endsWith("\n"))
+    if (prefixed.endsWith("\n"))
     {
-      Serial.print(message);
-      _ws.textAll(message);
+      Serial.print(prefixed);
+      _ws.textAll(prefixed);
     }
     else
     {
-      Serial.println(message);
-      _ws.textAll(message + "\n");
+      Serial.println(prefixed);
+      _ws.textAll(prefixed + "\n");
     }
   }
   if (_fileLoggingEnabled)
   {
-    logToFile(message.c_str());
+    logToFile(prefixed.c_str());
   }
 }
 
@@ -188,23 +215,25 @@ void SerialLog::printf(const char *format, ...)
   vsnprintf(buf, sizeof(buf), format, args);
   va_end(args);
 
+  String ts = getTimestamp();
+  String prefixed = ts + buf;
+
   if (_consoleLoggingEnabled)
   {
-    size_t len = strlen(buf);
-    if (len > 0 && buf[len - 1] == '\n')
+    if (prefixed.endsWith("\n"))
     {
-      Serial.print(buf);
-      _ws.textAll(buf);
+      Serial.print(prefixed);
+      _ws.textAll(prefixed);
     }
     else
     {
-      Serial.println(buf);
-      _ws.textAll(String(buf) + "\n");
+      Serial.println(prefixed);
+      _ws.textAll(prefixed + "\n");
     }
   }
   if (_fileLoggingEnabled)
   {
-    logToFile(buf);
+    logToFile(prefixed.c_str());
   }
 }
 
