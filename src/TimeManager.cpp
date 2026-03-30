@@ -81,6 +81,15 @@ void TimeManager::begin()
   // Perform an initial NTP sync attempt at startup.
   SerialLog::getInstance().print("TimeManager: Performing initial NTP sync...\n");
   syncWithNTP();
+
+  // Right after the first sync we also run the DST check in case the
+  // initial RTC value was already on a transition boundary.  This gives
+  // added assurance that the internal DST flag is correct before the
+  // main loop starts calling update().
+  checkDST();
+  // Prevent the periodic timer from firing immediately in the first
+  // update() call by pretending that we just ran.
+  _lastDstCheck = millis();
 }
 
 /**
@@ -122,8 +131,12 @@ bool TimeManager::update()
 #ifdef LOG_TICKS
   SerialLog::getInstance().print("TimeManager: Tick\n");
 #endif
-  // Perform routine checks, like the daily time sync.
-  checkDST();
+  // Perform routine checks, like the daily time sync and DST change.
+  if (currentMillis - _lastDstCheck >= DST_CHECK_INTERVAL)
+  {
+    checkDST();
+    _lastDstCheck = currentMillis;
+  }
 
   if (!_rtc_alarms_initialized)
   {
@@ -403,6 +416,9 @@ void TimeManager::checkDriftAndResync()
 
 void TimeManager::checkDST()
 {
+  // This method is invoked periodically from update(), once during begin(),
+  // and immediately when timezone is modified.  Only state-change logging is
+  // retained to avoid flooding the serial output.
   bool currentDstState = ConfigManager::getInstance().isDST();
 
   DateTime now = getRTCTime();

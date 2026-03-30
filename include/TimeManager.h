@@ -234,6 +234,12 @@ public:
   void updateNextAlarmsCache();
 
 private:
+  // Timestamp of the last DST evaluation (millis()).
+  unsigned long _lastDstCheck = 0;
+  // How often to evaluate DST transitions (once per hour).
+  static const unsigned long DST_CHECK_INTERVAL = 60UL * 60UL * 1000UL;
+
+private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
    */

@@ -1316,6 +1316,10 @@ void ConfigManager::setTimezone(const String &tz)
       _isDirty = true;
     }
   }
+  // timezone change may also change whether DST should be active; force a
+  // re-evaluation right away rather than waiting for the next tick in
+  // TimeManager::update().
+  TimeManager::getInstance().checkDST();
   scheduleSave();
 }
 
