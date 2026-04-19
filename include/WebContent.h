@@ -1819,6 +1819,10 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
         const displayTitle = `Alarm ${index + 1}`;
 
+        const hasDays = alarm.days !== 0;
+        const biweeklyChecked = alarm.biweekly ? "checked" : "";
+        const biweeklyDisplay = hasDays ? "" : "d-none";
+
         card.innerHTML = `
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center alarm-header">
@@ -1844,9 +1848,16 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 "0"
               )}" title="Set the alarm time.">
             </div>
-            <div>
+            <div class="mb-3">
               <label class="form-label">Repeat on</label>
               <div class="d-flex justify-content-around day-btn-group">${daysHtml}</div>
+            </div>
+            <div class="biweekly-section ${biweeklyDisplay}">
+              <div class="form-check form-switch">
+                <input class="form-check-input biweekly-toggle" type="checkbox" ${biweeklyChecked} title="Enable to repeat every other week instead of every week.">
+                <label class="form-check-label">Every other week</label>
+              </div>
+              <small class="text-muted biweekly-hint ${alarm.biweekly ? '' : 'd-none'}">This alarm will ring every 2 weeks on the selected days.</small>
             </div>
           </div>
         </div>
@@ -1877,16 +1888,52 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
           btn.addEventListener("click", () => {
             btn.classList.toggle("btn-primary");
             btn.classList.toggle("btn-outline-secondary");
+            // Show/hide biweekly toggle based on whether any days are selected
+            const anyDaySelected = card.querySelector(".day-btn.btn-primary") !== null;
+            const biweeklySection = card.querySelector(".biweekly-section");
+            if (biweeklySection) {
+              if (anyDaySelected) {
+                biweeklySection.classList.remove("d-none");
+              } else {
+                biweeklySection.classList.add("d-none");
+                // Also uncheck biweekly when no days are selected
+                const biweeklyToggle = card.querySelector(".biweekly-toggle");
+                if (biweeklyToggle) {
+                  biweeklyToggle.checked = false;
+                  const hint = card.querySelector(".biweekly-hint");
+                  if (hint) hint.classList.add("d-none");
+                }
+              }
+            }
             handleInputChange();
           });
         });
+
+        // Biweekly toggle handler
+        const biweeklyToggle = card.querySelector(".biweekly-toggle");
+        if (biweeklyToggle) {
+          biweeklyToggle.addEventListener("change", () => {
+            const hint = card.querySelector(".biweekly-hint");
+            if (hint) {
+              if (biweeklyToggle.checked) {
+                hint.classList.remove("d-none");
+              } else {
+                hint.classList.add("d-none");
+              }
+            }
+            handleInputChange();
+          });
+        }
 
         card
           .querySelector('input[type="time"]')
           .addEventListener("change", () => handleInputChange());
         card
-          .querySelector('input[type="checkbox"]')
+          .querySelector('.form-check-input:not(.biweekly-toggle)')
           .addEventListener("change", () => handleInputChange());
+
+        // Store biweeklyOddWeek in data attribute for round-tripping
+        card.dataset.biweeklyOddWeek = alarm.biweeklyOddWeek ? "true" : "false";
 
         return card;
       }
@@ -1906,7 +1953,9 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
               enabled: true,
               hour: 7,
               minute: 0,
-              days: 0
+              days: 0,
+              biweekly: false,
+              biweeklyOddWeek: false
           };
           
           const card = createAlarmCard(newAlarm, count);
@@ -1949,10 +1998,10 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         statusEl.innerHTML = STATUS_INDICATORS.SAVING;
 
         const allAlarmsData = [];
-        alarmsContainer.querySelectorAll(".card").forEach((card) => {
+         alarmsContainer.querySelectorAll(".card").forEach((card) => {
           const alarmData = {
             id: parseInt(card.dataset.id),
-            enabled: card.querySelector(".form-check-input").checked,
+            enabled: card.querySelector(".form-check-input:not(.biweekly-toggle)").checked,
             hour: parseInt(
               card.querySelector('input[type="time"]').value.split(":")[0]
             ),
@@ -1960,10 +2009,16 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
               card.querySelector('input[type="time"]').value.split(":")[1]
             ),
             days: 0,
+            biweekly: false,
+            biweeklyOddWeek: card.dataset.biweeklyOddWeek === "true"
           };
           card.querySelectorAll(".day-btn.btn-primary").forEach((btn) => {
             alarmData.days |= parseInt(btn.dataset.value);
           });
+          const biweeklyToggle = card.querySelector(".biweekly-toggle");
+          if (biweeklyToggle && biweeklyToggle.checked && alarmData.days !== 0) {
+            alarmData.biweekly = true;
+          }
           allAlarmsData.push(alarmData);
         });
 

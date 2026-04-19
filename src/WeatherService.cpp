@@ -241,7 +241,15 @@ void WeatherService::loop()
   unsigned long now = millis();
 
   LockGuard lock(_mutex);
-  if (now - _lastUpdate > WEATHER_UPDATE_INTERVAL || _lastUpdate == 0)
+  uint32_t interval = WEATHER_UPDATE_INTERVAL;
+  if (_failureCount > 0)
+  {
+    // Exponential backoff: 1 fail = 10m, 2 = 20m, 3 = 40m, max 2 hours
+    interval = (uint32_t)WEATHER_UPDATE_INTERVAL * (1 << (std::min((int)_failureCount, 4)));
+    if (interval > 2 * 60 * 60 * 1000) interval = 2 * 60 * 60 * 1000;
+  }
+
+  if (now - _lastUpdate > interval || _lastUpdate == 0)
   {
     _lastUpdate = now;
     xSemaphoreGive(_wakeSignal); // Wake the persistent task
@@ -624,19 +632,23 @@ void WeatherService::updateWeather()
         _currentWeather.sunset = sunset;
 
         _currentWeather.isValid = true;
+        _failureCount = 0; // Success! Reset failures
       }
 
       SerialLog::getInstance().printf("Weather Updated: %.1fF, %s\n", temp, _currentWeather.condition.c_str());
-      SerialLog::getInstance().printf("Free Heap after Weather Update: %u\n", ESP.getFreeHeap());
     }
     else
     {
       SerialLog::getInstance().printf("JSON Error: %s\n", error.c_str());
+      LockGuard lock(_mutex);
+      _failureCount++;
     }
   }
   else
   {
     SerialLog::getInstance().printf("Weather HTTP Failed: %d\n", httpCode);
+    LockGuard lock(_mutex);
+    _failureCount++;
   }
   http.end();
 }

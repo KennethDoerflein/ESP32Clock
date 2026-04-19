@@ -245,6 +245,8 @@ void ClockWebServer::begin()
         alarmObj["hour"] = alarm.getHour();
         alarmObj["minute"] = alarm.getMinute();
         alarmObj["days"] = alarm.getDays();
+        alarmObj["biweekly"] = alarm.isBiweekly();
+        alarmObj["biweeklyOddWeek"] = alarm.isBiweeklyOddWeek();
       }
       
       String response;
@@ -346,6 +348,16 @@ void ClockWebServer::begin()
             alarm.setHour(alarmObj["hour"] | 6);
             alarm.setMinute(alarmObj["minute"] | 0);
             alarm.setDays(alarmObj["days"] | 0);
+
+            bool newBiweekly = alarmObj["biweekly"] | false;
+            alarm.setBiweekly(newBiweekly);
+            if (newBiweekly && alarmObj.containsKey("biweeklyOddWeek")) {
+              alarm.setBiweeklyOddWeek(alarmObj["biweeklyOddWeek"] | false);
+            } else if (newBiweekly) {
+              // Auto-compute parity from current week when first enabling biweekly
+              DateTime now = TimeManager::getInstance().getLocalTime();
+              alarm.setBiweeklyOddWeek(Alarm::isOddWeek(now));
+            }
             
             newAlarms.push_back(alarm);
           }

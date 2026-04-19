@@ -120,12 +120,12 @@ bool TimeManager::update()
   }
   _lastDecodedSecond = now.second();
 
-  // Cache the time snapshot for consistent rendering within this frame.
+  // Cache the time snapshot for consistent rendering within this frame (Local Time).
   // This prevents race conditions where the RTC may return a different
   // second when queried again during the render phase.
   {
     RecursiveLockGuard lock(_mutex);
-    _cachedTime = now;
+    _cachedTime = getLocalTime();
   }
 
 #ifdef LOG_TICKS
@@ -148,10 +148,11 @@ bool TimeManager::update()
   }
 
   // Update alarm cache if the minute has changed
-  // 'now' is already populated at the top of the function
-  if (now.minute() != _lastCacheUpdateMinute)
+  // 'localNow' is used for alarm calculations
+  DateTime localNow = getCachedTime();
+  if (localNow.minute() != _lastCacheUpdateMinute)
   {
-    updateNextAlarmsCache(now);
+    updateNextAlarmsCache(localNow);
   }
 
   return true; // An update occurred.
@@ -212,7 +213,7 @@ bool TimeManager::updateNtp()
  */
 void TimeManager::getFormattedTime(char *buf, size_t bufSize) const
 {
-  DateTime now = getRTCTime();
+  DateTime now = getLocalTime();
   if (is24HourFormat())
   {
     snprintf(buf, bufSize, "%02d:%02d", now.hour(), now.minute());
@@ -256,7 +257,7 @@ String TimeManager::getFormattedSeconds() const
  */
 void TimeManager::getFormattedDate(char *buf, size_t bufSize) const
 {
-  DateTime now = getRTCTime();
+  DateTime now = getLocalTime();
   static const char *monthNames[] = {
       "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
       "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
@@ -281,7 +282,7 @@ void TimeManager::getTOD(char *buf, size_t bufSize) const
     buf[0] = '\0';
     return;
   }
-  DateTime now = getRTCTime();
+  DateTime now = getLocalTime();
   snprintf(buf, bufSize, "%s", (now.hour() < 12) ? "AM" : "PM");
 }
 
@@ -298,7 +299,7 @@ String TimeManager::getTOD() const
  */
 void TimeManager::getDayOfWeek(char *buf, size_t bufSize) const
 {
-  DateTime now = getRTCTime();
+  DateTime now = getLocalTime();
   static const char *dayNames[] = {
       "SUN", "MON", "TUE", "WED",
       "THU", "FRI", "SAT"};
@@ -328,8 +329,8 @@ bool TimeManager::is24HourFormat() const
  */
 uint8_t TimeManager::getHour() const
 {
-  // Return the raw hour (0-23) from the RTC.
-  DateTime now = getRTCTime();
+  // Return the local hour (0-23).
+  DateTime now = getLocalTime();
   return now.hour();
 }
 
@@ -341,7 +342,7 @@ uint8_t TimeManager::getHour() const
  */
 void TimeManager::checkDailySync()
 {
-  DateTime now = getRTCTime();
+  DateTime now = getLocalTime();
   if (now.hour() < 2)
   {
     return;
@@ -417,55 +418,49 @@ void TimeManager::checkDriftAndResync()
 void TimeManager::checkDST()
 {
   // This method is invoked periodically from update(), once during begin(),
-  // and immediately when timezone is modified.  Only state-change logging is
-  // retained to avoid flooding the serial output.
+  // and immediately when timezone is modified.
   bool currentDstState = ConfigManager::getInstance().isDST();
 
-  DateTime now = getRTCTime();
-  
-  // To robustly detect DST transitions without relying on mktime's mutation format
-  // (which varies in newlib/esp-idf), we explicitly convert the RTC local time
-  // into an Epoch (UTC) using our CURRENT knowledge of the DST state.
-  struct tm t = {};
-  t.tm_year = now.year() - 1900;
-  t.tm_mon = now.month() - 1;
-  t.tm_mday = now.day();
-  t.tm_hour = now.hour();
-  t.tm_min = now.minute();
-  t.tm_sec = now.second();
-  t.tm_isdst = currentDstState ? 1 : 0;
-
-  time_t epoch = mktime(&t);
-  if (epoch == -1) {
-    return; // mktime failed to parse, safety abort
+  DateTime utc = getRTCTime();
+  if (!utc.isValid())
+  {
+    return;
   }
 
-  // Then, we convert that exact UTC epoch back to a local time using the system's
-  // current timezone rules. localtime_r is authoritative.
+  // With UTC in the RTC, we can get the epoch directly from unixtime().
+  // localtime_r is then authoritative for determining the correct DST state.
+  time_t epoch = (time_t)utc.unixtime();
   struct tm resolved;
   localtime_r(&epoch, &resolved);
 
   bool newDstState = resolved.tm_isdst > 0;
 
-  // If the true DST state for this UTC moment differs from our recorded state, or 
-  // mktime/localtime_r found a discrepancy, we apply the resolved time.
   if (newDstState != currentDstState)
   {
-    SerialLog::getInstance().printf("DST Change Detected: %d -> %d\n", currentDstState, newDstState);
-
-    DateTime adjustedTime(resolved.tm_year + 1900, resolved.tm_mon + 1, resolved.tm_mday,
-                          resolved.tm_hour, resolved.tm_min, resolved.tm_sec);
-
-    SerialLog::getInstance().printf("DST transition. Adjusting RTC: %02d:%02d -> %02d:%02d\n",
-                                     now.hour(), now.minute(),
-                                     adjustedTime.hour(), adjustedTime.minute());
-    {
-      RecursiveLockGuard lock(_mutex);
-      RTC.adjust(adjustedTime);
-    }
-
     ConfigManager::getInstance().setDST(newDstState);
+    SerialLog::getInstance().printf("DST State updated: %d -> %d\n", currentDstState, newDstState);
   }
+}
+
+DateTime TimeManager::getLocalTime() const
+{
+  DateTime utc = getRTCTime();
+  if (!utc.isValid())
+  {
+    return utc;
+  }
+
+  // DateTime::unixtime() returns seconds since 1970-01-01 00:00:00 UTC.
+  // Since the RTC stores UTC, this gives us the exact epoch without any
+  // manual struct-to-time_t conversion (and avoids the non-standard timegm).
+  time_t now_utc = (time_t)utc.unixtime();
+
+  // localtime_r converts the UTC epoch to local time using the TZ variable.
+  struct tm t_local;
+  localtime_r(&now_utc, &t_local);
+
+  return DateTime(t_local.tm_year + 1900, t_local.tm_mon + 1, t_local.tm_mday,
+                  t_local.tm_hour, t_local.tm_min, t_local.tm_sec);
 }
 
 void TimeManager::updateSnoozeStates()
@@ -510,10 +505,11 @@ DateTime TimeManager::getRTCTime() const
 DateTime TimeManager::getCachedTime() const
 {
   RecursiveLockGuard lock(_mutex);
-  // If no time has been cached yet (before first update), return current RTC time
+  // If no time has been cached yet (before first update), return local time
+  // so callers always get a locally-adjusted value.
   if (!_cachedTime.isValid() || _cachedTime.year() < 2000)
   {
-    return RTC.now();
+    return getLocalTime();
   }
   return _cachedTime;
 }
@@ -535,31 +531,31 @@ void TimeManager::checkMissedAlarms()
 
   SerialLog::getInstance().print("Checking for missed alarms on boot...\n");
 
-  DateTime now = getRTCTime();
-  // Don't look back further than 30 minutes.
+  // Work in UTC epoch space since the RTC stores UTC.
+  time_t nowEpoch = (time_t)getRTCTime().unixtime();
   const uint32_t lookbehindSeconds = 30 * 60;
-  DateTime startTime = now - TimeSpan(lookbehindSeconds);
+  time_t startEpoch = nowEpoch - lookbehindSeconds;
 
   int8_t mostRecentMissedAlarmId = -1;
   auto &config = ConfigManager::getInstance();
-
-  // To find the most recent missed alarm, we iterate chronologically through
-  // the look-behind window and check all alarms for each minute. The last
-  // one we find will be the most recent.
-  DateTime t = DateTime(startTime.unixtime());
-  DateTime checkTime = DateTime(t.year(), t.month(), t.day(), t.hour(), t.minute());
-
-  // Get a snapshot of all alarms
   std::vector<Alarm> alarms = config.getAllAlarms();
 
-  for (; checkTime <= now; checkTime = checkTime + TimeSpan(0, 0, 1, 0))
+  // Iterate minute-by-minute in UTC epoch space.
+  // Convert each moment to local time before calling shouldRing(),
+  // since alarm hour/minute are stored in local time.
+  for (time_t t = startEpoch; t <= nowEpoch; t += 60)
   {
+    struct tm t_local;
+    localtime_r(&t, &t_local);
+    DateTime checkLocal(
+        t_local.tm_year + 1900, t_local.tm_mon + 1, t_local.tm_mday,
+        t_local.tm_hour, t_local.tm_min, t_local.tm_sec);
+
     for (const auto &alarm : alarms)
     {
-      if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkTime))
+      if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkLocal))
       {
-        // This alarm should have rung. We record it as the most recent candidate.
-        // If we find another one later in the loop, it will overwrite this one.
+        // Record the most recent candidate; overwrite as we find later ones.
         mostRecentMissedAlarmId = alarm.getId();
       }
     }
@@ -615,7 +611,7 @@ void TimeManager::clearRtcAlarms()
 
 void TimeManager::updateNextAlarmsCache()
 {
-  updateNextAlarmsCache(getRTCTime());
+  updateNextAlarmsCache(getLocalTime());
 }
 
 void TimeManager::updateNextAlarmsCache(const DateTime &now)
@@ -663,7 +659,7 @@ void TimeManager::setNextAlarms()
   RecursiveLockGuard lock(_mutex);
   clearRtcAlarms();
 
-  // Update cache first to ensure we have latest
+  // Update cache first to ensure we have latest (local times)
   updateNextAlarmsCache();
 
   // We need at least 2 alarms for RTC setting
@@ -672,9 +668,12 @@ void TimeManager::setNextAlarms()
   if (!nextAlarms.empty())
   {
     _rtcAlarm1Id = nextAlarms[0].id;
-    RTC.setAlarm1(nextAlarms[0].time, DS3231_A1_Date);
-    char buf[40];
-    snprintf(buf, sizeof(buf), "Set RTC alarm 1 for %04d-%02d-%02d %02d:%02d:%02d\n",
+    // Store local ring time converted back to UTC for the hardware alarm
+    DateTime utcTime = localToUtc(nextAlarms[0].time);
+    RTC.setAlarm1(utcTime, DS3231_A1_Date);
+    
+    char buf[60];
+    snprintf(buf, sizeof(buf), "Set RTC alarm 1 for %04d-%02d-%02d %02d:%02d:%02d (LOCAL)\n",
              nextAlarms[0].time.year(), nextAlarms[0].time.month(), nextAlarms[0].time.day(),
              nextAlarms[0].time.hour(), nextAlarms[0].time.minute(), nextAlarms[0].time.second());
     SerialLog::getInstance().print(buf);
@@ -683,11 +682,37 @@ void TimeManager::setNextAlarms()
   if (nextAlarms.size() > 1)
   {
     _rtcAlarm2Id = nextAlarms[1].id;
-    RTC.setAlarm2(nextAlarms[1].time, DS3231_A2_Date);
-    char buf[40];
-    snprintf(buf, sizeof(buf), "Set RTC alarm 2 for %04d-%02d-%02d %02d:%02d\n",
+    // Store local ring time converted back to UTC for the hardware alarm
+    DateTime utcTime = localToUtc(nextAlarms[1].time);
+    RTC.setAlarm2(utcTime, DS3231_A2_Date);
+    
+    char buf[60];
+    snprintf(buf, sizeof(buf), "Set RTC alarm 2 for %04d-%02d-%02d %02d:%02d (LOCAL)\n",
              nextAlarms[1].time.year(), nextAlarms[1].time.month(), nextAlarms[1].time.day(),
              nextAlarms[1].time.hour(), nextAlarms[1].time.minute());
     SerialLog::getInstance().print(buf);
   }
+}
+
+DateTime TimeManager::localToUtc(const DateTime &local) const
+{
+  if (!local.isValid()) return local;
+
+  struct tm t_local = {};
+  t_local.tm_year = local.year() - 1900;
+  t_local.tm_mon = local.month() - 1;
+  t_local.tm_mday = local.day();
+  t_local.tm_hour = local.hour();
+  t_local.tm_min = local.minute();
+  t_local.tm_sec = local.second();
+  t_local.tm_isdst = -1; // Let system determine
+
+  // mktime converts local tm to time_t (UTC epoch)
+  time_t now_utc = mktime(&t_local);
+
+  struct tm t_utc;
+  gmtime_r(&now_utc, &t_utc);
+
+  return DateTime(t_utc.tm_year + 1900, t_utc.tm_mon + 1, t_utc.tm_mday,
+                  t_utc.tm_hour, t_utc.tm_min, t_utc.tm_sec);
 }

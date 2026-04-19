@@ -30,6 +30,37 @@ public:
   Alarm() = default;
 
   /**
+   * @brief Computes whether the given DateTime falls in an odd ISO week.
+   * @param dt The DateTime to evaluate.
+   * @return True if the ISO week number is odd, false if even.
+   */
+  static bool isOddWeek(const DateTime &dt)
+  {
+    // Convert to time_t for reliable day-of-year calculation via struct tm.
+    time_t epoch = (time_t)dt.unixtime();
+    struct tm t;
+    gmtime_r(&epoch, &t);
+
+    // ISO 8601 week number approximation:
+    // Compute the ordinal day of the year (1-based), then derive the week.
+    // ISO weeks start on Monday (tm_wday: 0=Sun, so Mon=1).
+    int dayOfYear = t.tm_yday + 1; // tm_yday is 0-based
+    // Adjust so Monday=0 .. Sunday=6
+    int weekday = (t.tm_wday + 6) % 7;
+    int isoWeek = (dayOfYear - weekday + 10) / 7;
+
+    // Handle edge cases: week 0 belongs to previous year's last week.
+    // We allow isoWeek 53 to exist for years which have it, as parity (isoWeek % 2)
+    // still holds correctly. Only clamp if it somehow exceeds 53.
+    if (isoWeek < 1)
+      isoWeek = 52;
+    else if (isoWeek > 53)
+      isoWeek = 1;
+
+    return (isoWeek % 2) == 1;
+  }
+
+  /**
    * @brief Gets the unique identifier of the alarm.
    * @return The alarm's ID.
    */
@@ -58,6 +89,18 @@ public:
    * @return A bitmask where each bit corresponds to a day (e.g., DAY_MON).
    */
   uint8_t getDays() const { return _days; }
+
+  /**
+   * @brief Checks if the alarm is set to biweekly (every other week).
+   * @return True if biweekly mode is enabled, false otherwise.
+   */
+  bool isBiweekly() const { return _biweekly; }
+
+  /**
+   * @brief Gets the week parity the biweekly alarm should fire on.
+   * @return True if the alarm fires on odd ISO weeks, false for even.
+   */
+  bool isBiweeklyOddWeek() const { return _biweeklyOddWeek; }
 
   /**
    * @brief Checks if the alarm is currently snoozed.
@@ -114,6 +157,18 @@ public:
    * @param days A bitmask representing the days (e.g., DAY_MON | DAY_WED).
    */
   void setDays(uint8_t days) { _days = days; }
+
+  /**
+   * @brief Enables or disables biweekly (every other week) mode.
+   * @param biweekly True to enable biweekly mode, false for every week.
+   */
+  void setBiweekly(bool biweekly) { _biweekly = biweekly; }
+
+  /**
+   * @brief Sets the week parity the biweekly alarm should fire on.
+   * @param oddWeek True for odd ISO weeks, false for even.
+   */
+  void setBiweeklyOddWeek(bool oddWeek) { _biweeklyOddWeek = oddWeek; }
 
   /**
    * @brief Manually sets the snooze state of the alarm.
@@ -202,8 +257,23 @@ public:
       // Time matches. Check day of the week.
       uint8_t todayBitmask = 1 << now.dayOfTheWeek();
 
-      // Ring if it's a one-time alarm or a repeating alarm for today.
-      return (_days == 0 || (_days & todayBitmask) > 0);
+      if (_days == 0)
+      {
+        return true; // One-time alarm
+      }
+
+      if ((_days & todayBitmask) == 0)
+      {
+        return false; // Not scheduled for today's day of week
+      }
+
+      // For biweekly alarms, check if this is the correct week.
+      if (_biweekly && isOddWeek(now) != _biweeklyOddWeek)
+      {
+        return false; // Wrong week parity
+      }
+
+      return true;
     }
     return false;
   }
@@ -213,7 +283,9 @@ private:
   bool _enabled = false;
   uint8_t _hour = 6; // Default to 6:00 AM
   uint8_t _minute = 0;
-  uint8_t _days = 0; // Bitmask for days of the week
+  uint8_t _days = 0;          // Bitmask for days of the week
+  bool _biweekly = false;     // Fire every other week instead of every week
+  bool _biweeklyOddWeek = false; // Which week parity to fire on (true=odd, false=even)
   bool _snoozed = false;
   uint32_t _snoozeUntil = 0;     // Unix timestamp for reboot resilience
   uint8_t _lastDismissedDay = 8; // 8 is an invalid day to ensure it can ring on first boot

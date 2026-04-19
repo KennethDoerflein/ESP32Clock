@@ -90,8 +90,10 @@ private:
   /// @brief Blocking geocoding helper. Called only from weatherTaskEntry.
   bool resolveLocation(const String &query, String &resolvedAddress, float &lat, float &lon);
 
+  // Weather state
   WeatherData _currentWeather;
-  unsigned long _lastUpdate;
+  unsigned long _lastUpdate = 0;
+  uint8_t _failureCount = 0; ///< Number of consecutive failed updates
 
   mutable SemaphoreHandle_t _mutex;
   TaskHandle_t _weatherTaskHandle;

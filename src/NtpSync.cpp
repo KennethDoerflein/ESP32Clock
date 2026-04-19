@@ -67,25 +67,29 @@ static unsigned long currentRetryDelay = 0;
  */
 static void _processSuccessfulNtpSync(const struct tm &timeinfo)
 {
-  // Convert the C `tm` struct to an `RTClib::DateTime` object.
-  DateTime time_to_set(
-      timeinfo.tm_year + 1900,
-      timeinfo.tm_mon + 1,
-      timeinfo.tm_mday,
-      timeinfo.tm_hour,
-      timeinfo.tm_min,
-      timeinfo.tm_sec);
+  // The system clock is already synced by SNTP. 
+  // We want to store UTC in the hardware RTC.
+  time_t now = time(nullptr);
+  struct tm utc_tm;
+  gmtime_r(&now, &utc_tm);
 
-  // Update the hardware RTC directly. No manual RTT compensation needed;
-  // the SNTP daemon has already applied it to the system clock.
+  DateTime time_to_set(
+      utc_tm.tm_year + 1900,
+      utc_tm.tm_mon + 1,
+      utc_tm.tm_mday,
+      utc_tm.tm_hour,
+      utc_tm.tm_min,
+      utc_tm.tm_sec);
+
+  // Update the hardware RTC with UTC time.
   RTC.adjust(time_to_set);
 
-  // Update DST status in configuration
+  // Update DST status in configuration (for UI/logging purposes only)
   ConfigManager::getInstance().setDST(timeinfo.tm_isdst > 0);
 
-  SerialLog::getInstance().print("RTC synchronized with NTP time: ");
-  char timeStr[20];
-  sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
+  SerialLog::getInstance().print("RTC synchronized with NTP time (UTC): ");
+  char timeStr[25];
+  sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d UTC",
           time_to_set.year(),
           time_to_set.month(),
           time_to_set.day(),
