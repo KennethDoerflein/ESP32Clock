@@ -130,6 +130,94 @@ bool UpdateManager::isUpdateInProgress()
 }
 
 /**
+ * @brief Checks GitHub for a new firmware version without downloading.
+ *
+ * Queries the GitHub releases API and compares the latest tag_name against
+ * the current FIRMWARE_VERSION. Returns a JSON string with the result.
+ *
+ * @return A JSON string: {"available":bool,"currentVersion":"...","newVersion":"...","error":"..."}
+ */
+String UpdateManager::checkForUpdate()
+{
+    JsonDocument result;
+    result["currentVersion"] = FIRMWARE_VERSION;
+    result["available"] = false;
+
+    if (_updateInProgress)
+    {
+        result["error"] = "An update is already in progress.";
+        String out;
+        serializeJson(result, out);
+        return out;
+    }
+
+    // Ensure system time is set for TLS verification
+    time_t now = time(nullptr);
+    if (now < 1000000000)
+    {
+        SerialLog::getInstance().print("Time not set. Attempting NTP sync...\n");
+        if (!syncTime())
+        {
+            result["error"] = "Failed to synchronize time. Cannot verify certificates.";
+            String out;
+            serializeJson(result, out);
+            return out;
+        }
+    }
+
+    HTTPClient http;
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(10000);
+
+    String url = "https://api.github.com/repos/" + String(GITHUB_REPO) + "/releases/latest";
+    http.begin(client, url);
+
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_OK)
+    {
+        result["error"] = "Error checking for updates. HTTP code: " + String(httpCode);
+        http.end();
+        String out;
+        serializeJson(result, out);
+        return out;
+    }
+
+    String payload = http.getString();
+    http.end();
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    if (error)
+    {
+        result["error"] = "Error parsing update data.";
+        String out;
+        serializeJson(result, out);
+        return out;
+    }
+
+    if (doc["tag_name"].isNull())
+    {
+        result["error"] = "Could not find version info in release data.";
+        String out;
+        serializeJson(result, out);
+        return out;
+    }
+
+    const char *tagName = doc["tag_name"];
+    result["newVersion"] = tagName;
+
+    if (strcmp(tagName, FIRMWARE_VERSION) != 0)
+    {
+        result["available"] = true;
+    }
+
+    String out;
+    serializeJson(result, out);
+    return out;
+}
+
+/**
  * @brief Initiates a firmware update from GitHub with signature verification.
  * @return A string indicating the result of the update check.
  */

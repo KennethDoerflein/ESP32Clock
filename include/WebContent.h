@@ -2127,22 +2127,49 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
             <div class="card mb-4">
               <div class="card-body">
                 <h5 class="card-title d-flex align-items-center"><i class="bi bi-upload me-2"></i>Manual Update</h5>
-                <p class="card-text text-muted small">Select a .bin file from your computer to upload and flash.</p>
-                <form id="upload-form">
-                  <div class="input-group">
-                    <input type="file" class="form-control" id="firmware" name="firmware" accept=".bin" required title="Select a .bin firmware file.">
-                    <button class="btn btn-primary" type="submit" title="Upload the selected firmware file.">Upload</button>
+                <p class="card-text text-muted small">Select or drop a .bin firmware file to flash.</p>
+                <div id="drop-zone" class="border border-secondary rounded p-4 text-center mb-3" style="border-style:dashed!important;cursor:pointer;transition:border-color .2s">
+                  <p class="text-muted mb-2">Drag &amp; drop firmware here, or</p>
+                  <label class="btn btn-outline-primary btn-sm" for="firmware">Choose .bin File</label>
+                  <input type="file" id="firmware" name="firmware" accept=".bin" class="d-none" required>
+                  <div id="file-name-display" class="mt-2 small text-secondary"></div>
+                </div>
+                <div id="upload-progress-container" class="d-none mb-3">
+                  <div class="progress" style="height:24px">
+                    <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width:0%%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%%</div>
                   </div>
-                </form>
+                  <div id="upload-progress-text" class="text-center mt-1 small text-muted"></div>
+                </div>
+                <div id="manual-status" class="mb-3"></div>
+                <div class="d-grid">
+                  <button id="upload-submit-btn" class="btn btn-primary" disabled title="Upload the selected firmware file."><i class="bi bi-upload me-1"></i>Upload Firmware</button>
+                </div>
               </div>
             </div>
-            <div id="status" class="my-4"></div>
             <div class="card">
               <div class="card-body">
                 <h5 class="card-title d-flex align-items-center"><i class="bi bi-cloud-download me-2"></i>Online Update</h5>
-                <p class="card-text text-muted small">Check for the latest release and update automatically.</p>
-                <div class="d-grid">
-                  <button id="online-button" class="btn btn-success" title="Check for and apply updates from the internet.">Check for Updates</button>
+                <p class="card-text text-muted small">Check for the latest release on GitHub.</p>
+                <div class="d-flex justify-content-between align-items-center mb-3 p-2 border rounded bg-dark bg-opacity-25">
+                  <span class="text-muted small">Current Firmware</span>
+                  <span id="ota-current-version" class="badge bg-secondary font-monospace">%FIRMWARE_VERSION%</span>
+                </div>
+                <div id="ota-version-comparison" class="d-none mb-3">
+                  <div class="d-flex justify-content-between align-items-center p-2 border border-success rounded bg-dark bg-opacity-25">
+                    <span class="text-success small"><i class="bi bi-arrow-up-circle-fill me-1"></i>New Version</span>
+                    <span id="ota-new-version" class="badge bg-success font-monospace"></span>
+                  </div>
+                </div>
+                <div id="ota-progress-container" class="d-none mb-3">
+                  <div class="progress" style="height:24px">
+                    <div id="ota-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width:100%%">Downloading...</div>
+                  </div>
+                  <div id="ota-progress-text" class="text-center mt-1 small text-muted">The device is downloading firmware from GitHub...</div>
+                </div>
+                <div id="ota-status" class="mb-3"></div>
+                <div class="d-grid gap-2">
+                  <button id="online-button" class="btn btn-success" title="Check GitHub for the latest firmware."><i class="bi bi-search me-1"></i>Check for Updates</button>
+                  <button id="install-update-button" class="btn btn-warning d-none" title="Download and install the new firmware."><i class="bi bi-download me-1"></i>Install Update</button>
                 </div>
               </div>
             </div>
@@ -2203,7 +2230,13 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     </div>
   </div>
   <script>
-    const uploadForm = document.getElementById('upload-form');
+    const fileInput = document.getElementById('firmware');
+    const dropZone = document.getElementById('drop-zone');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    const uploadSubmitBtn = document.getElementById('upload-submit-btn');
+    const uploadProgressContainer = document.getElementById('upload-progress-container');
+    const uploadProgressBar = document.getElementById('upload-progress-bar');
+    const uploadProgressText = document.getElementById('upload-progress-text');
     const onlineButton = document.getElementById('online-button');
     const ntpSyncButton = document.getElementById('ntp-sync-button');
     const rolloverBtn = document.getElementById('rollover-btn');
@@ -2211,14 +2244,111 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     const logsTab = document.getElementById('serial-log-tab');
     const ntpSyncStatusDiv = document.getElementById('ntp-sync-status');
     const statusDiv = document.getElementById('status');
-    const fileInput = document.getElementById('firmware');
     const backButton = document.getElementById('back-button');
-    const uploadButton = uploadForm.querySelector('button');
     const rebootBtn = document.getElementById('reboot-button');
     const resetBtn = document.getElementById('factory-reset-button');
     const resetKeepWifiBtn = document.getElementById('factory-reset-keep-wifi-button');
     let isUpdating = false;
     let pollInterval = null;
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    // File picker via hidden input
+    fileInput.addEventListener('change', function() {
+      if (this.files.length > 0) {
+        const file = this.files[0];
+        if (!file.name.endsWith('.bin')) {
+          showStatus('Please select a .bin firmware file.', 'warning');
+          this.value = '';
+          fileNameDisplay.textContent = '';
+          uploadSubmitBtn.disabled = true;
+          return;
+        }
+        fileNameDisplay.textContent = file.name + ' (' + formatSize(file.size) + ')';
+        uploadSubmitBtn.disabled = false;
+        statusDiv.innerHTML = '';
+      }
+    });
+
+    // Drag and drop
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      this.style.borderColor = '#0d6efd';
+    });
+    dropZone.addEventListener('dragleave', function() {
+      this.style.borderColor = '';
+    });
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.style.borderColor = '';
+      if (e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files;
+        fileInput.dispatchEvent(new Event('change'));
+      }
+    });
+    dropZone.addEventListener('click', function(e) {
+      if (e.target !== fileInput && !e.target.classList.contains('btn')) {
+        fileInput.click();
+      }
+    });
+
+    // Upload button
+    uploadSubmitBtn.addEventListener('click', function() {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append('firmware', file, file.name);
+
+      setButtonsDisabled(true);
+      isUpdating = true;
+      statusDiv.innerHTML = '';
+      uploadProgressContainer.classList.remove('d-none');
+      uploadProgressBar.style.width = '0%%';
+      uploadProgressBar.textContent = '0%%';
+      uploadProgressBar.setAttribute('aria-valuenow', '0');
+      uploadProgressText.textContent = 'Preparing upload...';
+
+      xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          uploadProgressBar.style.width = pct + '%%';
+          uploadProgressBar.textContent = pct + '%%';
+          uploadProgressBar.setAttribute('aria-valuenow', pct);
+          uploadProgressText.textContent = 'Uploading... ' + formatSize(e.loaded) + ' / ' + formatSize(e.total);
+        }
+      });
+
+      xhr.addEventListener('load', function() {
+        uploadProgressContainer.classList.add('d-none');
+        if (xhr.status === 200) {
+          showManualStatus(xhr.responseText, 'success');
+          setButtonsDisabled(false);
+          isUpdating = false;
+        } else {
+          showManualStatus('Upload failed: ' + xhr.responseText, 'danger');
+          setButtonsDisabled(false);
+          isUpdating = false;
+        }
+      });
+
+      xhr.addEventListener('error', function() {
+        uploadProgressContainer.classList.add('d-none');
+        // Device rebooted before response — treat as success
+        showManualStatus('Upload complete. Device is rebooting...', 'success');
+        setButtonsDisabled(false);
+        isUpdating = false;
+      });
+
+      xhr.open('POST', '/update');
+      xhr.send(formData);
+    });
+
 
     const freeRamEl = document.getElementById('free-ram');
     const uptimeEl = document.getElementById('uptime');
@@ -2281,31 +2411,31 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
           })
           .then(data => {
             if (data.inProgress) {
-              showStatus('Updating firmware... please wait.', 'info');
               setButtonsDisabled(true);
             } else {
               // Update finished, but polling caught it.
               clearInterval(pollInterval);
-              showStatus('Update complete. Device will reboot shortly.', 'success');
-              setButtonsDisabled(false); // Re-enable buttons now
+              otaProgressContainer.classList.add('d-none');
+              showOtaStatus('Update complete. Device will reboot shortly.', 'success');
+              setButtonsDisabled(false);
               isUpdating = false;
             }
           })
           .catch((error) => {
             // Fetch fails if device reboots. This is an expected "success" case.
             clearInterval(pollInterval);
-            showStatus('Update complete. Device is rebooting...', 'success');
-            setButtonsDisabled(false); // Re-enable buttons now
+            otaProgressContainer.classList.add('d-none');
+            showOtaStatus('Update complete. Device is rebooting...', 'success');
+            setButtonsDisabled(false);
             isUpdating = false;
           });
       }, 2500);
     }
 
-    function showStatus(message, type = 'info') {
-      statusDiv.innerHTML = `<div class="alert alert-${type} d-flex align-items-center" role="alert">
-          ${type === 'info' ? '<div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading...</span></div>' : ''}
-          <div>${message}</div>
-        </div>`;
+    function showManualStatus(message, type = 'info') {
+      const icons = { success: 'bi-check-circle-fill', danger: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill', warning: 'bi-exclamation-circle-fill' };
+      const iconHtml = type === 'info' ? '<div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading...</span></div>' : `<i class="bi ${icons[type] || ''} me-2"></i>`;
+      manualStatusDiv.innerHTML = `<div class="alert alert-${type} d-flex align-items-center py-2 mb-0" role="alert">${iconHtml}<div>${message}</div></div>`;
     }
 
     function setSystemButtonsDisabled(disabled) {
@@ -2331,8 +2461,12 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     }
 
     function setButtonsDisabled(disabled) {
-        uploadButton.disabled = disabled;
+        uploadSubmitBtn.disabled = disabled;
         onlineButton.disabled = disabled;
+        installUpdateButton.disabled = disabled;
+        fileInput.disabled = disabled;
+        dropZone.style.pointerEvents = disabled ? 'none' : '';
+        dropZone.style.opacity = disabled ? '0.5' : '';
         
         // Disable/enable back button
         if(disabled) {
@@ -2344,77 +2478,91 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
         setSystemButtonsDisabled(disabled);
     }
 
-    uploadForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      if (!fileInput.files.length) {
-        showStatus('Please select a firmware file first.', 'warning');
-        return;
-      }
-      showStatus('Uploading firmware... Do not close this page.');
-      setButtonsDisabled(true);
-      isUpdating = true; // Set flag to prevent navigation
+    const otaProgressContainer = document.getElementById('ota-progress-container');
+    const otaProgressBar = document.getElementById('ota-progress-bar');
+    const otaProgressText = document.getElementById('ota-progress-text');
+    const otaStatusDiv = document.getElementById('ota-status');
+    const otaVersionComparison = document.getElementById('ota-version-comparison');
+    const otaNewVersion = document.getElementById('ota-new-version');
+    const installUpdateButton = document.getElementById('install-update-button');
 
-      const formData = new FormData(this);
-      fetch('/update', {
-        method: 'POST',
-        body: formData
-      })
-      .then(response => {
-        if (!response.ok) {
-          // Server sent a 500 or other error
-          throw new Error(`Server responded with status: ${response.status} ${response.statusText}`);
+    function showOtaStatus(message, type) {
+      const icons = { success: 'bi-check-circle-fill', danger: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill', warning: 'bi-exclamation-circle-fill' };
+      otaStatusDiv.innerHTML = `<div class="alert alert-${type} d-flex align-items-center py-2 mb-0" role="alert"><i class="bi ${icons[type] || ''} me-2"></i><div>${message}</div></div>`;
+    }
+
+    function resetOtaUI() {
+      otaVersionComparison.classList.add('d-none');
+      installUpdateButton.classList.add('d-none');
+      otaProgressContainer.classList.add('d-none');
+      otaStatusDiv.innerHTML = '';
+    }
+
+    // Step 1: Check for updates (version check only)
+    onlineButton.addEventListener('click', function() {
+      resetOtaUI();
+      otaProgressContainer.classList.remove('d-none');
+      otaProgressBar.textContent = 'Checking...';
+      otaProgressText.textContent = 'Contacting GitHub for the latest release...';
+      onlineButton.disabled = true;
+
+      fetch('/api/update/check', { method: 'POST' })
+      .then(response => response.json())
+      .then(data => {
+        otaProgressContainer.classList.add('d-none');
+        onlineButton.disabled = false;
+
+        if (data.error) {
+          showOtaStatus(data.error, 'danger');
+          return;
         }
-        return response.text();
-      })
-      .then(text => {
-        // Server sent 200 OK
-        if (text.includes('Update successful')) {
-            showStatus(text, 'success');
-            // Device is rebooting. Re-enable buttons and allow navigation.
-            setButtonsDisabled(false);
-            isUpdating = false; 
+
+        if (data.available) {
+          otaNewVersion.textContent = data.newVersion;
+          otaVersionComparison.classList.remove('d-none');
+          installUpdateButton.classList.remove('d-none');
+          showOtaStatus('A new firmware version is available!', 'info');
         } else {
-            // This means the update FAILED from the server side (e.g., Update.end() failed)
-            showStatus(text, 'danger');
-            setButtonsDisabled(false);
-            isUpdating = false;
+          showOtaStatus('You are running the latest firmware (' + data.currentVersion + ').', 'success');
         }
       })
       .catch(error => {
-        // This catch block will be hit if the server reboots *before* sending a response,
-        // OR if the response.ok was false.
-        showStatus(`Upload failed: ${error.message}`, 'danger');
-        setButtonsDisabled(false);
-        isUpdating = false;
+        otaProgressContainer.classList.add('d-none');
+        onlineButton.disabled = false;
+        showOtaStatus('Failed to check for updates: ' + error.message, 'danger');
       });
     });
 
-    onlineButton.addEventListener('click', function() {
-      showStatus('Checking for online updates...', 'info');
+    // Step 2: Install update (user confirmed)
+    installUpdateButton.addEventListener('click', function() {
+      installUpdateButton.classList.add('d-none');
+      otaProgressContainer.classList.remove('d-none');
+      otaProgressBar.textContent = 'Downloading...';
+      otaProgressText.textContent = 'The device is downloading firmware from GitHub...';
       setButtonsDisabled(true);
       isUpdating = true;
+      otaStatusDiv.innerHTML = '';
 
       fetch('/api/update/github', { method: 'POST' })
-      .then(response => response.text()) // Server always sends 200 OK
+      .then(response => response.text())
       .then(text => {
-        // Now analyze the text response from our server
         if (text.includes('Starting')) {
-          showStatus(text, 'info'); // Blue spinner, update is starting
           startPollingStatus();
         } else if (text.toLowerCase().includes('error') || text.toLowerCase().includes('failed')) {
-          showStatus(text, 'danger'); // Red alert, show error
-          setButtonsDisabled(false);  // Re-enable buttons
+          otaProgressContainer.classList.add('d-none');
+          showOtaStatus(text, 'danger');
+          setButtonsDisabled(false);
           isUpdating = false;
         } else {
-          // This is for "No new update found."
-          showStatus(text, 'success'); // Green alert, show success
-          setButtonsDisabled(false);   // Re-enable buttons
+          otaProgressContainer.classList.add('d-none');
+          showOtaStatus(text, 'success');
+          setButtonsDisabled(false);
           isUpdating = false;
         }
       })
       .catch(error => {
-        // This will only catch actual network failures
-        showStatus(`Online update check failed: ${error.message}`, 'danger');
+        otaProgressContainer.classList.add('d-none');
+        showOtaStatus('Update failed: ' + error.message, 'danger');
         setButtonsDisabled(false);
         isUpdating = false;
       });

@@ -779,6 +779,11 @@ void ClockWebServer::begin()
           }
         });
 
+    server.on("/api/update/check", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+      String result = UpdateManager::getInstance().checkForUpdate();
+      request->send(200, "application/json", result); });
+
     server.on("/api/update/github", HTTP_POST, [](AsyncWebServerRequest *request)
               {
       String status = UpdateManager::getInstance().handleGithubUpdate();
