@@ -41,18 +41,29 @@ DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
   {
     if (alarm.getDays() == 0 || (alarm.getDays() & (1 << now.dayOfTheWeek())))
     {
-      return DateTime(now.year(), now.month(), now.day(), alarm.getHour(), alarm.getMinute(), 0);
+      DateTime candidate(now.year(), now.month(), now.day(), alarm.getHour(), alarm.getMinute(), 0);
+      // For biweekly alarms, verify this is the correct week
+      if (!alarm.isBiweekly() || Alarm::isOddWeek(candidate) == alarm.isBiweeklyOddWeek())
+      {
+        return candidate;
+      }
     }
   }
 
-  // Check for the next 7 days
-  for (int i = 1; i <= 7; ++i)
+  // Check future days (14 days for biweekly to find the correct week parity)
+  int maxDays = alarm.isBiweekly() ? 14 : 7;
+  for (int i = 1; i <= maxDays; ++i)
   {
     uint8_t dayOfWeek = (now.dayOfTheWeek() + i) % 7;
     if (alarm.getDays() == 0 || (alarm.getDays() & (1 << dayOfWeek)))
     {
       DateTime next = now + TimeSpan(i, 0, 0, 0);
-      return DateTime(next.year(), next.month(), next.day(), alarm.getHour(), alarm.getMinute(), 0);
+      DateTime candidate(next.year(), next.month(), next.day(), alarm.getHour(), alarm.getMinute(), 0);
+      // For biweekly alarms, verify this is the correct week
+      if (!alarm.isBiweekly() || Alarm::isOddWeek(candidate) == alarm.isBiweeklyOddWeek())
+      {
+        return candidate;
+      }
     }
   }
 
@@ -213,7 +224,7 @@ bool TimeManager::updateNtp()
  */
 void TimeManager::getFormattedTime(char *buf, size_t bufSize) const
 {
-  DateTime now = getLocalTime();
+  DateTime now = getCachedTime();
   if (is24HourFormat())
   {
     snprintf(buf, bufSize, "%02d:%02d", now.hour(), now.minute());
@@ -257,7 +268,7 @@ String TimeManager::getFormattedSeconds() const
  */
 void TimeManager::getFormattedDate(char *buf, size_t bufSize) const
 {
-  DateTime now = getLocalTime();
+  DateTime now = getCachedTime();
   static const char *monthNames[] = {
       "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
       "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
@@ -282,7 +293,7 @@ void TimeManager::getTOD(char *buf, size_t bufSize) const
     buf[0] = '\0';
     return;
   }
-  DateTime now = getLocalTime();
+  DateTime now = getCachedTime();
   snprintf(buf, bufSize, "%s", (now.hour() < 12) ? "AM" : "PM");
 }
 
@@ -299,7 +310,7 @@ String TimeManager::getTOD() const
  */
 void TimeManager::getDayOfWeek(char *buf, size_t bufSize) const
 {
-  DateTime now = getLocalTime();
+  DateTime now = getCachedTime();
   static const char *dayNames[] = {
       "SUN", "MON", "TUE", "WED",
       "THU", "FRI", "SAT"};
@@ -351,14 +362,24 @@ void TimeManager::checkDailySync()
   // Create a YYYYMMDD integer for the current date.
   uint32_t today = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
 
+  bool needsSync = false;
   {
     RecursiveLockGuard lock(_mutex);
-    // If the last sync was on a different day, and it's 3 AM or later, we should sync.
+    // If the last sync was on a different day, trigger a sync.
     if (lastSyncDate < today)
     {
-      SerialLog::getInstance().print("Performing daily time sync...\n");
-      startNtpSync(); // This starts the non-blocking NTP sync.
+      // Stamp lastSyncDate immediately to prevent this from firing again
+      // on every logicTask iteration (every 10ms) for the rest of the day.
+      // If the sync fails, checkDriftAndResync() will catch residual drift.
+      lastSyncDate = today;
+      needsSync = true;
     }
+  }
+
+  if (needsSync)
+  {
+    SerialLog::getInstance().print("Performing daily time sync...\n");
+    startNtpSync(); // This starts the non-blocking NTP sync.
   }
 }
 
@@ -516,8 +537,12 @@ DateTime TimeManager::getCachedTime() const
 
 bool TimeManager::isTimeSet() const
 {
-  // The DS3231 RTC has a Lost Power flag that is more reliable than checking
-  // the year.
+  // Guard against calling RTC.lostPower() before the hardware is initialized,
+  // matching the same guard used in getRTCTime().
+  if (!isRtcFound())
+  {
+    return false;
+  }
   RecursiveLockGuard lock(_mutex);
   return !RTC.lostPower();
 }

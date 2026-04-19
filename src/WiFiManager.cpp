@@ -88,13 +88,15 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
     _connectionResult = true;
 
     // If this is the first successful connection with these credentials,
-    // mark them as valid and save the config.
+    // mark them as valid. Do NOT call config.save() here — the WiFi event
+    // callback runs in the WiFi stack task context; NVS writes from here
+    // can corrupt flash. Defer the save to handleConnection() (Core 0).
     auto &config = ConfigManager::getInstance();
     if (!config.areWifiCredsValid())
     {
-      logger.print("WiFi credentials validated. Saving flag.\n");
+      logger.print("WiFi credentials validated. Deferring save.\n");
       config.setWifiCredsValid(true);
-      config.save();
+      instance._pendingCredsValidSave = true;
     }
 
     // Since we have an IP, it's time to start mDNS.
@@ -140,6 +142,20 @@ void WiFiManager::handleConnection()
     config.save();
     LockGuard lock(_mutex);
     _pendingReboot = true;
+  }
+
+  // Flush the "creds valid" flag save deferred from the standard event handler
+  bool doCredsValidSave = false;
+  {
+    LockGuard lock(_mutex);
+    if (_pendingCredsValidSave) {
+      _pendingCredsValidSave = false;
+      doCredsValidSave = true;
+    }
+  }
+  if (doCredsValidSave) {
+    ConfigManager::getInstance().save();
+    SerialLog::getInstance().print("WiFi credentials valid flag saved.\n");
   }
 
   if (isCaptivePortal())

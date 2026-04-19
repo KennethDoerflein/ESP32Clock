@@ -154,7 +154,9 @@ String UpdateManager::handleGithubUpdate()
     }
     
     char timeStr[64];
-    strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
     SerialLog::getInstance().printf("System time: %s\n", timeStr);
 
     HTTPClient http;

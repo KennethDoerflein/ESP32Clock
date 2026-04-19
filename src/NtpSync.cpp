@@ -251,12 +251,17 @@ DateTime getNtpTime()
     return DateTime(); // Return an invalid DateTime
   }
 
-  // Convert tm struct to DateTime object
+  // The system clock returns local time via getLocalTime().
+  // Convert to UTC to match the RTC (which stores UTC).
+  time_t now = time(nullptr);
+  struct tm utc_tm;
+  gmtime_r(&now, &utc_tm);
+
   return DateTime(
-      timeinfo.tm_year + 1900,
-      timeinfo.tm_mon + 1,
-      timeinfo.tm_mday,
-      timeinfo.tm_hour,
-      timeinfo.tm_min,
-      timeinfo.tm_sec);
+      utc_tm.tm_year + 1900,
+      utc_tm.tm_mon + 1,
+      utc_tm.tm_mday,
+      utc_tm.tm_hour,
+      utc_tm.tm_min,
+      utc_tm.tm_sec);
 }

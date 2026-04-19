@@ -564,7 +564,7 @@ void loop()
           Alarm alarm = config.getAlarmById(alarmId);
           if (alarm.getId() != 255)
           {
-            alarm.dismiss(timeManager.getRTCTime());
+            alarm.dismiss(timeManager.getCachedTime());
             config.setAlarmById(alarmId, alarm);
             config.save();
           }
@@ -639,7 +639,7 @@ void loop()
         {
           if (alarm.isSnoozed())
           {
-            alarm.dismiss(timeManager.getRTCTime());
+            alarm.dismiss(timeManager.getCachedTime());
             config.setAlarmById(alarm.getId(), alarm);
           }
         }

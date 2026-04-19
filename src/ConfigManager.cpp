@@ -317,6 +317,10 @@ void ConfigManager::load()
       alarm.setMinute(_preferences.getUChar(key, 0));
       snprintf(key, sizeof(key), "a_%d_days", i);
       alarm.setDays(_preferences.getUChar(key, 0));
+      snprintf(key, sizeof(key), "a_%d_biwk", i);
+      alarm.setBiweekly(_preferences.getBool(key, false));
+      snprintf(key, sizeof(key), "a_%d_biwkOdd", i);
+      alarm.setBiweeklyOddWeek(_preferences.getBool(key, false));
       snprintf(key, sizeof(key), "a_%d_snz", i);
       bool snoozed = _preferences.getBool(key, false);
       snprintf(key, sizeof(key), "a_%d_snzUntil", i);
@@ -424,6 +428,10 @@ bool ConfigManager::save()
       _preferences.remove(key);
       snprintf(key, sizeof(key), "a_%d_days", i);
       _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_biwk", i);
+      _preferences.remove(key);
+      snprintf(key, sizeof(key), "a_%d_biwkOdd", i);
+      _preferences.remove(key);
       snprintf(key, sizeof(key), "a_%d_snz", i);
       _preferences.remove(key);
       snprintf(key, sizeof(key), "a_%d_snzUntil", i);
@@ -446,6 +454,10 @@ bool ConfigManager::save()
     _preferences.putUChar(key, _alarms[i].getMinute());
     snprintf(key, sizeof(key), "a_%zu_days", i);
     _preferences.putUChar(key, _alarms[i].getDays());
+    snprintf(key, sizeof(key), "a_%zu_biwk", i);
+    _preferences.putBool(key, _alarms[i].isBiweekly());
+    snprintf(key, sizeof(key), "a_%zu_biwkOdd", i);
+    _preferences.putBool(key, _alarms[i].isBiweeklyOddWeek());
     snprintf(key, sizeof(key), "a_%zu_snz", i);
     _preferences.putBool(key, _alarms[i].isSnoozed());
     snprintf(key, sizeof(key), "a_%zu_snzUntil", i);

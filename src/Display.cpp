@@ -10,6 +10,7 @@
 #include "Display.h"
 #include "ConfigManager.h"
 #include "TimeManager.h"
+#include "Constants.h"
 #include "fonts/CenturyGothic28.h"
 #include <Arduino.h>
 
@@ -222,13 +223,9 @@ void Display::updateBrightness()
   }
   else
   {
-    if (config.getBrightness() > 255)
+    if (config.getBrightness() < BRIGHTNESS_MIN)
     {
-      dutyCycle = 255; // Clamp to max value
-    }
-    else if (config.getBrightness() < 10)
-    {
-      dutyCycle = 10; // Clamp to min value
+      dutyCycle = BRIGHTNESS_MIN;
     }
     else
     {

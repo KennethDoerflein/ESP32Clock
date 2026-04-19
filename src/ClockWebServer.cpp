@@ -351,7 +351,7 @@ void ClockWebServer::begin()
 
             bool newBiweekly = alarmObj["biweekly"] | false;
             alarm.setBiweekly(newBiweekly);
-            if (newBiweekly && alarmObj.containsKey("biweeklyOddWeek")) {
+            if (newBiweekly && alarmObj["biweeklyOddWeek"].is<bool>()) {
               alarm.setBiweeklyOddWeek(alarmObj["biweeklyOddWeek"] | false);
             } else if (newBiweekly) {
               // Auto-compute parity from current week when first enabling biweekly
