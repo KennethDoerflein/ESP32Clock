@@ -2243,7 +2243,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     const downloadSystemLogBtn = document.getElementById('download-system-log-btn');
     const logsTab = document.getElementById('serial-log-tab');
     const ntpSyncStatusDiv = document.getElementById('ntp-sync-status');
-    const statusDiv = document.getElementById('status');
+    const manualStatusDiv = document.getElementById('manual-status');
     const backButton = document.getElementById('back-button');
     const rebootBtn = document.getElementById('reboot-button');
     const resetBtn = document.getElementById('factory-reset-button');
@@ -2262,7 +2262,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
       if (this.files.length > 0) {
         const file = this.files[0];
         if (!file.name.endsWith('.bin')) {
-          showStatus('Please select a .bin firmware file.', 'warning');
+          showManualStatus('Please select a .bin firmware file.', 'warning');
           this.value = '';
           fileNameDisplay.textContent = '';
           uploadSubmitBtn.disabled = true;
@@ -2270,7 +2270,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
         }
         fileNameDisplay.textContent = file.name + ' (' + formatSize(file.size) + ')';
         uploadSubmitBtn.disabled = false;
-        statusDiv.innerHTML = '';
+        manualStatusDiv.innerHTML = '';
       }
     });
 
@@ -2307,7 +2307,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       setButtonsDisabled(true);
       isUpdating = true;
-      statusDiv.innerHTML = '';
+      manualStatusDiv.innerHTML = '';
       uploadProgressContainer.classList.remove('d-none');
       uploadProgressBar.style.width = '0%%';
       uploadProgressBar.textContent = '0%%';
