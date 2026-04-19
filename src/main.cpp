@@ -12,6 +12,7 @@
 #include <Arduino.h>
 #include <memory> // For std::unique_ptr
 #include <ESPmDNS.h>
+#include <Preferences.h>
 
 #include "Constants.h"
 // Include all custom module headers.
@@ -32,6 +33,9 @@
 #include "ButtonManager.h"
 #include "WeatherService.h"
 #include "UpdateManager.h"
+#include "WebContent.h"
+#include <ESPAsyncWebServer.h>
+#include <DNSServer.h>
 #include <esp_task_wdt.h>
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -121,6 +125,168 @@ void updateAlarmState(const std::vector<Alarm> &alarms)
 void IRAM_ATTR onAlarm()
 {
   g_alarm_triggered = true;
+}
+
+/**
+ * @brief Resets the safe mode boot counter to zero.
+ *
+ * Called after a successful setup to indicate the firmware booted cleanly,
+ * and also from safe mode after a successful firmware upload.
+ */
+void resetBootCounter()
+{
+  Preferences prefs;
+  prefs.begin(SAFE_MODE_NVS_NAMESPACE, false);
+  prefs.putUInt(SAFE_MODE_NVS_KEY, 0);
+  prefs.end();
+}
+
+/**
+ * @brief Enters safe mode due to a detected boot loop.
+ *
+ * This function never returns. It initializes only the minimal set of
+ * peripherals needed to allow firmware upload over WiFi:
+ * - Display (for status messages)
+ * - ConfigManager (read-only, for WiFi credentials)
+ * - WiFi (STA with saved credentials, or AP fallback)
+ * - A minimal web server with OTA upload capability
+ *
+ * It deliberately avoids initializing sensors, alarms, time management,
+ * or the full web server to prevent re-triggering whatever crash caused
+ * the boot loop.
+ */
+void enterSafeMode()
+{
+  auto &logger = SerialLog::getInstance();
+  logger.print("\n*** ENTERING SAFE MODE ***\n");
+  logger.print("Boot loop detected. Starting minimal recovery environment.\n");
+
+  // Initialize display
+  auto &display = Display::getInstance();
+  display.begin();
+  display.drawMultiLineStatusMessage("SAFE MODE", "Starting WiFi...");
+
+  // Initialize ConfigManager to read saved WiFi credentials
+  ConfigManager::getInstance().begin();
+
+  // Attempt WiFi STA connection with saved credentials
+  String ssid = ConfigManager::getInstance().getWifiSSID();
+  String password = ConfigManager::getInstance().getWifiPassword();
+  bool wifiConnected = false;
+  DNSServer *dnsServer = nullptr;
+
+  if (ssid.length() > 0)
+  {
+    logger.printf("Safe Mode: Attempting to connect to SSID: %s\n", ssid.c_str());
+    display.drawMultiLineStatusMessage("SAFE MODE", "Connecting WiFi...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid.c_str(), password.c_str());
+
+    unsigned long startTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startTime < SAFE_MODE_WIFI_TIMEOUT)
+    {
+      delay(250);
+      logger.print(".");
+    }
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      wifiConnected = true;
+      logger.printf("\nSafe Mode: WiFi connected! IP: %s\n", WiFi.localIP().toString().c_str());
+      display.drawMultiLineStatusMessage("SAFE MODE", ("IP: " + WiFi.localIP().toString()).c_str());
+    }
+    else
+    {
+      logger.print("\nSafe Mode: WiFi connection failed.\n");
+      WiFi.disconnect(true);
+    }
+  }
+
+  // If STA failed, start AP
+  if (!wifiConnected)
+  {
+    logger.printf("Safe Mode: Starting AP '%s'\n", SAFE_MODE_AP_SSID);
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(SAFE_MODE_AP_SSID);
+    IPAddress apIP = WiFi.softAPIP();
+    logger.printf("Safe Mode: AP IP: %s\n", apIP.toString().c_str());
+    display.drawMultiLineStatusMessage("SAFE MODE", ("AP: " + String(SAFE_MODE_AP_SSID)).c_str());
+
+    // Start DNS server for captive portal behavior
+    dnsServer = new DNSServer();
+    dnsServer->setErrorReplyCode(DNSReplyCode::NoError);
+    dnsServer->start(53, "*", apIP);
+  }
+
+  // Create a minimal web server (separate from ClockWebServer)
+  AsyncWebServer safeServer(80);
+
+  // Serve the safe mode HTML page
+  safeServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+                { request->send_P(200, "text/html", SAFE_MODE_HTML); });
+
+  // Handle firmware upload (reuses UpdateManager)
+  safeServer.on(
+      "/update", HTTP_POST,
+      [](AsyncWebServerRequest *request)
+      {
+        // Response is sent in the upload handler's final callback
+      },
+      [](AsyncWebServerRequest *request, String filename, size_t index,
+         uint8_t *data, size_t len, bool final)
+      {
+        if (UpdateManager::getInstance().isUpdateInProgress() && index == 0)
+        {
+          request->send(409, "text/plain", "An update is already in progress.");
+          return;
+        }
+        UpdateManager::getInstance().handleFileUpload(data, len, index, request->contentLength());
+        if (final)
+        {
+          if (UpdateManager::getInstance().endUpdate())
+          {
+            // Reset boot counter so the new firmware boots normally
+            resetBootCounter();
+            request->send(200, "text/plain", "Update successful! Rebooting...");
+            delay(1000);
+            ESP.restart();
+          }
+          else
+          {
+            String err = UpdateManager::getInstance().getLastError();
+            request->send(500, "text/plain", "Update failed: " + (err.length() > 0 ? err : String("Unknown error.")));
+          }
+        }
+      });
+
+  // Reboot endpoint
+  safeServer.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
+                {
+    request->send(200, "text/plain", "Rebooting...");
+    request->onDisconnect([](){ ESP.restart(); }); });
+
+  // Catch-all for captive portal redirect (AP mode only)
+  if (!wifiConnected)
+  {
+    safeServer.onNotFound([](AsyncWebServerRequest *request)
+                          {
+      String redirectUrl = "http://" + request->host();
+      request->redirect(redirectUrl); });
+  }
+
+  safeServer.begin();
+  logger.print("Safe Mode: Web server started. Waiting for firmware upload.\n");
+
+  // Infinite loop — safe mode never exits except via reboot/reflash
+  for (;;)
+  {
+    if (dnsServer)
+    {
+      dnsServer->processNextRequest();
+    }
+    esp_task_wdt_reset();
+    delay(10);
+  }
 }
 
 /**
@@ -258,53 +424,32 @@ void setup()
   esp_task_wdt_init(30, true);
   esp_task_wdt_add(NULL); // Add the main task (Core 1) to the WDT
 
+  // --- Boot Loop Detection ---
+  // Increment a persistent boot counter BEFORE any complex initialization.
+  // If we reach the threshold, enter safe mode. The counter is reset to 0
+  // at the end of setup() after a successful boot.
+  {
+    Preferences prefs;
+    prefs.begin(SAFE_MODE_NVS_NAMESPACE, false);
+    uint32_t bootCount = prefs.getUInt(SAFE_MODE_NVS_KEY, 0);
+    bootCount++;
+    prefs.putUInt(SAFE_MODE_NVS_KEY, bootCount);
+    prefs.end();
+
+    logger.printf("Boot counter: %u / %d\n", bootCount, SAFE_MODE_BOOT_THRESHOLD);
+
+    if (bootCount >= SAFE_MODE_BOOT_THRESHOLD)
+    {
+      // Boot loop detected — enter safe mode (never returns)
+      enterSafeMode();
+    }
+  }
+
   bool displayInitialized = false;
 
   // Initialize ConfigManager.
   logger.print("Initializing ConfigManager...\n");
   ConfigManager::getInstance().begin();
-
-  // Check for crash/panic reset and display warning in dev builds
-  esp_reset_reason_t reason = esp_reset_reason();
-  if (String(FIRMWARE_VERSION).startsWith("dev") && (reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT || reason == ESP_RST_TASK_WDT))
-  {
-    auto &display = Display::getInstance();
-    display.begin();
-    displayInitialized = true;
-    display.drawMultiLineStatusMessage("CRASH DETECTED", "SAFE MODE...");
-
-    // Init minimal systems for logs
-    SerialLog::getInstance().print("Entering Crash Safe Mode...\n");
-
-    // Init WiFi
-    WiFiManager::getInstance().begin();
-
-    // Init WebServer
-    ClockWebServer::getInstance().begin();
-
-    bool ipDisplayed = false;
-
-    // Loop indefinitely to keep WebServer alive but stop other logic
-    while (true)
-    {
-      WiFiManager::getInstance().handleConnection();
-      SerialLog::getInstance().loop();
-
-      if (WiFi.status() == WL_CONNECTED && !ipDisplayed)
-      {
-        display.drawMultiLineStatusMessage("CRASH DETECTED","CHECK LOGS");
-        ipDisplayed = true;
-      }
-      else if (WiFi.status() != WL_CONNECTED && ipDisplayed)
-      {
-        display.drawMultiLineStatusMessage("CRASH DETECTED", "CONNECTING...");
-        ipDisplayed = false;
-      }
-
-      esp_task_wdt_reset();
-      delay(10);
-    }
-  }
 
   // Check for factory reset request at boot using the Snooze button.
   // This avoids conflicts with the ESP32's hardware bootloader mode.
@@ -464,6 +609,11 @@ void setup()
       &g_logicTaskHandle,
       0 // Core 0
   );
+
+  // Reset the boot counter to 0 — setup completed successfully.
+  // This proves the firmware is stable and prevents safe mode on next boot.
+  resetBootCounter();
+  logger.print("Boot counter reset. Firmware is stable.\n");
 
   logger.print("--- Setup Complete ---\n");
 }

@@ -2502,4 +2502,241 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+/**
+ * @brief Self-contained Safe Mode HTML page.
+ *
+ * This page has NO external CDN dependencies because the device may be in
+ * AP-only mode with no internet access. It provides a firmware upload form
+ * and a reboot button to recover from a boot loop.
+ */
+const char SAFE_MODE_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Clock - Safe Mode</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #1a1a2e; color: #e0e0e0;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 1rem;
+        }
+        .container {
+            background-color: #16213e; padding: 2rem; border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4); width: 100%; max-width: 440px;
+        }
+        .header { text-align: center; margin-bottom: 1.5rem; }
+        .header h1 { color: #e94560; font-size: 1.6rem; margin-bottom: 0.25rem; }
+        .header p { color: #999; font-size: 0.85rem; }
+        .status-box {
+            background-color: #0f3460; padding: 1rem; border-radius: 8px;
+            margin-bottom: 1.5rem; text-align: center; font-size: 0.9rem;
+        }
+        .status-box .label { color: #999; margin-bottom: 0.25rem; }
+        .status-box .value { color: #53d8fb; font-family: monospace; font-size: 1.1rem; }
+        .upload-area {
+            border: 2px dashed #555; border-radius: 8px; padding: 1.5rem;
+            text-align: center; margin-bottom: 1rem; transition: border-color 0.2s;
+        }
+        .upload-area.highlight { border-color: #53d8fb; }
+        .upload-area p { margin-bottom: 0.75rem; color: #bbb; }
+        input[type="file"] { display: none; }
+        .file-label {
+            display: inline-block; padding: 0.6rem 1.5rem; background-color: #0f3460;
+            color: #53d8fb; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+            border: 1px solid #53d8fb; transition: background-color 0.2s;
+        }
+        .file-label:hover { background-color: #1a4a7a; }
+        .file-name { margin-top: 0.5rem; font-size: 0.85rem; color: #aaa; min-height: 1.2em; }
+        .progress-container { display: none; margin-bottom: 1rem; }
+        .progress-bar-bg {
+            background-color: #333; border-radius: 6px; height: 24px; overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%; background: linear-gradient(90deg, #0f3460, #53d8fb);
+            border-radius: 6px; width: 0%; transition: width 0.3s;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem; color: white; font-weight: bold;
+        }
+        .progress-text { text-align: center; margin-top: 0.5rem; font-size: 0.85rem; color: #aaa; }
+        .btn {
+            display: block; width: 100%; padding: 0.75rem; border: none;
+            border-radius: 6px; cursor: pointer; font-size: 1rem;
+            font-weight: 600; transition: background-color 0.2s; margin-bottom: 0.75rem;
+        }
+        .btn-upload { background-color: #e94560; color: white; }
+        .btn-upload:hover { background-color: #c73e54; }
+        .btn-upload:disabled { background-color: #555; cursor: not-allowed; }
+        .btn-reboot { background-color: #333; color: #ccc; }
+        .btn-reboot:hover { background-color: #444; }
+        .msg { padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; text-align: center; font-size: 0.9rem; display: none; }
+        .msg-success { background-color: #1b4332; color: #95d5b2; }
+        .msg-error { background-color: #4a1515; color: #f8a0a0; }
+        .warning {
+            background-color: #3d2e00; color: #ffd166; padding: 0.75rem;
+            border-radius: 6px; margin-bottom: 1rem; font-size: 0.8rem; text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>&#x26A0; Safe Mode</h1>
+            <p>Boot loop detected. Upload new firmware to recover.</p>
+        </div>
+
+        <div class="status-box">
+            <div class="label">Device IP Address</div>
+            <div class="value" id="ip-display">Loading...</div>
+        </div>
+
+        <div class="warning">
+            The device detected repeated crashes and entered safe mode.
+            Upload a working firmware file (.bin) to restore normal operation.
+        </div>
+
+        <div id="msg" class="msg"></div>
+
+        <div class="upload-area" id="drop-zone">
+            <p>Select or drop a firmware file</p>
+            <label class="file-label" for="fw-file">Choose .bin File</label>
+            <input type="file" id="fw-file" accept=".bin">
+            <div class="file-name" id="file-name"></div>
+        </div>
+
+        <div class="progress-container" id="progress-container">
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-bar">0%</div>
+            </div>
+            <div class="progress-text" id="progress-text">Uploading...</div>
+        </div>
+
+        <button class="btn btn-upload" id="upload-btn" disabled>Upload Firmware</button>
+        <button class="btn btn-reboot" id="reboot-btn">Reboot Device</button>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fw-file');
+        const fileNameEl = document.getElementById('file-name');
+        const uploadBtn = document.getElementById('upload-btn');
+        const rebootBtn = document.getElementById('reboot-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const msgEl = document.getElementById('msg');
+        const dropZone = document.getElementById('drop-zone');
+        const ipDisplay = document.getElementById('ip-display');
+
+        // Display IP
+        ipDisplay.textContent = window.location.host;
+
+        // File selection
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                const file = this.files[0];
+                if (!file.name.endsWith('.bin')) {
+                    showMsg('Please select a .bin firmware file.', true);
+                    this.value = '';
+                    uploadBtn.disabled = true;
+                    fileNameEl.textContent = '';
+                    return;
+                }
+                fileNameEl.textContent = file.name + ' (' + formatSize(file.size) + ')';
+                uploadBtn.disabled = false;
+                hideMsg();
+            }
+        });
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('highlight');
+        });
+        dropZone.addEventListener('dragleave', function() {
+            this.classList.remove('highlight');
+        });
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('highlight');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        // Upload
+        uploadBtn.addEventListener('click', function() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const xhr = new XMLHttpRequest();
+            const formData = new FormData();
+            formData.append('update', file, file.name);
+
+            uploadBtn.disabled = true;
+            rebootBtn.disabled = true;
+            progressContainer.style.display = 'block';
+            hideMsg();
+
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = pct + '%';
+                    progressBar.textContent = pct + '%';
+                    progressText.textContent = 'Uploading... ' + formatSize(e.loaded) + ' / ' + formatSize(e.total);
+                }
+            });
+
+            xhr.addEventListener('load', function() {
+                if (xhr.status === 200) {
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '100%';
+                    progressText.textContent = 'Upload complete!';
+                    showMsg('Firmware uploaded successfully! Device is rebooting...', false);
+                } else {
+                    showMsg('Upload failed: ' + xhr.responseText, true);
+                    uploadBtn.disabled = false;
+                    rebootBtn.disabled = false;
+                }
+            });
+
+            xhr.addEventListener('error', function() {
+                showMsg('Upload failed. Connection lost.', true);
+                uploadBtn.disabled = false;
+                rebootBtn.disabled = false;
+            });
+
+            xhr.open('POST', '/update');
+            xhr.send(formData);
+        });
+
+        // Reboot
+        rebootBtn.addEventListener('click', function() {
+            if (confirm('Reboot the device? It may enter safe mode again if the firmware issue is not fixed.')) {
+                fetch('/reboot').then(() => {
+                    showMsg('Device is rebooting...', false);
+                    rebootBtn.disabled = true;
+                }).catch(() => showMsg('Reboot command sent.', false));
+            }
+        });
+
+        function showMsg(text, isError) {
+            msgEl.textContent = text;
+            msgEl.className = 'msg ' + (isError ? 'msg-error' : 'msg-success');
+            msgEl.style.display = 'block';
+        }
+        function hideMsg() { msgEl.style.display = 'none'; }
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+    </script>
+</body>
+</html>
+)rawliteral";
+
 #endif // WEB_CONTENT_H
