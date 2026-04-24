@@ -147,6 +147,7 @@ private:
   volatile bool _ignoreDisconnectEvent = false;
   bool _pendingCredentialSave = false; // Set by event handler; flushed in handleConnection()
   bool _pendingCredsValidSave = false; // Set by event handler; flushed in handleConnection()
+  bool _pendingMdnsSetup = false;      // Set by event handler; flushed in handleConnection()
 
   // Static event handler for WiFi events
   static void wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info);

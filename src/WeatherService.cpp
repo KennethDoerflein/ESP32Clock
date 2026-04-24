@@ -639,14 +639,16 @@ void WeatherService::updateWeather()
     }
     else
     {
-      SerialLog::getInstance().printf("JSON Error: %s\n", error.c_str());
+      SerialLog::getInstance().printf("Weather JSON Error: %s\n", error.c_str());
       LockGuard lock(_mutex);
       _failureCount++;
     }
   }
   else
   {
-    SerialLog::getInstance().printf("Weather HTTP Failed: %d\n", httpCode);
+    String errorMsg = http.errorToString(httpCode);
+    String payload = http.getString();
+    SerialLog::getInstance().printf("Weather HTTP Failed: %d (%s)\nResponse: %s\n", httpCode, errorMsg.c_str(), payload.c_str());
     LockGuard lock(_mutex);
     _failureCount++;
   }

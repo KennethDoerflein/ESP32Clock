@@ -100,12 +100,12 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
     }
 
     // Since we have an IP, it's time to start mDNS.
-    // We need to ensure the web server has been initialized first,
+    // Defer to handleConnection() to avoid blocking the LwIP event task.
     if (WiFi.isConnected())
     {
       WiFi.mode(WIFI_STA);
       logger.print("Switched to STA mode. AP is now off.\n");
-      ClockWebServer::getInstance().setupMDNS();
+      instance._pendingMdnsSetup = true;
     }
   }
   else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
@@ -146,16 +146,24 @@ void WiFiManager::handleConnection()
 
   // Flush the "creds valid" flag save deferred from the standard event handler
   bool doCredsValidSave = false;
+  bool doMdnsSetup = false;
   {
     LockGuard lock(_mutex);
     if (_pendingCredsValidSave) {
       _pendingCredsValidSave = false;
       doCredsValidSave = true;
     }
+    if (_pendingMdnsSetup) {
+      _pendingMdnsSetup = false;
+      doMdnsSetup = true;
+    }
   }
   if (doCredsValidSave) {
     ConfigManager::getInstance().save();
     SerialLog::getInstance().print("WiFi credentials valid flag saved.\n");
+  }
+  if (doMdnsSetup) {
+    ClockWebServer::getInstance().setupMDNS();
   }
 
   if (isCaptivePortal())
@@ -515,7 +523,8 @@ void WiFiManager::setHostname(const String &hostname)
   // Update mDNS
   if (WiFi.isConnected())
   {
-    ClockWebServer::getInstance().setupMDNS();
+    LockGuard lock(_mutex);
+    _pendingMdnsSetup = true;
   }
 }
 
