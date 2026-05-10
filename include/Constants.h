@@ -60,4 +60,11 @@
 const int BRIGHTNESS_MIN = 5;
 const int BRIGHTNESS_MAX = 255;
 
+// --- Safe Mode Constants ---
+#define SAFE_MODE_BOOT_THRESHOLD 10           ///< Number of consecutive crash-boots before entering safe mode.
+#define SAFE_MODE_NVS_NAMESPACE "safemode"   ///< NVS namespace for the boot counter.
+#define SAFE_MODE_NVS_KEY "bootcount"        ///< NVS key for the boot counter.
+#define SAFE_MODE_AP_SSID "Clock-SafeMode"   ///< AP SSID used when safe mode cannot connect to saved WiFi.
+#define SAFE_MODE_WIFI_TIMEOUT 15000         ///< Timeout in ms for STA connection attempt in safe mode.
+
 #endif

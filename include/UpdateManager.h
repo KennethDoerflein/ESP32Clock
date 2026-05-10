@@ -53,6 +53,12 @@ public:
     bool endUpdate();
 
     /**
+     * @brief Checks GitHub for a new firmware version without downloading.
+     * @return A JSON string with the check result: {"available":bool,"currentVersion":"...","newVersion":"...","error":"..."}
+     */
+    String checkForUpdate();
+
+    /**
      * @brief Initiates a firmware update from GitHub with signature verification.
      * @return A string indicating the result of the update check.
      */

@@ -166,10 +166,17 @@ public:
   bool is24HourFormat() const;
 
   /**
-   * @brief Gets the current time from the RTC.
-   * @return A DateTime object representing the current time.
+   * @brief Gets the current time from the RTC (UTC).
+   * @return A DateTime object representing the current UTC time.
    */
   DateTime getRTCTime() const;
+
+  /**
+   * @brief Gets the current UTC time converted to local time.
+   * @details Uses the system timezone to convert the UTC RTC time.
+   * @return A DateTime object representing the current local time.
+   */
+  DateTime getLocalTime() const;
 
   /**
    * @brief Checks if the RTC has been set to a valid time.
@@ -256,7 +263,7 @@ private:
 
   uint8_t _lastDecodedSecond = 61;
 
-  /// @brief Cached time snapshot from the last successful second transition.
+  /// @brief Cached time snapshot from the last successful second transition (local time).
   /// This ensures consistent time data between update detection and rendering.
   DateTime _cachedTime;
 
@@ -276,4 +283,11 @@ private:
    * @brief Clears both hardware alarms on the RTC.
    */
   void clearRtcAlarms();
+
+  /**
+   * @brief Converts a local DateTime to UTC based on system timezone.
+   * @param local The local DateTime to convert.
+   * @return A DateTime object representing UTC time.
+   */
+  DateTime localToUtc(const DateTime &local) const;
 };

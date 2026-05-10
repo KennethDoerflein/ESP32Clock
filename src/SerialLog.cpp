@@ -411,29 +411,41 @@ void SerialLog::logResetReason()
   // Check for crash log in RTC memory
   if (g_crashLog.magic == CRASH_LOG_MAGIC)
   {
-    print("--- CRASH DUMP FROM PREVIOUS SESSION ---\n");
-
-    String dump = "";
-    dump.reserve(512);
-    size_t start = g_crashLog.wrapped ? g_crashLog.head : 0;
-    size_t count = g_crashLog.wrapped ? CRASH_LOG_SIZE : g_crashLog.head;
-
-    for (size_t i = 0; i < count; i++)
+    if (g_crashLog.head > 0 || g_crashLog.wrapped)
     {
-      char c = g_crashLog.buffer[(start + i) % CRASH_LOG_SIZE];
-      dump += c;
-      if (dump.length() >= 512)
+      print("--- CRASH DUMP FROM PREVIOUS SESSION ---\n");
+
+      String dump = "";
+      dump.reserve(512);
+      size_t start = g_crashLog.wrapped ? g_crashLog.head : 0;
+      size_t count = g_crashLog.wrapped ? CRASH_LOG_SIZE : g_crashLog.head;
+
+      for (size_t i = 0; i < count; i++)
+      {
+        char c = g_crashLog.buffer[(start + i) % CRASH_LOG_SIZE];
+        if (c == '\0') continue; // Skip nulls
+        dump += c;
+        if (dump.length() >= 512)
+        {
+          print(dump);
+          dump = "";
+        }
+      }
+      if (dump.length() > 0)
       {
         print(dump);
-        dump = "";
       }
-    }
-    if (dump.length() > 0)
-    {
-      print(dump);
-    }
 
-    print("\n--- END CRASH DUMP ---\n");
+      print("\n--- END CRASH DUMP ---\n");
+    }
+    else
+    {
+      print("Crash log buffer was empty.\n");
+    }
+  }
+  else
+  {
+    print("Crash log magic signature not found (Cold Boot?).\n");
   }
 
   // Initialize RTC Log for the new session
@@ -441,4 +453,7 @@ void SerialLog::logResetReason()
   g_crashLog.head = 0;
   g_crashLog.wrapped = false;
   memset(g_crashLog.buffer, 0, CRASH_LOG_SIZE);
+  
+  // Log some initial session info
+  printf("New session started. Max heap: %u, Free heap: %u\n", ESP.getHeapSize(), ESP.getFreeHeap());
 }
