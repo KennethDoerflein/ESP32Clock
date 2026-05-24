@@ -314,6 +314,16 @@ const char SERIAL_LOG_TAB_PANE_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
   </div>
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="card-title d-flex align-items-center text-warning"><i class="bi bi-exclamation-triangle-fill me-2"></i>Diagnostic Crash Log</h5>
+      <p class="card-text text-muted small">Manage the dedicated diagnostic crash log file stored on the device.</p>
+      <div class="d-grid gap-2">
+        <a href="/api/crash/download" id="download-crash-log-btn" class="btn btn-warning" target="_blank">Download Crash Log</a>
+        <button id="clear-crash-btn" class="btn btn-outline-danger" title="Clear the crash log file manually.">Clear Crash Log</button>
+      </div>
+    </div>
+  </div>
   <div class="log-container">
     <div class="log-header">
       <h5>Live Log</h5>
@@ -2241,6 +2251,8 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     const ntpSyncButton = document.getElementById('ntp-sync-button');
     const rolloverBtn = document.getElementById('rollover-btn');
     const downloadSystemLogBtn = document.getElementById('download-system-log-btn');
+    const downloadCrashLogBtn = document.getElementById('download-crash-log-btn');
+    const clearCrashBtn = document.getElementById('clear-crash-btn');
     const logsTab = document.getElementById('serial-log-tab');
     const ntpSyncStatusDiv = document.getElementById('ntp-sync-status');
     const manualStatusDiv = document.getElementById('manual-status');
@@ -2444,11 +2456,19 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
       if (resetBtn) resetBtn.disabled = disabled;
       if (resetKeepWifiBtn) resetKeepWifiBtn.disabled = disabled;
       if (rolloverBtn) rolloverBtn.disabled = disabled;
+      if (clearCrashBtn) clearCrashBtn.disabled = disabled;
       if (downloadSystemLogBtn) {
         if (disabled) {
           downloadSystemLogBtn.classList.add('disabled');
         } else {
           downloadSystemLogBtn.classList.remove('disabled');
+        }
+      }
+      if (downloadCrashLogBtn) {
+        if (disabled) {
+          downloadCrashLogBtn.classList.add('disabled');
+        } else {
+          downloadCrashLogBtn.classList.remove('disabled');
         }
       }
       if (logsTab) {
@@ -2610,6 +2630,28 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
           .finally(() => {
             if (!isUpdating) {
               setButtonsDisabled(false);
+            }
+          });
+        }
+      });
+    }
+
+    if (clearCrashBtn) {
+      clearCrashBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear the diagnostic crash log?')) {
+          setSystemButtonsDisabled(true);
+          fetch('/api/crash/clear', { method: 'POST' })
+          .then(response => {
+            if (response.ok) {
+              alert("Crash log cleared successfully.");
+            } else {
+              alert("Failed to clear crash log.");
+            }
+          })
+          .catch(e => alert("Error: " + e))
+          .finally(() => {
+            if (!isUpdating) {
+              setSystemButtonsDisabled(false);
             }
           });
         }

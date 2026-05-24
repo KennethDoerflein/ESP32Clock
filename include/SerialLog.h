@@ -78,11 +78,18 @@ public:
    * @return The path to the log file.
    */
   static const char *getLogFilePath() { return LOG_FILE_PATH; }
+  static const char *getCrashLogFilePath() { return CRASH_FILE_PATH; }
 
   /**
    * @brief Logs the reason for the last reset.
    */
   void logResetReason();
+
+  /**
+   * @brief Registers crash/shutdown handlers for diagnostic logging.
+   * Must be called once during setup().
+   */
+  void registerCrashHandlers();
 
 private:
   /**
@@ -103,6 +110,8 @@ private:
   // Constants for file logging
   static const char *LOG_FILE_PATH;
   static const size_t MAX_LOG_SIZE;
+  static const char *CRASH_FILE_PATH;
+  static const size_t MAX_CRASH_LOG_SIZE;
   static const size_t BUFFER_THRESHOLD;
   static const unsigned long FLUSH_INTERVAL;
 
@@ -126,4 +135,9 @@ private:
    * @brief Rotates the log file when it exceeds the maximum size.
    */
   void rotateLogFile();
+
+  /**
+   * @brief Rotates the crash log file when it exceeds the maximum size.
+   */
+  void rotateCrashLogFile();
 };

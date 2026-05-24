@@ -815,6 +815,35 @@ void ClockWebServer::begin()
       SerialLog::getInstance().rotate();
       request->send(200, "text/plain", "Log rotated successfully."); });
 
+    server.on("/api/crash/download", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        if (!LittleFS.exists(SerialLog::getCrashLogFilePath()))
+        {
+          request->send(404, "text/plain", "Crash log file not found");
+          return;
+        }
+        AsyncWebServerResponse *response = request->beginResponse(LittleFS, SerialLog::getCrashLogFilePath(), "text/plain", true);
+        if (response == nullptr)
+        {
+          request->send(500, "text/plain", "Internal Server Error: Could not open crash log file");
+          return;
+        }
+        response->addHeader("Content-Disposition", "attachment; filename=\"crash.log\"");
+        request->send(response); });
+
+    server.on("/api/crash/clear", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+        if (LittleFS.exists(SerialLog::getCrashLogFilePath()))
+        {
+          LittleFS.remove(SerialLog::getCrashLogFilePath());
+        }
+        String oldCrashPath = String(SerialLog::getCrashLogFilePath()) + ".old";
+        if (LittleFS.exists(oldCrashPath))
+        {
+          LittleFS.remove(oldCrashPath);
+        }
+        request->send(200, "text/plain", "Crash log cleared successfully."); });
+
     SerialLog::getInstance().begin(&server);
   }
 

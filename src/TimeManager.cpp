@@ -17,6 +17,7 @@
 #include "SerialLog.h"
 #include "LockGuard.h"
 #include <ctime>
+#include <sys/time.h>
 #include <esp_task_wdt.h>
 #include <WiFi.h>
 
@@ -76,6 +77,40 @@ TimeManager::TimeManager()
 }
 
 /**
+ * @brief Seeds the ESP32's internal system clock from the hardware RTC.
+ *
+ * The ESP32's time() function returns epoch 0 on every boot until SNTP
+ * succeeds. This creates a window where all timestamps are wrong and
+ * localtime_r returns Jan 1, 1970. By seeding from the DS3231 hardware
+ * RTC immediately at boot, we ensure:
+ * - SerialLog timestamps show correct wallclock time from the first line
+ * - checkDST()/getLocalTime() work correctly before NTP
+ * - If NTP fails entirely, the clock still shows the right time
+ */
+void TimeManager::seedSystemClockFromRTC()
+{
+  auto &logger = SerialLog::getInstance();
+
+  DateTime rtcTime = getRTCTime();
+  if (!rtcTime.isValid() || rtcTime.year() < 2024 || rtcTime.year() > 2040)
+  {
+    logger.printf("WARNING: RTC time is invalid or out of range (year=%d). Cannot seed system clock.\n",
+                  rtcTime.isValid() ? rtcTime.year() : 0);
+    return;
+  }
+
+  // RTC stores UTC. Set the ESP32 system clock to this UTC epoch.
+  struct timeval tv;
+  tv.tv_sec = (time_t)rtcTime.unixtime();
+  tv.tv_usec = 0;
+  settimeofday(&tv, nullptr);
+
+  logger.printf("System clock seeded from RTC: %04d-%02d-%02d %02d:%02d:%02d UTC\n",
+                rtcTime.year(), rtcTime.month(), rtcTime.day(),
+                rtcTime.hour(), rtcTime.minute(), rtcTime.second());
+}
+
+/**
  * @brief Initializes the TimeManager.
  *
  * Performs an initial, blocking NTP sync to set the time as soon as possible
@@ -85,14 +120,23 @@ void TimeManager::begin()
 {
   // Note: RTC hardware initialization is handled externally in setupSensors()
   // to group all I2C device setups together.
+  auto &logger = SerialLog::getInstance();
 
-  // Initialize the SNTP daemon once (configures NTP servers and timezone).
+  // --- Step 1: Validate and seed system clock from hardware RTC ---
+  // The ESP32's internal clock starts at epoch 0 on every boot.
+  // Until SNTP succeeds, time(nullptr) returns garbage. Seed it
+  // from the DS3231 so all timestamps are immediately meaningful,
+  // even if NTP never connects.
+  seedSystemClockFromRTC();
+
+  // --- Step 2: Initialize the SNTP daemon (configures NTP servers and timezone) ---
   initNtp();
 
-  // Perform an initial NTP sync attempt at startup.
-  SerialLog::getInstance().print("TimeManager: Performing initial NTP sync...\n");
+  // --- Step 3: Perform initial NTP sync ---
+  logger.print("TimeManager: Performing initial NTP sync...\n");
   syncWithNTP();
 
+  // --- Step 4: DST check ---
   // Right after the first sync we also run the DST check in case the
   // initial RTC value was already on a transition boundary.  This gives
   // added assurance that the internal DST flag is correct before the
@@ -184,6 +228,14 @@ void TimeManager::syncWithNTP()
     uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
     lastSyncDate = ymd;
     SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
+  }
+  else
+  {
+    // The blocking sync failed (SNTP daemon may not have a response yet).
+    // Start the non-blocking sync state machine so the logicTask keeps
+    // retrying via updateNtp() until we get a valid time.
+    SerialLog::getInstance().print("Initial NTP sync failed. Starting non-blocking retry...\n");
+    startNtpSync();
   }
 }
 
@@ -393,12 +445,15 @@ void TimeManager::checkDailySync()
 void TimeManager::checkDriftAndResync()
 {
   // How often to check for drift (e.g., every 4 hours).
-  const unsigned long DRIFT_CHECK_INTERVAL = 4 * 60 * 60 * 1000;
+  static const unsigned long DRIFT_CHECK_INTERVAL = 4UL * 60 * 60 * 1000;
+  // First check runs early (5 minutes) to catch post-crash drift quickly.
+  static const unsigned long INITIAL_DRIFT_CHECK_DELAY = 5UL * 60 * 1000;
   // The maximum acceptable drift in seconds before forcing a resync.
-  const int DRIFT_THRESHOLD_SECONDS = 2;
+  static const int DRIFT_THRESHOLD_SECONDS = 2;
 
   unsigned long currentMillis = millis();
-  if (currentMillis - lastDriftCheck < DRIFT_CHECK_INTERVAL)
+  unsigned long interval = _initialDriftCheckDone ? DRIFT_CHECK_INTERVAL : INITIAL_DRIFT_CHECK_DELAY;
+  if (currentMillis - lastDriftCheck < interval)
   {
     return; // Not time for a drift check yet.
   }
@@ -408,6 +463,7 @@ void TimeManager::checkDriftAndResync()
   }
 
   lastDriftCheck = currentMillis;
+  _initialDriftCheckDone = true;
 
   SerialLog::getInstance().print("Performing periodic clock drift check...\n");
 

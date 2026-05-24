@@ -13,6 +13,7 @@
 #include "LockGuard.h"
 #include <Arduino.h>
 #include <esp_task_wdt.h>
+#include <esp_sntp.h>
 
 /**
  * @brief One-time initialization of the SNTP client.
@@ -67,6 +68,8 @@ static unsigned long currentRetryDelay = 0;
  */
 static void _processSuccessfulNtpSync(const struct tm &timeinfo)
 {
+  auto &logger = SerialLog::getInstance();
+
   // The system clock is already synced by SNTP. 
   // We want to store UTC in the hardware RTC.
   time_t now = time(nullptr);
@@ -81,22 +84,35 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
       utc_tm.tm_min,
       utc_tm.tm_sec);
 
+  // Log the drift between the old RTC value and the new NTP value.
+  // This is critical forensic data for diagnosing time accuracy issues.
+  DateTime oldRtcTime = RTC.now();
+  if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
+  {
+    int32_t driftSeconds = (int32_t)oldRtcTime.unixtime() - (int32_t)time_to_set.unixtime();
+    logger.printf("NTP correction: RTC was %s by %ld seconds\n",
+                  driftSeconds > 0 ? "ahead" : "behind",
+                  (long)abs(driftSeconds));
+  }
+
   // Update the hardware RTC with UTC time.
   RTC.adjust(time_to_set);
+
+  // Verify the write by reading back
+  DateTime readback = RTC.now();
+  int32_t writeError = abs((int32_t)readback.unixtime() - (int32_t)time_to_set.unixtime());
+  if (writeError > 2)
+  {
+    logger.printf("WARNING: RTC write verification failed! Expected %lu, got %lu (delta=%ld)\n",
+                  (unsigned long)time_to_set.unixtime(), (unsigned long)readback.unixtime(), (long)writeError);
+  }
 
   // Update DST status in configuration (for UI/logging purposes only)
   ConfigManager::getInstance().setDST(timeinfo.tm_isdst > 0);
 
-  SerialLog::getInstance().print("RTC synchronized with NTP time (UTC): ");
-  char timeStr[25];
-  sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d UTC",
-          time_to_set.year(),
-          time_to_set.month(),
-          time_to_set.day(),
-          time_to_set.hour(),
-          time_to_set.minute(),
-          time_to_set.second());
-  SerialLog::getInstance().printf("%s\n", timeStr);
+  logger.printf("RTC synchronized with NTP time (UTC): %04d-%02d-%02d %02d:%02d:%02d\n",
+                time_to_set.year(), time_to_set.month(), time_to_set.day(),
+                time_to_set.hour(), time_to_set.minute(), time_to_set.second());
 }
 
 /**
@@ -110,7 +126,16 @@ bool getNTPData(struct tm &timeinfo)
   // Refresh timezone in case user changed it
   setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
   tzset();
-  return getLocalTime(&timeinfo);
+
+  // ONLY return true if the background SNTP daemon has successfully received 
+  // a packet from the network and updated the internal system clock. 
+  // If we just check getLocalTime(), it will return true immediately even with 
+  // the incorrect drifted time because we seeded the system clock from the RTC at boot.
+  if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED)
+  {
+    return getLocalTime(&timeinfo, 0); // 0 timeout means don't block
+  }
+  return false;
 }
 
 /**
@@ -124,6 +149,12 @@ void startNtpSync()
     return;
   }
   SerialLog::getInstance().printf("Starting non-blocking NTP sync...\n");
+  
+  // Reset the SNTP sync status to ensure we detect a new network update.
+  sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
+  // Restart the SNTP client to force an immediate network query.
+  configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
+
   ntpState = NTP_SYNC_IN_PROGRESS;
   retryCount = 0;
   // Set lastSyncAttemptMs to 0 to trigger an immediate first attempt in updateNtpSync
@@ -191,6 +222,11 @@ NtpSyncState updateNtpSync()
  */
 bool syncTime()
 {
+  // Reset the SNTP sync status to ensure we detect a new network update.
+  sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
+  // Restart the SNTP client to force an immediate network query.
+  configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
+
   unsigned long delayForNextAttempt = baseDelayMs;
   struct tm timeinfo;
 

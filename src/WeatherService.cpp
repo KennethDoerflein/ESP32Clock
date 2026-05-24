@@ -307,7 +307,7 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
   HTTPClient http;
   WiFiClientSecure client;
   client.setInsecure();
-  client.setTimeout(15);  // 15s cap on TLS handshake (seconds)
+  client.setTimeout(15000);  // 15s cap on TLS handshake (milliseconds)
 
   SerialLog::getInstance().printf("Resolving Location: %s\n", url.c_str());
 
@@ -330,8 +330,9 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
     filter["results"][0]["country_code"] = true;
     filter["results"][0]["admin1"] = true;
 
+    String payload = http.getString();
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
     if (!error)
     {
@@ -528,7 +529,7 @@ void WeatherService::updateWeather()
   HTTPClient http;
   WiFiClientSecure client;
   client.setInsecure();
-  client.setTimeout(15);  // 15s cap on TLS handshake (seconds)
+  client.setTimeout(15000);  // 15s cap on TLS handshake (milliseconds)
 
   // Use reserve to prevent reallocations
   String url;
@@ -573,7 +574,8 @@ void WeatherService::updateWeather()
     filter["daily"]["sunrise"] = true;
     filter["daily"]["sunset"] = true;
 
-    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+    String payload = http.getString();
+    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
     if (!error)
     {
@@ -635,7 +637,7 @@ void WeatherService::updateWeather()
         _failureCount = 0; // Success! Reset failures
       }
 
-      SerialLog::getInstance().printf("Weather Updated: %.1fF, %s\n", temp, _currentWeather.condition.c_str());
+      SerialLog::getInstance().printf("Weather Updated: %.1fF, %s\n", temp, getConditionFromWMO(code));
     }
     else
     {

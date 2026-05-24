@@ -50,6 +50,14 @@ public:
   void begin();
 
   /**
+   * @brief Seeds the ESP32 system clock from the hardware RTC at boot.
+   * Ensures time(nullptr) returns a valid wallclock time immediately,
+   * even before NTP succeeds. Public because offline mode calls it
+   * from main.cpp without going through begin().
+   */
+  void seedSystemClockFromRTC();
+
+  /**
    * @brief Updates the time manager's state.
    *
    * This method should be called repeatedly in the main loop. It handles
@@ -269,6 +277,10 @@ private:
 
   /// @brief Timestamp of the last drift check.
   unsigned long lastDriftCheck = 0;
+
+  /// @brief Whether the first post-boot drift check has been completed.
+  /// The first check uses a shorter interval (5 min) to catch post-crash drift quickly.
+  bool _initialDriftCheckDone = false;
 
   bool _rtc_alarms_initialized = false;
   int8_t _rtcAlarm1Id = -1; ///< The ID of the alarm associated with RTC alarm 1.

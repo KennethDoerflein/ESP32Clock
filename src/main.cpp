@@ -32,6 +32,7 @@
 #include <LittleFS.h>
 #include "ButtonManager.h"
 #include "WeatherService.h"
+#include "NtpSync.h"
 #include "UpdateManager.h"
 #include "WebContent.h"
 #include <ESPAsyncWebServer.h>
@@ -419,6 +420,9 @@ void setup()
   // Log the reset reason immediately after FS mount
   logger.logResetReason();
 
+  // Register diagnostic crash handlers (shutdown handler, stack overflow, malloc fail)
+  logger.registerCrashHandlers();
+
   // Initialize Task Watchdog Timer (TWDT)
   // 30 seconds timeout, true = panic (reset) on timeout
   esp_task_wdt_init(30, true);
@@ -588,6 +592,11 @@ void setup()
   else if (timeManager.isTimeSet())
   {
     logger.print("WiFi connection failed. RTC time is valid. Starting in offline mode.\n");
+    // Even without WiFi, seed the system clock from the RTC and apply timezone
+    // so log timestamps show wallclock time and DST detection works.
+    timeManager.seedSystemClockFromRTC();
+    initNtp(); // Sets TZ environment variable and calls tzset()
+    timeManager.checkDST();
     display.drawMultiLineStatusMessage("Offline Mode", "AP: Clock-Setup");
     delay(OFFLINE_MODE_MESSAGE_DELAY); // Show the message for 5 seconds.
     displayManager.setPage(ConfigManager::getInstance().getDefaultPage());

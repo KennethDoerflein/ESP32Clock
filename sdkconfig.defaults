@@ -1,3 +1,9 @@
 # ESP-IDF Component Configuration
 # Enable libsodium for cryptographic operations
 CONFIG_LIBSODIUM_USE_MBEDTLS_SHA=y
+
+# FreeRTOS Diagnostic Hooks
+# Enable stack overflow detection (method 2 = canary + watermark)
+CONFIG_FREERTOS_CHECK_STACKOVERFLOW_CANARY=y
+# Enable malloc-failed hook
+CONFIG_FREERTOS_ENABLE_MALLOC_FAILED_HOOK=y

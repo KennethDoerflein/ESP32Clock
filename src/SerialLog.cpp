@@ -11,7 +11,9 @@
 #include "UpdateManager.h"
 #include "LockGuard.h"
 #include <esp_attr.h>
+#include <esp_system.h>
 #include <time.h>
+#include <freertos/task.h>
 
 // RTC Memory for Crash Logging
 #define CRASH_LOG_MAGIC 0xDEADBEEF
@@ -30,6 +32,8 @@ RTC_NOINIT_ATTR RtcCrashLog g_crashLog;
 // Initialize static members
 const char *SerialLog::LOG_FILE_PATH = "/system.log";
 const size_t SerialLog::MAX_LOG_SIZE = 256 * 1024;    // 256KB
+const char *SerialLog::CRASH_FILE_PATH = "/crash.log";
+const size_t SerialLog::MAX_CRASH_LOG_SIZE = 64 * 1024; // 64KB
 const size_t SerialLog::BUFFER_THRESHOLD = 256;       // 256 Bytes
 const unsigned long SerialLog::FLUSH_INTERVAL = 2000; // 2 Seconds
 
@@ -155,17 +159,25 @@ static String getTimestamp()
   struct tm t;
   localtime_r(&now, &t);
 
-  char buf[28];
+  // Retrieve current task name safely
+  const char *taskName = "unknown";
+  TaskHandle_t curTask = xTaskGetCurrentTaskHandle();
+  if (curTask != nullptr)
+  {
+    taskName = pcTaskGetName(curTask);
+  }
+
+  char buf[64];
   // If year is before 2021 the clock hasn't been synced yet — show uptime.
   if (t.tm_year + 1900 < 2021)
   {
-    snprintf(buf, sizeof(buf), "[+%lums] ", (unsigned long)millis());
+    snprintf(buf, sizeof(buf), "[+%lums] [%s] ", (unsigned long)millis(), taskName);
   }
   else
   {
-    snprintf(buf, sizeof(buf), "[%04d-%02d-%02d %02d:%02d:%02d] ",
+    snprintf(buf, sizeof(buf), "[%04d-%02d-%02d %02d:%02d:%02d] [%s] ",
              t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
-             t.tm_hour, t.tm_min, t.tm_sec);
+             t.tm_hour, t.tm_min, t.tm_sec, taskName);
   }
   return String(buf);
 }
@@ -250,6 +262,11 @@ void SerialLog::logToFile(const char *message)
   // We do this here to capture the formatted message.
   if (g_crashLog.magic == CRASH_LOG_MAGIC)
   {
+    if (g_crashLog.head >= CRASH_LOG_SIZE)
+    {
+      g_crashLog.head = 0;
+      g_crashLog.wrapped = false;
+    }
     size_t len = strlen(message);
     for (size_t i = 0; i < len; i++)
     {
@@ -261,6 +278,11 @@ void SerialLog::logToFile(const char *message)
     // Ensure newline in RTC log too
     if (len == 0 || message[len - 1] != '\n')
     {
+      if (g_crashLog.head >= CRASH_LOG_SIZE)
+      {
+        g_crashLog.head = 0;
+        g_crashLog.wrapped = false;
+      }
       g_crashLog.buffer[g_crashLog.head] = '\n';
       g_crashLog.head = (g_crashLog.head + 1) % CRASH_LOG_SIZE;
       if (g_crashLog.head == 0)
@@ -406,13 +428,35 @@ void SerialLog::logResetReason()
     break;
   }
 
+  // Save the magic and temporarily disable crash logging to prevent circular self-overwriting/corruption.
+  uint32_t oldMagic = g_crashLog.magic;
+  g_crashLog.magic = 0;
+
   print("RESET REASON: " + reasonStr + "\n");
 
   // Check for crash log in RTC memory
-  if (g_crashLog.magic == CRASH_LOG_MAGIC)
+  if (oldMagic == CRASH_LOG_MAGIC)
   {
+    // Sanity check head bounds
+    if (g_crashLog.head >= CRASH_LOG_SIZE)
+    {
+      g_crashLog.head = 0;
+      g_crashLog.wrapped = false;
+    }
+
     if (g_crashLog.head > 0 || g_crashLog.wrapped)
     {
+      // Open the crash log file in LittleFS for appending the crash details
+      File crashFile = LittleFS.open(CRASH_FILE_PATH, "a");
+      if (crashFile)
+      {
+        String bootTime = getTimestamp();
+        crashFile.printf("\n=========================================\n");
+        crashFile.printf("CRASH DETECTED ON BOOT: %s", bootTime.c_str());
+        crashFile.printf("RESET REASON: %s\n", reasonStr.c_str());
+        crashFile.printf("-----------------------------------------\n");
+      }
+
       print("--- CRASH DUMP FROM PREVIOUS SESSION ---\n");
 
       String dump = "";
@@ -428,15 +472,32 @@ void SerialLog::logResetReason()
         if (dump.length() >= 512)
         {
           print(dump);
+          if (crashFile)
+          {
+            crashFile.print(dump);
+          }
           dump = "";
         }
       }
       if (dump.length() > 0)
       {
         print(dump);
+        if (crashFile)
+        {
+          crashFile.print(dump);
+        }
       }
 
       print("\n--- END CRASH DUMP ---\n");
+
+      if (crashFile)
+      {
+        crashFile.printf("\n=========================================\n");
+        crashFile.close();
+        
+        // Check size and rotate if necessary
+        rotateCrashLogFile();
+      }
     }
     else
     {
@@ -448,7 +509,7 @@ void SerialLog::logResetReason()
     print("Crash log magic signature not found (Cold Boot?).\n");
   }
 
-  // Initialize RTC Log for the new session
+  // Initialize/Reset RTC Log for the new session
   g_crashLog.magic = CRASH_LOG_MAGIC;
   g_crashLog.head = 0;
   g_crashLog.wrapped = false;
@@ -457,3 +518,115 @@ void SerialLog::logResetReason()
   // Log some initial session info
   printf("New session started. Max heap: %u, Free heap: %u\n", ESP.getHeapSize(), ESP.getFreeHeap());
 }
+
+/**
+ * @brief Rotates the crash log file when it exceeds the maximum size.
+ */
+void SerialLog::rotateCrashLogFile()
+{
+  // Check size of the crash log file
+  File crashFile = LittleFS.open(CRASH_FILE_PATH, "r");
+  if (!crashFile)
+    return;
+
+  size_t size = crashFile.size();
+  crashFile.close();
+
+  if (size < MAX_CRASH_LOG_SIZE)
+    return;
+
+  // Rotation needed
+  String oldCrashPath = String(CRASH_FILE_PATH) + ".old";
+
+  // Remove the old backup if it exists
+  if (LittleFS.exists(oldCrashPath))
+  {
+    LittleFS.remove(oldCrashPath);
+  }
+
+  // Rename current crash log to .old
+  LittleFS.rename(CRASH_FILE_PATH, oldCrashPath);
+
+  // Immediately create a new empty crash log file
+  File newFile = LittleFS.open(CRASH_FILE_PATH, "w");
+  if (newFile)
+  {
+    newFile.close();
+  }
+}
+
+// --- Diagnostic Crash Hooks ---
+// IMPORTANT: These handlers execute in crash/fault context. They must NEVER
+// take a mutex (deadlock risk) or call any function that allocates heap memory.
+// We write directly to the RTC buffer and Serial, then restart.
+
+/**
+ * @brief Helper to append a message to the RTC crash buffer.
+ * Safe to call from any context (ISR, crash handler, etc.)
+ * because it only touches RTC_NOINIT memory with raw pointer arithmetic.
+ */
+static void IRAM_ATTR writeToCrashBuffer(const char *msg)
+{
+  if (g_crashLog.magic != CRASH_LOG_MAGIC)
+    return;
+  if (g_crashLog.head >= CRASH_LOG_SIZE)
+  {
+    g_crashLog.head = 0;
+    g_crashLog.wrapped = false;
+  }
+  size_t len = strlen(msg);
+  for (size_t i = 0; i < len; i++)
+  {
+    g_crashLog.buffer[g_crashLog.head] = msg[i];
+    g_crashLog.head = (g_crashLog.head + 1) % CRASH_LOG_SIZE;
+    if (g_crashLog.head == 0)
+      g_crashLog.wrapped = true;
+  }
+}
+
+/**
+ * @brief Shutdown handler registered with esp_register_shutdown_handler().
+ * Fires on any panic, abort(), assert failure, or ESP.restart().
+ * Stamps the RTC crash buffer so we know the system was shutting down.
+ * The ESP-IDF's built-in panic handler already prints assertion details,
+ * backtraces, and register dumps to Serial before this runs.
+ */
+static void onShutdown()
+{
+  writeToCrashBuffer("\n[SHUTDOWN HANDLER] System shutting down.\n");
+}
+
+/**
+ * @brief Registers the shutdown handler. Must be called once during setup().
+ */
+void SerialLog::registerCrashHandlers()
+{
+  esp_register_shutdown_handler(onShutdown);
+}
+
+extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+  // This hook may be called from ISR context on ESP32.
+  // Avoid ALL FreeRTOS API, heap allocations, and mutex operations.
+  char buf[128];
+  snprintf(buf, sizeof(buf), "\n[STACK OVERFLOW] Task: '%s' overflowed its stack!\n", pcTaskName ? pcTaskName : "?");
+
+  writeToCrashBuffer(buf);
+
+  // ets_printf is ROM-resident and safe to call from ISR/crash context
+  ets_printf("%s", buf);
+  esp_restart();
+}
+
+extern "C" void vApplicationMallocFailedHook(void)
+{
+  const char *buf = "\n[MALLOC FAILED] Out of Memory!\n";
+
+  writeToCrashBuffer(buf);
+
+  Serial.print(buf);
+  Serial.flush();
+  delay(500);
+  esp_restart();
+}
+
