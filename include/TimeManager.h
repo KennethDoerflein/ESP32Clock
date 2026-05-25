@@ -58,6 +58,14 @@ public:
   void seedSystemClockFromRTC();
 
   /**
+   * @brief Periodically realigns the ESP32 system clock to the hardware RTC.
+   * @details Compares the system clock against the RTC every 60 seconds.
+   *          If drift >= 2 seconds, corrects the system clock via settimeofday().
+   *          Skipped when an NTP sync is in progress to avoid conflicts.
+   */
+  void syncSystemClockFromRTC();
+
+  /**
    * @brief Updates the time manager's state.
    *
    * This method should be called repeatedly in the main loop. It handles
@@ -281,6 +289,15 @@ private:
   /// @brief Whether the first post-boot drift check has been completed.
   /// The first check uses a shorter interval (5 min) to catch post-crash drift quickly.
   bool _initialDriftCheckDone = false;
+
+  /// @brief Timestamp of the last system clock realignment from the RTC.
+  unsigned long _lastSystemClockSync = 0;
+  /// @brief How often to realign the system clock to the RTC (milliseconds).
+  static const unsigned long SYSTEM_CLOCK_SYNC_INTERVAL = 60000; // 60 seconds
+
+  /// @brief Last known-good RTC reading for monotonicity validation.
+  /// Used by getRTCTime() to reject corrupted I2C reads that jump backward.
+  mutable DateTime _lastValidRtcTime;
 
   bool _rtc_alarms_initialized = false;
   int8_t _rtcAlarm1Id = -1; ///< The ID of the alarm associated with RTC alarm 1.

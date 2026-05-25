@@ -111,6 +111,47 @@ void TimeManager::seedSystemClockFromRTC()
 }
 
 /**
+ * @brief Periodically realigns the ESP32 system clock to the hardware RTC.
+ *
+ * The ESP32's internal crystal drifts significantly (seconds per hour).
+ * This function compares the system clock against the DS3231 RTC (±2 ppm)
+ * and corrects it if the drift exceeds 2 seconds. It is designed to be
+ * called frequently (e.g., every 60 seconds) but skips work if an NTP
+ * sync is actively running to avoid conflicts.
+ */
+void TimeManager::syncSystemClockFromRTC()
+{
+  // Don't fight with an active NTP sync — the SNTP daemon is updating
+  // the system clock in the background.
+  if (isNtpSyncInProgress())
+  {
+    return;
+  }
+
+  DateTime rtcTime = getRTCTime();
+  if (!rtcTime.isValid() || rtcTime.year() < 2024 || rtcTime.year() > 2040)
+  {
+    return; // RTC time is invalid, cannot use as reference
+  }
+
+  // Compare RTC (UTC) against the system clock (UTC)
+  time_t sysEpoch = time(nullptr);
+  time_t rtcEpoch = (time_t)rtcTime.unixtime();
+  int32_t drift = (int32_t)sysEpoch - (int32_t)rtcEpoch;
+
+  if (abs(drift) >= 2)
+  {
+    struct timeval tv;
+    tv.tv_sec = rtcEpoch;
+    tv.tv_usec = 0;
+    settimeofday(&tv, nullptr);
+
+    SerialLog::getInstance().printf(
+        "System clock realigned to RTC (drift was %+lds)\n", (long)drift);
+  }
+}
+
+/**
  * @brief Initializes the TimeManager.
  *
  * Performs an initial, blocking NTP sync to set the time as soon as possible
@@ -191,6 +232,13 @@ bool TimeManager::update()
   {
     checkDST();
     _lastDstCheck = currentMillis;
+  }
+
+  // --- Layer 1: Periodic system clock realignment from RTC ---
+  if (currentMillis - _lastSystemClockSync >= SYSTEM_CLOCK_SYNC_INTERVAL)
+  {
+    syncSystemClockFromRTC();
+    _lastSystemClockSync = currentMillis;
   }
 
   if (!_rtc_alarms_initialized)
@@ -448,8 +496,6 @@ void TimeManager::checkDriftAndResync()
   static const unsigned long DRIFT_CHECK_INTERVAL = 4UL * 60 * 60 * 1000;
   // First check runs early (5 minutes) to catch post-crash drift quickly.
   static const unsigned long INITIAL_DRIFT_CHECK_DELAY = 5UL * 60 * 1000;
-  // The maximum acceptable drift in seconds before forcing a resync.
-  static const int DRIFT_THRESHOLD_SECONDS = 2;
 
   unsigned long currentMillis = millis();
   unsigned long interval = _initialDriftCheckDone ? DRIFT_CHECK_INTERVAL : INITIAL_DRIFT_CHECK_DELAY;
@@ -465,31 +511,11 @@ void TimeManager::checkDriftAndResync()
   lastDriftCheck = currentMillis;
   _initialDriftCheckDone = true;
 
-  SerialLog::getInstance().print("Performing periodic clock drift check...\n");
-
-  // Get the current time from the NTP server without adjusting the RTC.
-  // Feed WDT before potentially blocking call
-  esp_task_wdt_reset();
-  DateTime ntpTime = getNtpTime();
-  if (!ntpTime.isValid())
-  {
-    SerialLog::getInstance().print("Drift check failed: Could not get NTP time.\n");
-    return;
-  }
-
-  // Get the current time from the local RTC.
-  DateTime rtcTime = getRTCTime();
-  // Calculate the time difference.
-  TimeSpan drift = rtcTime - ntpTime;
-
-  SerialLog::getInstance().printf("RTC vs NTP drift is %ld seconds.\n", drift.totalseconds());
-
-  // If the absolute drift exceeds the threshold, start a non-blocking sync.
-  if (abs(drift.totalseconds()) > DRIFT_THRESHOLD_SECONDS)
-  {
-    SerialLog::getInstance().print("Drift exceeds threshold. Triggering NTP resync...\n");
-    startNtpSync();
-  }
+  // Trigger a non-blocking NTP sync. The sync captures pre-sync snapshots
+  // of all three time sources (Layer 3) and, upon success, logs a full
+  // three-source diagnostic dashboard and corrects the RTC if needed.
+  SerialLog::getInstance().print("Performing periodic drift check via NTP sync...\n");
+  startNtpSync();
 }
 
 void TimeManager::checkDST()
@@ -576,7 +602,68 @@ DateTime TimeManager::getRTCTime() const
     return DateTime(); // Returns an invalid DateTime (year < 2000)
   }
   RecursiveLockGuard lock(_mutex);
-  return RTC.now();
+
+  // --- Layer 2: Double-read I2C validation ---
+  // Read the RTC twice in quick succession. If the I2C bus is corrupted,
+  // the two readings will differ wildly. Valid readings should agree
+  // within 1 second (the read takes ~1ms, so at most one second boundary
+  // can be crossed between reads).
+  DateTime read1 = RTC.now();
+  DateTime read2 = RTC.now();
+
+  if (!read1.isValid() || !read2.isValid())
+  {
+    SerialLog::getInstance().print("WARNING: RTC read returned invalid DateTime\n");
+    // Return last known-good if available
+    if (_lastValidRtcTime.isValid() && _lastValidRtcTime.year() >= 2024)
+    {
+      return _lastValidRtcTime;
+    }
+    return DateTime(); // No fallback available
+  }
+
+  int32_t readDelta = abs((int32_t)read1.unixtime() - (int32_t)read2.unixtime());
+  if (readDelta > 1)
+  {
+    SerialLog::getInstance().printf(
+        "WARNING: RTC double-read mismatch! read1=%lu, read2=%lu (delta=%ld). Using last known-good.\n",
+        (unsigned long)read1.unixtime(), (unsigned long)read2.unixtime(), (long)readDelta);
+    if (_lastValidRtcTime.isValid() && _lastValidRtcTime.year() >= 2024)
+    {
+      return _lastValidRtcTime;
+    }
+    return read2; // No fallback, use the more recent read
+  }
+
+  // Sanity check: year must be in valid range
+  if (read2.year() < 2024 || read2.year() > 2040)
+  {
+    SerialLog::getInstance().printf(
+        "WARNING: RTC time out of range (year=%d). Using last known-good.\n", read2.year());
+    if (_lastValidRtcTime.isValid() && _lastValidRtcTime.year() >= 2024)
+    {
+      return _lastValidRtcTime;
+    }
+    return DateTime();
+  }
+
+  // Monotonicity check: time should not jump backward by more than 2 seconds.
+  // A small backward jump (1-2s) can happen legitimately due to NTP corrections.
+  if (_lastValidRtcTime.isValid() && _lastValidRtcTime.year() >= 2024)
+  {
+    int32_t timeDelta = (int32_t)read2.unixtime() - (int32_t)_lastValidRtcTime.unixtime();
+    if (timeDelta < -2)
+    {
+      SerialLog::getInstance().printf(
+          "WARNING: RTC time jumped backward by %ld seconds. Using last known-good.\n",
+          (long)abs(timeDelta));
+      return _lastValidRtcTime;
+    }
+  }
+
+  // All validations passed — update the last known-good value
+  _lastValidRtcTime = read2;
+  return read2;
 }
 
 DateTime TimeManager::getCachedTime() const

@@ -88,6 +88,16 @@ NtpSyncState updateNtpSync();
 void resetNtpSync();
 
 /**
+ * @brief Checks if a non-blocking NTP synchronization is currently in progress.
+ *
+ * This is used by the TimeManager to avoid realigning the system clock from
+ * the RTC while the SNTP daemon is actively updating the system clock.
+ *
+ * @return true if an NTP sync is in progress, false otherwise.
+ */
+bool isNtpSyncInProgress();
+
+/**
  * @brief Fetches the current time from an NTP server without setting the RTC.
  *
  * This function retrieves the time from an NTP server and returns it as a

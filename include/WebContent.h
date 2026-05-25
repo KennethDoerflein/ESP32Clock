@@ -2186,9 +2186,10 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
             <div class="card mt-4">
               <div class="card-body">
                 <h5 class="card-title d-flex align-items-center"><i class="bi bi-clock me-2"></i>Time Synchronization</h5>
-                <p class="card-text text-muted small">Manually trigger a time sync with the NTP server.</p>
-                <div class="d-grid">
-                  <button id="ntp-sync-button" class="btn btn-info">Sync Now</button>
+                <p class="card-text text-muted small">Sync the clock with an NTP server or your browser's time.</p>
+                <div class="d-grid gap-2">
+                  <button id="ntp-sync-button" class="btn btn-info" title="Sync time from an NTP server (requires internet).">Sync with NTP Server</button>
+                  <button id="browser-sync-button" class="btn btn-outline-info" title="Set the clock to your browser's current time. Useful when offline.">Sync with Browser Time</button>
                 </div>
                 <div id="ntp-sync-status" class="mt-2 text-center"></div>
               </div>
@@ -2249,6 +2250,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
     const uploadProgressText = document.getElementById('upload-progress-text');
     const onlineButton = document.getElementById('online-button');
     const ntpSyncButton = document.getElementById('ntp-sync-button');
+    const browserSyncButton = document.getElementById('browser-sync-button');
     const rolloverBtn = document.getElementById('rollover-btn');
     const downloadSystemLogBtn = document.getElementById('download-system-log-btn');
     const downloadCrashLogBtn = document.getElementById('download-crash-log-btn');
@@ -2452,6 +2454,7 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
 
     function setSystemButtonsDisabled(disabled) {
       ntpSyncButton.disabled = disabled;
+      browserSyncButton.disabled = disabled;
       if (rebootBtn) rebootBtn.disabled = disabled;
       if (resetBtn) resetBtn.disabled = disabled;
       if (resetKeepWifiBtn) resetKeepWifiBtn.disabled = disabled;
@@ -2613,6 +2616,37 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
           }
         });
     });
+
+    browserSyncButton.addEventListener('click', function() {
+      setButtonsDisabled(true);
+
+      const epoch = Math.floor(Date.now() / 1000);
+      fetch('/api/system/time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ epoch: epoch })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            ntpSyncStatusDiv.innerHTML = `<span class="text-success">${data.message}</span>`;
+          } else {
+            ntpSyncStatusDiv.innerHTML = `<span class="text-danger">${data.message}</span>`;
+          }
+          setTimeout(() => {
+            ntpSyncStatusDiv.innerHTML = '';
+          }, 5000);
+        })
+        .catch(error => {
+          ntpSyncStatusDiv.innerHTML = `<span class="text-danger">${error.message}</span>`;
+        })
+        .finally(() => {
+          if (!isUpdating) {
+            setButtonsDisabled(false);
+          }
+        });
+    });
+
 
     if (rolloverBtn) {
       rolloverBtn.addEventListener('click', function() {

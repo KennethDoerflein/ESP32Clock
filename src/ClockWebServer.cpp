@@ -22,9 +22,11 @@
 #include "SerialLog.h"
 #include "NtpSync.h"
 #include "AlarmManager.h"
+#include "TimeManager.h"
 #include "Constants.h"
 #include "WeatherService.h"
 #include "Utils.h"
+#include <sys/time.h>
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -604,6 +606,126 @@ void ClockWebServer::begin()
               {
       startNtpSync();
       request->send(200, "text/plain", "NTP sync started successfully."); });
+
+    // --- Layer 5: Manual Browser Time Sync ---
+    server.on(
+        "/api/system/time", HTTP_POST, [](AsyncWebServerRequest *request)
+        {
+            if (request->_tempObject) {
+                delete (std::vector<uint8_t>*)request->_tempObject;
+                request->_tempObject = nullptr;
+            } },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total)
+        {
+          if (index == 0)
+          {
+            if (total > 0 && total > 256) {
+              request->send(413, "text/plain", "Payload too large");
+              return;
+            }
+            request->_tempObject = new std::vector<uint8_t>();
+            request->onDisconnect([request]() {
+              if (request->_tempObject) {
+                delete (std::vector<uint8_t>*)request->_tempObject;
+                request->_tempObject = nullptr;
+              }
+            });
+          }
+
+          if (!request->_tempObject)
+            return;
+
+          std::vector<uint8_t> *buffer =
+              (std::vector<uint8_t> *)request->_tempObject;
+
+          if (buffer->size() + len > 256) {
+              delete buffer;
+              request->_tempObject = nullptr;
+              request->send(413, "text/plain", "Payload too large");
+              return;
+          }
+
+          buffer->insert(buffer->end(), data, data + len);
+
+          if (index + len == total)
+          {
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
+            delete buffer;
+            request->_tempObject = nullptr;
+
+            if (error)
+            {
+              request->send(400, "application/json", "{\"success\":false,\"message\":\"Invalid JSON\"}");
+              return;
+            }
+
+            if (!doc["epoch"].is<unsigned long>())
+            {
+              request->send(400, "application/json", "{\"success\":false,\"message\":\"Missing epoch field\"}");
+              return;
+            }
+
+            time_t epoch = (time_t)doc["epoch"].as<unsigned long>();
+
+            // Sanity check: year must be 2024-2040
+            struct tm check_tm;
+            gmtime_r(&epoch, &check_tm);
+            int year = check_tm.tm_year + 1900;
+            if (year < 2024 || year > 2040)
+            {
+              request->send(400, "application/json", "{\"success\":false,\"message\":\"Epoch out of valid range (2024-2040)\"}");
+              return;
+            }
+
+            auto &logger = SerialLog::getInstance();
+
+            // Log the old RTC time for drift diagnostics
+            DateTime oldRtcTime = RTC.now();
+            int32_t drift = 0;
+            if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
+            {
+              drift = (int32_t)oldRtcTime.unixtime() - (int32_t)epoch;
+              logger.printf("Browser time sync: RTC was %s by %ld seconds\n",
+                            drift > 0 ? "ahead" : "behind",
+                            (long)abs(drift));
+            }
+
+            // Write to hardware RTC (UTC)
+            DateTime time_to_set(
+                check_tm.tm_year + 1900,
+                check_tm.tm_mon + 1,
+                check_tm.tm_mday,
+                check_tm.tm_hour,
+                check_tm.tm_min,
+                check_tm.tm_sec);
+            RTC.adjust(time_to_set);
+
+            // Verify the write
+            DateTime readback = RTC.now();
+            int32_t writeError = abs((int32_t)readback.unixtime() - (int32_t)epoch);
+            if (writeError > 2)
+            {
+              logger.printf("WARNING: Browser sync RTC write verification failed! delta=%ld\n", (long)writeError);
+              request->send(500, "application/json", "{\"success\":false,\"message\":\"RTC write verification failed\"}");
+              return;
+            }
+
+            // Update the system clock
+            struct timeval tv;
+            tv.tv_sec = epoch;
+            tv.tv_usec = 0;
+            settimeofday(&tv, nullptr);
+
+            logger.printf("Browser time sync complete: %04d-%02d-%02d %02d:%02d:%02d UTC\n",
+                          time_to_set.year(), time_to_set.month(), time_to_set.day(),
+                          time_to_set.hour(), time_to_set.minute(), time_to_set.second());
+
+            request->send(200, "application/json", "{\"success\":true,\"message\":\"Time synchronized successfully\"}");
+          }
+        });
 
     server.on(
         "/api/display/save", HTTP_POST, [](AsyncWebServerRequest *request)

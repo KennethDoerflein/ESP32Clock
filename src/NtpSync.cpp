@@ -59,6 +59,24 @@ static unsigned long lastSyncAttemptMs = 0;
 /// @brief The current delay to wait before the next non-blocking retry.
 static unsigned long currentRetryDelay = 0;
 
+// --- Pre-sync snapshot variables (Layer 3: Three-Source Diagnostics) ---
+/// @brief System clock epoch captured at the start of an NTP sync.
+static time_t sysTimeAtSyncStart = 0;
+/// @brief Hardware RTC epoch captured at the start of an NTP sync.
+static uint32_t rtcTimeAtSyncStart = 0;
+/// @brief millis() captured at the start of an NTP sync for elapsed time calculation.
+static unsigned long millisAtSyncStart = 0;
+
+/**
+ * @brief Checks if a non-blocking NTP synchronization is currently in progress.
+ * @return true if an NTP sync is in progress, false otherwise.
+ */
+bool isNtpSyncInProgress()
+{
+  LockGuard lock(ntpMutex);
+  return ntpState == NTP_SYNC_IN_PROGRESS;
+}
+
 /**
  * @brief Processes the time data received from an NTP server.
  * @details Converts the tm struct to a DateTime and sets the hardware RTC.
@@ -84,21 +102,58 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
       utc_tm.tm_min,
       utc_tm.tm_sec);
 
-  // Log the drift between the old RTC value and the new NTP value.
-  // This is critical forensic data for diagnosing time accuracy issues.
-  DateTime oldRtcTime = RTC.now();
-  if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
+  // --- Layer 3: Three-Source Diagnostic Dashboard ---
+  // Back-calculate what each clock read at the moment the sync started,
+  // using the elapsed time to compensate for network latency.
+  if (millisAtSyncStart > 0 && sysTimeAtSyncStart > 0)
   {
-    int32_t driftSeconds = (int32_t)oldRtcTime.unixtime() - (int32_t)time_to_set.unixtime();
-    logger.printf("NTP correction: RTC was %s by %ld seconds\n",
-                  driftSeconds > 0 ? "ahead" : "behind",
-                  (long)abs(driftSeconds));
+    unsigned long elapsedMs = millis() - millisAtSyncStart;
+    time_t ntpTimeAtStart = (time_t)time_to_set.unixtime() - (time_t)(elapsedMs / 1000);
+    int32_t sysDrift = (int32_t)sysTimeAtSyncStart - (int32_t)ntpTimeAtStart;
+    int32_t rtcDrift = (int32_t)rtcTimeAtSyncStart - (int32_t)ntpTimeAtStart;
+
+    // Format the NTP reference time at sync start for logging
+    struct tm ntpStartTm;
+    time_t ntpStartEpoch = ntpTimeAtStart;
+    gmtime_r(&ntpStartEpoch, &ntpStartTm);
+
+    struct tm sysStartTm;
+    gmtime_r(&sysTimeAtSyncStart, &sysStartTm);
+
+    struct tm rtcStartTm;
+    time_t rtcStartEpoch = (time_t)rtcTimeAtSyncStart;
+    gmtime_r(&rtcStartEpoch, &rtcStartTm);
+
+    logger.printf("\n");
+    logger.printf("======= TIME CONSISTENCY CHECK =======\n");
+    logger.printf("  NTP Reference : %04d-%02d-%02d %02d:%02d:%02d UTC (authoritative)\n",
+                  ntpStartTm.tm_year + 1900, ntpStartTm.tm_mon + 1, ntpStartTm.tm_mday,
+                  ntpStartTm.tm_hour, ntpStartTm.tm_min, ntpStartTm.tm_sec);
+    logger.printf("  System Clock  : %04d-%02d-%02d %02d:%02d:%02d UTC  %+lds\n",
+                  sysStartTm.tm_year + 1900, sysStartTm.tm_mon + 1, sysStartTm.tm_mday,
+                  sysStartTm.tm_hour, sysStartTm.tm_min, sysStartTm.tm_sec, (long)sysDrift);
+    logger.printf("  Hardware RTC  : %04d-%02d-%02d %02d:%02d:%02d UTC  %+lds\n",
+                  rtcStartTm.tm_year + 1900, rtcStartTm.tm_mon + 1, rtcStartTm.tm_mday,
+                  rtcStartTm.tm_hour, rtcStartTm.tm_min, rtcStartTm.tm_sec, (long)rtcDrift);
+    logger.printf("  Sync Duration : %.2fs\n", elapsedMs / 1000.0);
+    logger.printf("======================================\n");
+  }
+  else
+  {
+    // Fallback: no pre-sync snapshot (e.g., blocking sync at boot)
+    DateTime oldRtcTime = RTC.now();
+    if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
+    {
+      int32_t driftSeconds = (int32_t)oldRtcTime.unixtime() - (int32_t)time_to_set.unixtime();
+      logger.printf("NTP correction: RTC was %s by %ld seconds\n",
+                    driftSeconds > 0 ? "ahead" : "behind",
+                    (long)abs(driftSeconds));
+    }
   }
 
-  // Update the hardware RTC with UTC time.
+  // --- Layer 4: RTC Write + Verification ---
   RTC.adjust(time_to_set);
 
-  // Verify the write by reading back
   DateTime readback = RTC.now();
   int32_t writeError = abs((int32_t)readback.unixtime() - (int32_t)time_to_set.unixtime());
   if (writeError > 2)
@@ -149,7 +204,15 @@ void startNtpSync()
     return;
   }
   SerialLog::getInstance().printf("Starting non-blocking NTP sync...\n");
-  
+
+  // --- Layer 3: Capture pre-sync snapshots for drift diagnostics ---
+  // These are read back in _processSuccessfulNtpSync() to calculate
+  // the precise drift of each clock source at the sync start moment.
+  sysTimeAtSyncStart = time(nullptr);
+  DateTime rtcSnap = RTC.now();
+  rtcTimeAtSyncStart = rtcSnap.isValid() ? rtcSnap.unixtime() : 0;
+  millisAtSyncStart = millis();
+
   // Reset the SNTP sync status to ensure we detect a new network update.
   sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
   // Restart the SNTP client to force an immediate network query.
