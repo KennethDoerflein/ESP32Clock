@@ -15,6 +15,7 @@
 #include <ArduinoJson.h>
 #include "SerialLog.h"
 #include "LockGuard.h"
+#include "UpdateManager.h"
 
 // --- Static Member Initialization ---
 const char *WiFiManager::AP_SSID = "Clock-Setup";
@@ -126,6 +127,11 @@ void WiFiManager::wifiEventHandler(WiFiEvent_t event, WiFiEventInfo_t info)
  */
 void WiFiManager::handleConnection()
 {
+  if (UpdateManager::getInstance().isUpdateInProgress())
+  {
+    return;
+  }
+
   // Flush credential save deferred from the event handler (safe to write NVS here)
   bool doCredentialSave = false;
   {

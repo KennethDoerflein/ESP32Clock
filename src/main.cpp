@@ -362,12 +362,12 @@ void logicTask(void *pvParameters)
 
   for (;;)
   {
-    // Handle WiFi
-    wifiManager.handleDns();
-    wifiManager.handleConnection();
-
     if (!UpdateManager::getInstance().isUpdateInProgress())
     {
+      // Handle WiFi
+      wifiManager.handleDns();
+      wifiManager.handleConnection();
+
       config.loop();
       weatherService.loop();
     }
