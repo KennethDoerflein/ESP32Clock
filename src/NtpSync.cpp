@@ -219,7 +219,13 @@ void startNtpSync()
   // Reset the SNTP sync status to ensure we detect a new network update.
   sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
   // Restart the SNTP client to force an immediate network query.
+  // Note: configTime(0,0,...) internally overwrites the TZ env variable with
+  // UTC offsets. We must restore the correct timezone immediately afterward
+  // to prevent localtime_r() on Core 1 from briefly returning UTC, which
+  // causes a visible time jump (screen flash) on the display.
   configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
+  setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
+  tzset();
 
   ntpState = NTP_SYNC_IN_PROGRESS;
   retryCount = 0;
@@ -291,7 +297,10 @@ bool syncTime()
   // Reset the SNTP sync status to ensure we detect a new network update.
   sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
   // Restart the SNTP client to force an immediate network query.
+  // Restore TZ immediately — see startNtpSync() comment for rationale.
   configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
+  setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
+  tzset();
 
   unsigned long delayForNextAttempt = baseDelayMs;
   struct tm timeinfo;

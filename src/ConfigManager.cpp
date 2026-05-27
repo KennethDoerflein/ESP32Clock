@@ -1131,15 +1131,20 @@ void ConfigManager::setLon(float longitude)
 
 void ConfigManager::setDST(bool active)
 {
+  bool changed = false;
   {
     RecursiveLockGuard lock(_mutex);
     if (isDst != active)
     {
       isDst = active;
       _isDirty = true;
+      changed = true;
     }
   }
-  scheduleSave();
+  if (changed)
+  {
+    scheduleSave();
+  }
 }
 
 void ConfigManager::setInvertColors(bool inverted)
