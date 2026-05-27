@@ -91,6 +91,12 @@ public:
    */
   void registerCrashHandlers();
 
+  /**
+   * @brief Cleans up stale/disconnected WebSocket clients.
+   * Should be called periodically from the main loop.
+   */
+  void cleanupClients();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.

@@ -194,12 +194,12 @@ void SerialLog::print(const String &message)
     if (prefixed.endsWith("\n"))
     {
       Serial.print(prefixed);
-      _ws.textAll(prefixed);
+      if (_ws.count() > 0) _ws.textAll(prefixed);
     }
     else
     {
       Serial.println(prefixed);
-      _ws.textAll(prefixed + "\n");
+      if (_ws.count() > 0) _ws.textAll(prefixed + "\n");
     }
   }
   if (_fileLoggingEnabled)
@@ -235,12 +235,12 @@ void SerialLog::printf(const char *format, ...)
     if (prefixed.endsWith("\n"))
     {
       Serial.print(prefixed);
-      _ws.textAll(prefixed);
+      if (_ws.count() > 0) _ws.textAll(prefixed);
     }
     else
     {
       Serial.println(prefixed);
-      _ws.textAll(prefixed + "\n");
+      if (_ws.count() > 0) _ws.textAll(prefixed + "\n");
     }
   }
   if (_fileLoggingEnabled)
@@ -553,6 +553,12 @@ void SerialLog::rotateCrashLogFile()
   {
     newFile.close();
   }
+}
+
+void SerialLog::cleanupClients()
+{
+  RecursiveLockGuard lock(_mutex);
+  _ws.cleanupClients();
 }
 
 // --- Diagnostic Crash Hooks ---

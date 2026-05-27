@@ -11,6 +11,8 @@
 #include "SensorModule.h"
 #include "ConfigManager.h"
 #include "SerialLog.h"
+#include "TimeManager.h"
+#include "LockGuard.h"
 #include "driver/temp_sensor.h"
 #include <math.h>
 
@@ -246,6 +248,14 @@ void handleSensorUpdates(bool force)
   if (force || (now - prevSensorMillis >= SENSOR_UPDATE_INTERVAL))
   {
     prevSensorMillis = now;
+
+    // All I2C operations (BME280 and RTC temperature reads) must be
+    // serialized with the same mutex that TimeManager uses for RTC.now()
+    // and RTC.adjust(). Without this, loopTask (Core 1) and logicTask
+    // (Core 0) can access the Wire bus simultaneously, corrupting the
+    // I2C transaction state and triggering a FreeRTOS mutex assertion.
+    RecursiveLockGuard i2cLock(TimeManager::getInstance().getI2CMutex());
+
     if (bme280_found)
     {
       float raw_bme_temp_c = BME.readTemperature();

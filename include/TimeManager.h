@@ -188,6 +188,23 @@ public:
   DateTime getRTCTime() const;
 
   /**
+   * @brief Sets the hardware RTC to a new time, protected by the I2C mutex.
+   * @details This must be used instead of bare RTC.adjust() calls to prevent
+   *          I2C bus corruption from concurrent access across cores.
+   * @param newTime The new UTC time to set on the RTC.
+   */
+  void adjustRTC(const DateTime &newTime);
+
+  /**
+   * @brief Returns the I2C mutex handle for external I2C bus serialization.
+   * @details All I2C peripherals sharing the same bus (RTC, BME280, etc.)
+   *          must acquire this mutex before any Wire transaction to prevent
+   *          concurrent access from different FreeRTOS tasks.
+   * @return The recursive mutex handle guarding I2C operations.
+   */
+  SemaphoreHandle_t getI2CMutex() const { return _mutex; }
+
+  /**
    * @brief Gets the current UTC time converted to local time.
    * @details Uses the system timezone to convert the UTC RTC time.
    * @return A DateTime object representing the current local time.

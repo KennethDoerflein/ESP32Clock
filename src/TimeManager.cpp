@@ -678,6 +678,15 @@ DateTime TimeManager::getCachedTime() const
   return _cachedTime;
 }
 
+void TimeManager::adjustRTC(const DateTime &newTime)
+{
+  RecursiveLockGuard lock(_mutex);
+  RTC.adjust(newTime);
+  // Update the last valid time to prevent the monotonicity check in
+  // getRTCTime() from rejecting the new (potentially backward-adjusted) time.
+  _lastValidRtcTime = newTime;
+}
+
 bool TimeManager::isTimeSet() const
 {
   // Guard against calling RTC.lostPower() before the hardware is initialized,

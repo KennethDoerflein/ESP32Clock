@@ -7,3 +7,10 @@ CONFIG_LIBSODIUM_USE_MBEDTLS_SHA=y
 CONFIG_FREERTOS_CHECK_STACKOVERFLOW_CANARY=y
 # Enable malloc-failed hook
 CONFIG_FREERTOS_ENABLE_MALLOC_FAILED_HOOK=y
+
+# Core Dump Configuration
+# Write core dump to the coredump partition on panic for post-mortem analysis.
+# Extract with: espcoredump.py info_corefile -t partition_table <port>
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_SHA256=y

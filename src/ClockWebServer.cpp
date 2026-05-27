@@ -27,6 +27,8 @@
 #include "WeatherService.h"
 #include "Utils.h"
 #include <sys/time.h>
+#include "esp_core_dump.h"
+#include "esp_partition.h"
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -965,6 +967,60 @@ void ClockWebServer::begin()
           LittleFS.remove(oldCrashPath);
         }
         request->send(200, "text/plain", "Crash log cleared successfully."); });
+
+    server.on("/api/crash/coredump", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        size_t addr = 0;
+        size_t size = 0;
+        esp_err_t err = esp_core_dump_image_get(&addr, &size);
+
+        if (err == ESP_ERR_NOT_FOUND || size == 0)
+        {
+          request->send(404, "text/plain", "No core dump found in flash");
+          return;
+        }
+
+        const esp_partition_t *pt = esp_partition_find_first(
+                                        ESP_PARTITION_TYPE_DATA,
+                                        ESP_PARTITION_SUBTYPE_DATA_COREDUMP,
+                                        NULL);
+        if (pt == NULL)
+        {
+          request->send(500, "text/plain", "Core dump partition not found");
+          return;
+        }
+
+        AsyncWebServerResponse *response = request->beginChunkedResponse(
+            "application/octet-stream",
+            [pt, size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+                if (index >= size) {
+                    return 0; // EOF
+                }
+                size_t remaining = size - index;
+                size_t toRead = (remaining > maxLen) ? maxLen : remaining;
+
+                esp_err_t readErr = esp_partition_read(pt, index, buffer, toRead);
+                if (readErr != ESP_OK) {
+                    return 0; // Error / EOF
+                }
+                return toRead;
+            }
+        );
+
+        response->addHeader("Content-Disposition", "attachment; filename=\"coredump.bin\"");
+        request->send(response); });
+
+    server.on("/api/crash/coredump/clear", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+        esp_err_t err = esp_core_dump_image_erase();
+        if (err == ESP_OK)
+        {
+          request->send(200, "text/plain", "Core dump erased successfully");
+        }
+        else
+        {
+          request->send(500, "text/plain", "Failed to erase core dump");
+        } });
 
     SerialLog::getInstance().begin(&server);
   }

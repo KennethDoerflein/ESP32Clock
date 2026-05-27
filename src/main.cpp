@@ -392,6 +392,14 @@ void logicTask(void *pvParameters)
       lastHeapLog = millis();
     }
 
+    // Periodically clean up stale WebSocket clients to prevent heap corruption
+    static unsigned long lastWsCleanup = 0;
+    if (millis() - lastWsCleanup > 1000)
+    {
+      SerialLog::getInstance().cleanupClients();
+      lastWsCleanup = millis();
+    }
+
     // Yield to prevent watchdog triggers
     vTaskDelay(pdMS_TO_TICKS(10));
     esp_task_wdt_reset(); // Feed the watchdog

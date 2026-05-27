@@ -9,6 +9,7 @@
 #include "NtpSync.h"
 #include "SensorModule.h"
 #include "SerialLog.h"
+#include "TimeManager.h"
 #include "ConfigManager.h"
 #include "LockGuard.h"
 #include <Arduino.h>
@@ -141,7 +142,7 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
   else
   {
     // Fallback: no pre-sync snapshot (e.g., blocking sync at boot)
-    DateTime oldRtcTime = RTC.now();
+    DateTime oldRtcTime = TimeManager::getInstance().getRTCTime();
     if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
     {
       int32_t driftSeconds = (int32_t)oldRtcTime.unixtime() - (int32_t)time_to_set.unixtime();
@@ -152,9 +153,11 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
   }
 
   // --- Layer 4: RTC Write + Verification ---
-  RTC.adjust(time_to_set);
+  // Use TimeManager's mutex-protected method to prevent I2C bus corruption
+  // from concurrent access by the main loop's getRTCTime() on Core 1.
+  TimeManager::getInstance().adjustRTC(time_to_set);
 
-  DateTime readback = RTC.now();
+  DateTime readback = TimeManager::getInstance().getRTCTime();
   int32_t writeError = abs((int32_t)readback.unixtime() - (int32_t)time_to_set.unixtime());
   if (writeError > 2)
   {
@@ -209,7 +212,7 @@ void startNtpSync()
   // These are read back in _processSuccessfulNtpSync() to calculate
   // the precise drift of each clock source at the sync start moment.
   sysTimeAtSyncStart = time(nullptr);
-  DateTime rtcSnap = RTC.now();
+  DateTime rtcSnap = TimeManager::getInstance().getRTCTime();
   rtcTimeAtSyncStart = rtcSnap.isValid() ? rtcSnap.unixtime() : 0;
   millisAtSyncStart = millis();
 
