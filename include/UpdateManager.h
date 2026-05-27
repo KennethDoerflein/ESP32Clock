@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <atomic>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include "FirmwareVerifier.h"
@@ -85,7 +86,7 @@ private:
     UpdateManager &operator=(const UpdateManager &) = delete;
 
     bool _updateFailed = false;
-    bool _updateInProgress = false;
+    std::atomic<bool> _updateInProgress{false};
     String _lastError;
 
 
