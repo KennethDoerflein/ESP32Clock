@@ -49,6 +49,7 @@ static constexpr bool DEFAULT_INVERT_COLORS = false;
 static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
 static constexpr bool DEFAULT_TEMP_CORRECTION_ENABLED = true;
 static constexpr float DEFAULT_TEMP_CORRECTION = 0.0;
+static constexpr float DEFAULT_TEMP_COMPENSATION_FACTOR = 0.15;
 static constexpr bool DEFAULT_IS_DST = false;
 static constexpr uint8_t DEFAULT_SNOOZE_DURATION = 9;
 static constexpr uint8_t DEFAULT_DISMISS_DURATION = 3;
@@ -263,6 +264,12 @@ public:
   bool isTempCorrectionEnabled() const;
 
   /**
+   * @brief Gets the temperature compensation factor.
+   * @return The compensation factor (0.0 to 1.0).
+   */
+  float getTempCompensationFactor() const;
+
+  /**
    * @brief Checks if Daylight Saving Time is currently active.
    * @return True if DST is active, false otherwise.
    */
@@ -408,6 +415,12 @@ public:
    * @param value The new correction value.
    */
   void setTempCorrection(float value);
+
+  /**
+   * @brief Sets the temperature compensation factor.
+   * @param value The new compensation factor (0.0 to 1.0).
+   */
+  void setTempCompensationFactor(float value);
 
   /**
    * @brief Gets the stored Address/Location.
@@ -726,6 +739,7 @@ private:
   String timezone = DEFAULT_TIMEZONE;
   bool tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
   float tempCorrection = DEFAULT_TEMP_CORRECTION;
+  float tempCompensationFactor = DEFAULT_TEMP_COMPENSATION_FACTOR;
   bool isDst = DEFAULT_IS_DST;
   uint8_t snoozeDuration = DEFAULT_SNOOZE_DURATION;
   uint8_t dismissDuration = DEFAULT_DISMISS_DURATION;

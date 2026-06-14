@@ -90,3 +90,15 @@ float getRtcTemperature();
  * @return The cached temperature, converted to the user's preferred unit.
  */
 float getCoreTemperature();
+
+/**
+ * @brief Gets the last cached raw (uncompensated) BME280 temperature reading.
+ * @return The raw temperature, converted to the user's preferred unit.
+ */
+float getRawBmeTemperature();
+
+/**
+ * @brief Gets the total compensation offset currently being applied.
+ * @return The offset in the user's preferred unit (negative = cooling correction).
+ */
+float getCompensationOffset();

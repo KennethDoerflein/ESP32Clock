@@ -22,6 +22,7 @@ RTC_Type RTC;
 
 // Static variables to cache the latest sensor readings.
 static float cached_bme_temp_c = 0.0;
+static float cached_raw_bme_temp_c = 0.0;
 static float cached_rtc_temp_c = 0.0;
 static float cached_core_temp_c = 0.0;
 static float cached_humidity = 0.0;
@@ -30,6 +31,11 @@ static bool bme280_found = false; // Track BME280 sensor status
 static unsigned long lastBmeRetry = 0;
 const unsigned long BME_RETRY_INTERVAL = 10000; // Retry every 10 seconds if not found
 const uint8_t BME280_I2C_ADDRESS = 0x76;
+
+// EMA (Exponential Moving Average) state for smoothing the thermal delta.
+static float smoothed_heat_delta = 0.0;
+static bool ema_initialized = false;
+const float EMA_ALPHA = 0.1; // Smoothing factor: lower = smoother, slower convergence
 
 /**
  * @brief Calculates the corrected relative humidity based on a temperature offset.
@@ -234,6 +240,40 @@ float getCoreTemperature()
 }
 
 /**
+ * @brief Gets the raw (uncompensated) BME280 temperature, converted to the user's preferred unit.
+ * @return The raw BME280 temperature, or 0 if the BME280 is not available.
+ */
+float getRawBmeTemperature()
+{
+  bool useCelsius = ConfigManager::getInstance().isCelsius();
+  if (useCelsius)
+  {
+    return cached_raw_bme_temp_c;
+  }
+  else
+  {
+    return (cached_raw_bme_temp_c * 9.0 / 5.0) + 32.0;
+  }
+}
+
+/**
+ * @brief Gets the total compensation offset currently being applied.
+ * @return The offset in the user's preferred unit (negative = temperature lowered).
+ */
+float getCompensationOffset()
+{
+  bool useCelsius = ConfigManager::getInstance().isCelsius();
+  if (useCelsius)
+  {
+    return cached_offset_c;
+  }
+  else
+  {
+    return cached_offset_c * 9.0 / 5.0;
+  }
+}
+
+/**
  * @brief Periodically reads sensor data and updates the cache.
  *
  * This function is designed to be called in the main loop. It uses a timer
@@ -256,6 +296,12 @@ void handleSensorUpdates(bool force)
     // I2C transaction state and triggering a FreeRTOS mutex assertion.
     RecursiveLockGuard i2cLock(TimeManager::getInstance().getI2CMutex());
 
+    // Read the core temp sensor FIRST so it's available for compensation.
+    if (core_temp_started)
+    {
+      temp_sensor_read_celsius(&cached_core_temp_c);
+    }
+
     if (bme280_found)
     {
       float raw_bme_temp_c = BME.readTemperature();
@@ -270,17 +316,48 @@ void handleSensorUpdates(bool force)
       }
       else
       {
-        if (rtc_found && ConfigManager::getInstance().isTempCorrectionEnabled())
+        // Always cache the raw reading for diagnostics
+        cached_raw_bme_temp_c = raw_bme_temp_c;
+
+        if (core_temp_started && ConfigManager::getInstance().isTempCorrectionEnabled())
         {
-          float raw_rtc_temp_c = RTC.getTemperature();
-          float correction = ConfigManager::getInstance().getTempCorrection();
-          cached_offset_c = -((raw_rtc_temp_c - raw_bme_temp_c)) + correction;
+          // --- Core-temperature-based thermal compensation ---
+          // The ESP32 core temp tracks internal heat generation. The thermal
+          // gradient from core to BME280 is proportional to how much self-heating
+          // is inflating the BME reading above true ambient. A configurable
+          // fraction (k) of this gradient is subtracted as the estimated offset.
+          float heat_delta = cached_core_temp_c - raw_bme_temp_c;
+
+          // Apply EMA smoothing to the heat delta to suppress sensor noise
+          if (!ema_initialized)
+          {
+            smoothed_heat_delta = heat_delta;
+            ema_initialized = true;
+          }
+          else
+          {
+            smoothed_heat_delta = EMA_ALPHA * heat_delta + (1.0f - EMA_ALPHA) * smoothed_heat_delta;
+          }
+
+          float k = ConfigManager::getInstance().getTempCompensationFactor();
+          float user_correction = ConfigManager::getInstance().getTempCorrection();
+
+          // Estimated self-heating: fraction of the smoothed thermal gradient
+          // Clamped to >= 0 because negative self-heat is physically nonsensical
+          float self_heat = k * smoothed_heat_delta;
+          if (self_heat < 0.0f)
+          {
+            self_heat = 0.0f;
+          }
+
+          // Total offset: subtract estimated self-heating, add manual correction
+          cached_offset_c = -self_heat + user_correction;
           cached_bme_temp_c = raw_bme_temp_c + cached_offset_c;
           cached_humidity = calculateCorrectedHumidity(raw_bme_temp_c, raw_humidity, cached_offset_c);
         }
         else
         {
-          // Correction is disabled or RTC is not found, use raw values
+          // Correction is disabled or core temp sensor not available, use raw values
           cached_bme_temp_c = raw_bme_temp_c;
           cached_humidity = raw_humidity;
           cached_offset_c = 0.0;
@@ -306,13 +383,6 @@ void handleSensorUpdates(bool force)
     if (rtc_found)
     {
       cached_rtc_temp_c = RTC.getTemperature();
-    }
-    
-    // Only read the core temp sensor if it was successfully started.
-    // If RTC init failed, setupSensors() returned early before temp_sensor_start().
-    if (core_temp_started)
-    {
-      temp_sensor_read_celsius(&cached_core_temp_c);
     }
   }
 }

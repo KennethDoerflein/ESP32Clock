@@ -418,6 +418,7 @@ void ClockWebServer::begin()
       doc["dismissDuration"] = config.getDismissDuration();
       doc["tempCorrectionEnabled"] = config.isTempCorrectionEnabled();
       doc["tempCorrection"] = config.getTempCorrection();
+      doc["tempCompensationFactor"] = config.getTempCompensationFactor();
       
       String response;
       serializeJson(doc, response);
@@ -486,6 +487,7 @@ void ClockWebServer::begin()
               bool oldInvertColors = config.isInvertColors();
               float oldTempCorrection = config.getTempCorrection();
               bool oldTempCorrectionEnabled = config.isTempCorrectionEnabled();
+              float oldTempCompensationFactor = config.getTempCompensationFactor();
               config.setAutoBrightness(doc["autoBrightness"]);
               config.setBrightness(doc["brightness"]);
               config.setAutoBrightnessStartHour(doc["autoBrightnessStartHour"]);
@@ -513,6 +515,10 @@ void ClockWebServer::begin()
               config.setDismissDuration(doc["dismissDuration"]);
               config.setTempCorrectionEnabled(doc["tempCorrectionEnabled"]);
               config.setTempCorrection(doc["tempCorrection"]);
+              if (doc["tempCompensationFactor"].is<float>())
+              {
+                config.setTempCompensationFactor(doc["tempCompensationFactor"]);
+              }
 
               if (oldScreenFlipped != config.isScreenFlipped())
               {
@@ -531,7 +537,8 @@ void ClockWebServer::begin()
                 startNtpSync();
               }
 
-              if (oldTempCorrection != config.getTempCorrection() || oldTempCorrectionEnabled != config.isTempCorrectionEnabled())
+              if (oldTempCorrection != config.getTempCorrection() || oldTempCorrectionEnabled != config.isTempCorrectionEnabled() ||
+                  oldTempCompensationFactor != config.getTempCompensationFactor())
               {
                 handleSensorUpdates(true);
               }
@@ -581,6 +588,8 @@ void ClockWebServer::begin()
       if (isBmeFound()) {
         doc["bmeTemp"] = String(getBmeTemperature(), 1);
         doc["bmeHumidity"] = String(getHumidity(), 1);
+        doc["rawBmeTemp"] = String(getRawBmeTemperature(), 1);
+        doc["compensationOffset"] = String(getCompensationOffset(), 1);
       }
       if (isRtcFound()) {
         doc["rtcTemp"] = String(getRtcTemperature(), 1);
@@ -1427,6 +1436,8 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.isTempCorrectionEnabled() ? "checked" : "";
   if (var == "TEMP_CORRECTION_CONTROLS_CLASS")
     return config.isTempCorrectionEnabled() ? "" : "d-none";
+  if (var == "TEMP_COMPENSATION_FACTOR")
+    return String(config.getTempCompensationFactor(), 2);
 
   if (var == "DEFAULT_PAGE_SELECTED_0")
     return config.getDefaultPage() == 0 ? "selected" : "";

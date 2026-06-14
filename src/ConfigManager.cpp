@@ -111,6 +111,7 @@ void ConfigManager::setDefaults()
   dismissDuration = DEFAULT_DISMISS_DURATION;
   tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
   tempCorrection = DEFAULT_TEMP_CORRECTION;
+  tempCompensationFactor = DEFAULT_TEMP_COMPENSATION_FACTOR;
   address = DEFAULT_ADDRESS;
   enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
   defaultPage = DEFAULT_DEFAULT_PAGE;
@@ -192,6 +193,7 @@ void ConfigManager::load()
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
   tempCorrectionEnabled = _preferences.getBool("tempCorrEn", DEFAULT_TEMP_CORRECTION_ENABLED);
   tempCorrection = _preferences.getFloat("tempCorr", DEFAULT_TEMP_CORRECTION);
+  tempCompensationFactor = _preferences.getFloat("tempCompF", DEFAULT_TEMP_COMPENSATION_FACTOR);
 
   // Try to load address, fall back to zipCode for migration
   address = _preferences.getString("address", "");
@@ -372,6 +374,7 @@ bool ConfigManager::save()
   _preferences.putUChar("dismissDur", dismissDuration);
   _preferences.putBool("tempCorrEn", tempCorrectionEnabled);
   _preferences.putFloat("tempCorr", tempCorrection);
+  _preferences.putFloat("tempCompF", tempCompensationFactor);
   _preferences.putString("address", address);
 
   String pagesStr = "";
@@ -734,6 +737,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
     isDst = DEFAULT_IS_DST;
     tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
     tempCorrection = DEFAULT_TEMP_CORRECTION;
+    tempCompensationFactor = DEFAULT_TEMP_COMPENSATION_FACTOR;
 
     snoozeDuration = DEFAULT_SNOOZE_DURATION;
     dismissDuration = DEFAULT_DISMISS_DURATION;
@@ -867,6 +871,11 @@ bool ConfigManager::isTempCorrectionEnabled() const
 {
   RecursiveLockGuard lock(_mutex);
   return tempCorrectionEnabled;
+}
+float ConfigManager::getTempCompensationFactor() const
+{
+  RecursiveLockGuard lock(_mutex);
+  return tempCompensationFactor;
 }
 bool ConfigManager::isDST() const
 {
@@ -1061,6 +1070,19 @@ void ConfigManager::setTempCorrection(float value)
     if (tempCorrection != value)
     {
       tempCorrection = value;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setTempCompensationFactor(float value)
+{
+  {
+    RecursiveLockGuard lock(_mutex);
+    if (tempCompensationFactor != value)
+    {
+      tempCompensationFactor = value;
       _isDirty = true;
     }
   }

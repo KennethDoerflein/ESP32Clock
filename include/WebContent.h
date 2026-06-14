@@ -1091,9 +1091,13 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   </div>
                   <div id="temp-correction-controls" class="%TEMP_CORRECTION_CONTROLS_CLASS%">
                     <hr>
+                    <label for="temp-compensation-factor" class="form-label">Compensation Factor: <span id="temp-compensation-factor-value">%TEMP_COMPENSATION_FACTOR%</span></label>
+                    <input type="range" class="form-range" id="temp-compensation-factor" name="tempCompensationFactor" min="0" max="1" step="0.01" value="%TEMP_COMPENSATION_FACTOR%">
+                    <small class="form-text text-muted">Controls how aggressively internal heat is compensated. Higher = more correction. Start at 0.15 and adjust to match a reference thermometer.</small>
+                    <hr>
                     <label for="temp-correction" class="form-label">Temperature Correction (&deg;%TEMP_CORRECTION_UNIT%)</label>
                     <input type="number" class="form-control" id="temp-correction" name="tempCorrection" step="0.1" value="%TEMP_CORRECTION_VALUE%">
-                    <small class="form-text text-muted">If the clock's temperature is 2 degrees too high, enter -2.0 here.</small>
+                    <small class="form-text text-muted">Fine-tune: if the clock is still 2 degrees too high after adjusting the factor, enter -2.0 here.</small>
                   </div>
                 </div>
                 <div class="mb-3 p-3 border rounded">
@@ -1245,6 +1249,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const tempCorrectionEnabledEl = document.getElementById("temp-correction-enabled");
       const tempCorrectionEl = document.getElementById("temp-correction");
       const tempCorrectionControlsEl = document.getElementById("temp-correction-controls");
+      const tempCompensationFactorEl = document.getElementById("temp-compensation-factor");
+      const tempCompensationFactorValueEl = document.getElementById("temp-compensation-factor-value");
       const screenFlippedEl = document.getElementById("screen-flipped");
       const invertColorsEl = document.getElementById("invert-colors");
       const timezoneEl = document.getElementById("timezone-select");
@@ -1448,6 +1454,9 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         tempCorrectionEl.value = tempCorrection.toFixed(1);
         tempCorrectionEnabledEl.checked = settings.tempCorrectionEnabled || false;
         
+        tempCompensationFactorEl.value = settings.tempCompensationFactor || 0.15;
+        tempCompensationFactorValueEl.textContent = parseFloat(tempCompensationFactorEl.value).toFixed(2);
+
         if (tempCorrectionEnabledEl.checked) {
           tempCorrectionControlsEl.classList.remove('d-none');
         } else {
@@ -1522,7 +1531,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           enabledPages: getEnabledPagesFromUI(),
           snoozeDuration: parseInt(document.getElementById('snooze-duration').value),
           dismissDuration: parseInt(document.getElementById('dismiss-duration').value),
-          tempCorrection: parseFloat(document.getElementById('temp-correction').value)
+          tempCorrection: parseFloat(document.getElementById('temp-correction').value),
+          tempCompensationFactor: parseFloat(tempCompensationFactorEl.value)
         };
 
         if (!settings.useCelsius) {
@@ -1634,6 +1644,10 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         if (decimalIndex !== -1 && value.length - decimalIndex > 2) {
           tempCorrectionEl.value = parseFloat(value).toFixed(1);
         }
+      });
+
+      tempCompensationFactorEl.addEventListener('input', () => {
+        tempCompensationFactorValueEl.textContent = parseFloat(tempCompensationFactorEl.value).toFixed(2);
       });
 
       autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
