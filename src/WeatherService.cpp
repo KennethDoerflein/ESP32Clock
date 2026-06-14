@@ -211,6 +211,8 @@ void WeatherService::weatherTaskEntry(void *parameter)
           SerialLog::getInstance().printf("Weather task: geocoding %s\n", success ? "succeeded" : "failed");
       }
 
+      esp_task_wdt_reset(); // Feed the WDT between geocoding and weather updates
+
       // 2. Regular weather update
       SerialLog::getInstance().print("Weather task: starting weather update...\n");
       service->updateWeather();
@@ -307,14 +309,14 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
   HTTPClient http;
   WiFiClientSecure client;
   client.setInsecure();
-  client.setTimeout(15000);  // 15s cap on TLS handshake (milliseconds)
+  client.setTimeout(10000);  // 10s cap on TLS handshake (milliseconds)
 
   SerialLog::getInstance().printf("Resolving Location: %s\n", url.c_str());
 
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
   http.useHTTP10(true);    // Disable chunked transfer encoding for stream safety
-  http.setTimeout(15000);  // 15s HTTP timeout — well under the 30s WDT
+  http.setTimeout(10000);  // 10s HTTP timeout
 
   int httpCode = http.GET();
   bool success = false;
@@ -529,7 +531,7 @@ void WeatherService::updateWeather()
   HTTPClient http;
   WiFiClientSecure client;
   client.setInsecure();
-  client.setTimeout(15000);  // 15s cap on TLS handshake (milliseconds)
+  client.setTimeout(10000);  // 10s cap on TLS handshake (milliseconds)
 
   // Use reserve to prevent reallocations
   String url;
@@ -547,7 +549,7 @@ void WeatherService::updateWeather()
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS); // Good practice
   http.useHTTP10(true);                                  // Disable chunked transfer encoding for stream safety
-  http.setTimeout(15000);                                // 15s HTTP timeout — well under the 30s WDT
+  http.setTimeout(10000);                                // 10s HTTP timeout
   int httpCode = http.GET();
 
   if (httpCode == 200)
