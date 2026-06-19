@@ -37,7 +37,7 @@ extern RTC_Type RTC;
 void setupSensors();
 
 /// @brief The interval for reading sensor data, in milliseconds.
-const unsigned long SENSOR_UPDATE_INTERVAL = 3000; // 3 seconds
+const unsigned long SENSOR_UPDATE_INTERVAL = 5000; // 5 seconds
 
 /**
  * @brief Handles periodic reading of sensor data.

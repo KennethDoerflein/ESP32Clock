@@ -148,6 +148,13 @@ public:
   int getNumAlarms() const;
 
   /**
+   * @brief Efficiently checks if any alarms are enabled or snoozed without copying the vector.
+   * @param anyEnabled Set to true if at least one alarm is enabled.
+   * @param anySnoozed Set to true if at least one alarm is snoozed.
+   */
+  void getAlarmSummary(bool &anyEnabled, bool &anySnoozed) const;
+
+  /**
    * @brief Gets the snooze-until timestamp of the first snoozed alarm.
    * @details Zero-allocation alternative to getAllAlarms() for snooze countdown display.
    * @return The snooze-until unix timestamp, or 0 if no alarm is snoozed.

@@ -547,6 +547,29 @@ int ConfigManager::getNumAlarms() const
 }
 
 /**
+ * @brief Efficiently checks if any alarms are enabled or snoozed without copying the vector.
+ * @param anyEnabled Set to true if at least one alarm is enabled.
+ * @param anySnoozed Set to true if at least one alarm is snoozed.
+ */
+void ConfigManager::getAlarmSummary(bool &anyEnabled, bool &anySnoozed) const
+{
+  RecursiveLockGuard lock(_mutex);
+  anyEnabled = false;
+  anySnoozed = false;
+  for (const auto &alarm : _alarms)
+  {
+    if (alarm.isEnabled())
+    {
+      anyEnabled = true;
+      if (alarm.isSnoozed())
+      {
+        anySnoozed = true;
+      }
+    }
+  }
+}
+
+/**
  * @brief Updates an alarm's configuration by index.
  * @param index The index of the alarm to update.
  * @param alarm The new alarm data to set.

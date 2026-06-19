@@ -153,7 +153,7 @@ void SerialLog::setLoggingEnabled(bool enabled)
  */
 // Returns a timestamp prefix string, e.g. "[2026-03-03 21:02:54] " or "[+12345ms] ".
 // Uses POSIX time() so it reflects NTP/RTC-synced time automatically.
-static String getTimestamp()
+static void getTimestamp(char* buf, size_t maxLen)
 {
   time_t now = time(nullptr);
   struct tm t;
@@ -167,40 +167,43 @@ static String getTimestamp()
     taskName = pcTaskGetName(curTask);
   }
 
-  char buf[64];
   // If year is before 2021 the clock hasn't been synced yet — show uptime.
   if (t.tm_year + 1900 < 2021)
   {
-    snprintf(buf, sizeof(buf), "[+%lums] [%s] ", (unsigned long)millis(), taskName);
+    snprintf(buf, maxLen, "[+%lums] [%s] ", (unsigned long)millis(), taskName);
   }
   else
   {
-    snprintf(buf, sizeof(buf), "[%04d-%02d-%02d %02d:%02d:%02d] [%s] ",
+    snprintf(buf, maxLen, "[%04d-%02d-%02d %02d:%02d:%02d] [%s] ",
              t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
              t.tm_hour, t.tm_min, t.tm_sec, taskName);
   }
-  return String(buf);
 }
 
 void SerialLog::print(const String &message)
 {
   RecursiveLockGuard lock(_mutex);
+  if (!_consoleLoggingEnabled && !_fileLoggingEnabled)
+    return;
 
-  String ts = getTimestamp();
-  String prefixed = ts + message;
+  char tsBuf[64];
+  getTimestamp(tsBuf, sizeof(tsBuf));
+  
+  bool needsNewline = !message.endsWith("\n");
+  
+  // Use reserve to avoid multiple allocations when concatenating.
+  String prefixed;
+  prefixed.reserve(strlen(tsBuf) + message.length() + (needsNewline ? 1 : 0));
+  prefixed += tsBuf;
+  prefixed += message;
+  if (needsNewline) {
+    prefixed += '\n';
+  }
 
   if (_consoleLoggingEnabled)
   {
-    if (prefixed.endsWith("\n"))
-    {
-      Serial.print(prefixed);
-      if (_ws.count() > 0) _ws.textAll(prefixed);
-    }
-    else
-    {
-      Serial.println(prefixed);
-      if (_ws.count() > 0) _ws.textAll(prefixed + "\n");
-    }
+    Serial.print(prefixed);
+    if (_ws.count() > 0) _ws.textAll(prefixed);
   }
   if (_fileLoggingEnabled)
   {
@@ -221,27 +224,30 @@ void SerialLog::printf(const char *format, ...)
   if (!_consoleLoggingEnabled && !_fileLoggingEnabled)
     return;
 
-  char buf[256];
+  char msgBuf[256];
   va_list args;
   va_start(args, format);
-  vsnprintf(buf, sizeof(buf), format, args);
+  vsnprintf(msgBuf, sizeof(msgBuf), format, args);
   va_end(args);
 
-  String ts = getTimestamp();
-  String prefixed = ts + buf;
+  char tsBuf[64];
+  getTimestamp(tsBuf, sizeof(tsBuf));
+  
+  size_t msgLen = strlen(msgBuf);
+  bool needsNewline = (msgLen > 0 && msgBuf[msgLen - 1] != '\n');
+  
+  String prefixed;
+  prefixed.reserve(strlen(tsBuf) + msgLen + (needsNewline ? 1 : 0));
+  prefixed += tsBuf;
+  prefixed += msgBuf;
+  if (needsNewline) {
+    prefixed += '\n';
+  }
 
   if (_consoleLoggingEnabled)
   {
-    if (prefixed.endsWith("\n"))
-    {
-      Serial.print(prefixed);
-      if (_ws.count() > 0) _ws.textAll(prefixed);
-    }
-    else
-    {
-      Serial.println(prefixed);
-      if (_ws.count() > 0) _ws.textAll(prefixed + "\n");
-    }
+    Serial.print(prefixed);
+    if (_ws.count() > 0) _ws.textAll(prefixed);
   }
   if (_fileLoggingEnabled)
   {
@@ -450,9 +456,10 @@ void SerialLog::logResetReason()
       File crashFile = LittleFS.open(CRASH_FILE_PATH, "a");
       if (crashFile)
       {
-        String bootTime = getTimestamp();
+        char bootTime[64];
+        getTimestamp(bootTime, sizeof(bootTime));
         crashFile.printf("\n=========================================\n");
-        crashFile.printf("CRASH DETECTED ON BOOT: %s", bootTime.c_str());
+        crashFile.printf("CRASH DETECTED ON BOOT: %s", bootTime);
         crashFile.printf("RESET REASON: %s\n", reasonStr.c_str());
         crashFile.printf("-----------------------------------------\n");
       }

@@ -76,7 +76,7 @@ TaskHandle_t g_logicTaskHandle = NULL;
  * should be in the IDLE, RINGING, or SNOOZED state. It checks the
  * AlarmManager and the configuration to make the decision.
  */
-void updateAlarmState(const std::vector<Alarm> &alarms)
+void updateAlarmState(bool anySnoozed)
 {
   auto &alarmManager = AlarmManager::getInstance();
   AlarmState oldState = g_alarmState;
@@ -90,15 +90,6 @@ void updateAlarmState(const std::vector<Alarm> &alarms)
   }
   else
   {
-    bool anySnoozed = false;
-    for (const auto &alarm : alarms)
-    {
-      if (alarm.isSnoozed())
-      {
-        anySnoozed = true;
-        break;
-      }
-    }
     newState = anySnoozed ? SNOOZED : IDLE;
   }
 
@@ -691,11 +682,13 @@ void loop()
     displayManager.update();
   }
 
-  // --- Cache alarm state once per loop to avoid redundant heap copies ---
-  std::vector<Alarm> alarms = config.getAllAlarms();
+  // --- Get alarm summary once per loop to avoid heap copies ---
+  bool anyAlarmEnabled = false;
+  bool anyAlarmSnoozed = false;
+  config.getAlarmSummary(anyAlarmEnabled, anyAlarmSnoozed);
 
   // --- Alarm State Machine ---
-  updateAlarmState(alarms);
+  updateAlarmState(anyAlarmSnoozed);
 
   // State actions
   switch (g_alarmState)
@@ -845,20 +838,7 @@ void loop()
     break;
   }
 
-  // --- Update Alarm Icon (reuses cached alarms vector) ---
-  bool anyAlarmEnabled = false;
-  bool anyAlarmSnoozed = false;
-  for (const auto &alarm : alarms)
-  {
-    if (alarm.isEnabled())
-    {
-      anyAlarmEnabled = true;
-      if (alarm.isSnoozed())
-      {
-        anyAlarmSnoozed = true;
-      }
-    }
-  }
+  // --- Update Alarm Icon ---
   displayManager.drawAlarmIcon(anyAlarmEnabled, anyAlarmSnoozed);
 
   handleBootButton();
