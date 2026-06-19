@@ -59,6 +59,7 @@ static constexpr const char *DEFAULT_ADDRESS = "";
 static constexpr int DEFAULT_DEFAULT_PAGE = 0;
 static constexpr float DEFAULT_LAT = 0.0;
 static constexpr float DEFAULT_LON = 0.0;
+static constexpr bool DEFAULT_OFFLINE_MODE = false;
 // 0: Clock, 1: Weather, 2: Info, 3: Weather+Clock
 // Using a C-style array for default initializer which can be easily converted to vector
 static constexpr int DEFAULT_ENABLED_PAGES[] = {0, 1, 3, 2};
@@ -241,6 +242,12 @@ public:
    * @return True if the screen is inverted, false otherwise.
    */
   bool isInvertColors() const;
+
+  /**
+   * @brief Checks if offline mode is enabled.
+   * @return True if offline mode is enabled, false otherwise.
+   */
+  bool isOfflineMode() const;
 
   /**
    * @brief Gets the timezone string.
@@ -552,6 +559,12 @@ public:
   void setAutoBrightness(bool enabled);
 
   /**
+   * @brief Enables or disables offline mode.
+   * @param enabled True to enable offline mode, false to disable.
+   */
+  void setOfflineMode(bool enabled);
+
+  /**
    * @brief Sets the manual brightness level.
    * @param value The brightness level (0-255).
    */
@@ -770,6 +783,7 @@ private:
   int defaultPage = DEFAULT_DEFAULT_PAGE;
   float lat = DEFAULT_LAT;
   float lon = DEFAULT_LON;
+  bool offlineMode = DEFAULT_OFFLINE_MODE;
 
   // Colors
   String backgroundColor = DEFAULT_BACKGROUND_COLOR;

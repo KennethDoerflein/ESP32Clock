@@ -113,6 +113,7 @@ void ConfigManager::setDefaults()
   autoTempCalibration = DEFAULT_AUTO_TEMP_CALIBRATION;
   tempCorrection = DEFAULT_TEMP_CORRECTION;
   tempCompensationFactor = DEFAULT_TEMP_COMPENSATION_FACTOR;
+  offlineMode = DEFAULT_OFFLINE_MODE;
   address = DEFAULT_ADDRESS;
   enabledPages.assign(std::begin(DEFAULT_ENABLED_PAGES), std::end(DEFAULT_ENABLED_PAGES));
   defaultPage = DEFAULT_DEFAULT_PAGE;
@@ -196,6 +197,7 @@ void ConfigManager::load()
   autoTempCalibration = _preferences.getBool("autoTCal", DEFAULT_AUTO_TEMP_CALIBRATION);
   tempCorrection = _preferences.getFloat("tempCorr", DEFAULT_TEMP_CORRECTION);
   tempCompensationFactor = _preferences.getFloat("tempCompF", DEFAULT_TEMP_COMPENSATION_FACTOR);
+  offlineMode = _preferences.getBool("offline", DEFAULT_OFFLINE_MODE);
 
   // Try to load address, fall back to zipCode for migration
   address = _preferences.getString("address", "");
@@ -378,6 +380,7 @@ bool ConfigManager::save()
   _preferences.putBool("autoTCal", autoTempCalibration);
   _preferences.putFloat("tempCorr", tempCorrection);
   _preferences.putFloat("tempCompF", tempCompensationFactor);
+  _preferences.putBool("offline", offlineMode);
   _preferences.putString("address", address);
 
   String pagesStr = "";
@@ -765,6 +768,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
     autoTempCalibration = DEFAULT_AUTO_TEMP_CALIBRATION;
     tempCorrection = DEFAULT_TEMP_CORRECTION;
     tempCompensationFactor = DEFAULT_TEMP_COMPENSATION_FACTOR;
+    offlineMode = DEFAULT_OFFLINE_MODE;
 
     snoozeDuration = DEFAULT_SNOOZE_DURATION;
     dismissDuration = DEFAULT_DISMISS_DURATION;
@@ -823,6 +827,11 @@ bool ConfigManager::isAutoBrightness() const
 {
   RecursiveLockGuard lock(_mutex);
   return autoBrightness;
+}
+bool ConfigManager::isOfflineMode() const
+{
+  RecursiveLockGuard lock(_mutex);
+  return offlineMode;
 }
 uint8_t ConfigManager::getBrightness() const
 {
@@ -1292,6 +1301,19 @@ void ConfigManager::setAutoBrightness(bool enabled)
     if (autoBrightness != enabled)
     {
       autoBrightness = enabled;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setOfflineMode(bool enabled)
+{
+  {
+    RecursiveLockGuard lock(_mutex);
+    if (offlineMode != enabled)
+    {
+      offlineMode = enabled;
       _isDirty = true;
     }
   }

@@ -1060,6 +1060,15 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   </label>
                   <input type="range" class="form-range" id="brightness" name="brightness" min="%BRIGHTNESS_MIN%" max="%BRIGHTNESS_MAX%" title="Adjust the manual brightness level." value="%BRIGHTNESS%" />
                 </div>
+                <div class="mb-3 p-3 border rounded border-danger">
+                  <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
+                    <label class="form-check-label text-danger" for="offline-mode" title="Enable offline mode. This disables WiFi permanently until a factory reset.">Offline Mode</label>
+                    <input class="form-check-input bg-danger border-danger" type="checkbox" role="switch" id="offline-mode" name="offlineMode" %OFFLINE_MODE_CHECKED% />
+                  </div>
+                  <div class="mt-2 small text-danger">
+                    Warning: Enabling offline mode will permanently disable WiFi on the next boot. A factory reset (holding snooze button during boot) is required to re-enable WiFi.
+                  </div>
+                </div>
                 <div class="mb-3 p-3 border rounded">
                   <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
                     <label class="form-check-label" for="24hour" title="Switch between 12-hour and 24-hour time formats.">24-Hour Format</label>
@@ -1237,6 +1246,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const displaySettingsForm = document.getElementById("display-settings-form");
       
       const autoBrightnessEl = document.getElementById("auto-brightness");
+      const offlineModeEl = document.getElementById("offline-mode");
       const brightnessEl = document.getElementById("brightness");
       const brightnessValueEl = document.getElementById("brightness-value");
       const manualBrightnessSectionEl = document.getElementById("manual-brightness-section");
@@ -1445,6 +1455,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
       function updateGeneralSettingsUI(settings) {
         autoBrightnessEl.checked = settings.autoBrightness || false;
+        offlineModeEl.checked = settings.offlineMode || false;
         celsiusEl.checked = settings.useCelsius || false;
         screenFlippedEl.checked = settings.screenFlipped || false;
         invertColorsEl.checked = settings.invertColors || false;
@@ -1522,6 +1533,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
 
         const settings = {
           autoBrightness: autoBrightnessEl.checked,
+          offlineMode: offlineModeEl.checked,
           // send numeric raw values to the server
           brightness: parseInt(brightnessEl.value),
           autoBrightnessStartHour: parseInt(autoBrightnessStartHourEl.value),
@@ -1659,6 +1671,14 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       });
 
       autoBrightnessEl.addEventListener('change', toggleBrightnessSlider);
+      offlineModeEl.addEventListener('change', (e) => {
+        if (offlineModeEl.checked) {
+          const confirmed = confirm("Are you sure you want to enable Offline Mode? WiFi will be permanently disabled on next boot. The ONLY way to revert this is a Factory Reset. Press OK to proceed.");
+          if (!confirmed) {
+            offlineModeEl.checked = false;
+          }
+        }
+      });
       
       // Use 'input' for sliders for real-time feedback, and 'change' for other inputs
       settingsForm.addEventListener('input', (e) => {

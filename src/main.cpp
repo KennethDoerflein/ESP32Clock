@@ -355,12 +355,15 @@ void logicTask(void *pvParameters)
   {
     if (!UpdateManager::getInstance().isUpdateInProgress())
     {
-      // Handle WiFi
-      wifiManager.handleDns();
-      wifiManager.handleConnection();
+      if (!config.isOfflineMode())
+      {
+        // Handle WiFi
+        wifiManager.handleDns();
+        wifiManager.handleConnection();
+        weatherService.loop();
+      }
 
       config.loop();
-      weatherService.loop();
     }
 
     if (!UpdateManager::getInstance().isUpdateInProgress() && wifiManager.isConnected())
@@ -535,20 +538,29 @@ void setup()
     }
   }
 
-  // Initialize WiFi. This will connect or start an AP.
-  logger.print("Initializing WiFiManager...\n");
-  bool captivePortalStarted = WiFiManager::getInstance().begin();
-
-  // If captive portal is active, enable it on the web server.
-  if (captivePortalStarted)
+  bool captivePortalStarted = false;
+  if (ConfigManager::getInstance().isOfflineMode())
   {
-    logger.print("Captive Portal is active. Enabling on web server.\n");
-    ClockWebServer::getInstance().enableCaptivePortal();
+    logger.print("Offline mode enabled. Disabling WiFi.\n");
+    WiFi.mode(WIFI_OFF);
   }
+  else
+  {
+    // Initialize WiFi. This will connect or start an AP.
+    logger.print("Initializing WiFiManager...\n");
+    captivePortalStarted = WiFiManager::getInstance().begin();
 
-  // Start the web server.
-  logger.print("Starting Web Server...\n");
-  ClockWebServer::getInstance().begin();
+    // If captive portal is active, enable it on the web server.
+    if (captivePortalStarted)
+    {
+      logger.print("Captive Portal is active. Enabling on web server.\n");
+      ClockWebServer::getInstance().enableCaptivePortal();
+    }
+
+    // Start the web server.
+    logger.print("Starting Web Server...\n");
+    ClockWebServer::getInstance().begin();
+  }
 
   delay(WEB_SERVER_STABILIZATION_DELAY); // Delay for web server stabilization.
 
@@ -562,9 +574,19 @@ void setup()
   // --- Post-WiFi Initialization Logic ---
   auto &timeManager = TimeManager::getInstance();
 
+  if (ConfigManager::getInstance().isOfflineMode())
+  {
+    logger.print("Starting in Offline Mode. RTC time will be used.\n");
+    timeManager.seedSystemClockFromRTC();
+    initNtp(); // Sets TZ environment variable
+    timeManager.checkDST();
+    display.drawMultiLineStatusMessage("Offline Mode", "WiFi Disabled");
+    delay(2000);
+    displayManager.setPage(ConfigManager::getInstance().getDefaultPage());
+  }
   // If the captive portal was started, the device needs configuration.
   // This takes precedence over any other mode.
-  if (captivePortalStarted)
+  else if (captivePortalStarted)
   {
     logger.print("Captive portal is active. Displaying setup instructions.\n");
     display.drawMultiLineStatusMessage("Connect to Clock-Setup", "Go to http://192.168.4.1");

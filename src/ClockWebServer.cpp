@@ -407,6 +407,7 @@ void ClockWebServer::begin()
       doc["invertColors"] = config.isInvertColors();
       doc["timezone"] = config.getTimezone();
       doc["address"] = config.getAddress();
+      doc["offlineMode"] = config.isOfflineMode();
       
       JsonArray pagesArray = doc["enabledPages"].to<JsonArray>();
       for (int pageId : config.getEnabledPages()) {
@@ -490,6 +491,7 @@ void ClockWebServer::begin()
               bool oldTempCorrectionEnabled = config.isTempCorrectionEnabled();
               bool oldAutoTempCalibration = config.isAutoTempCalibration();
               float oldTempCompensationFactor = config.getTempCompensationFactor();
+              bool oldOfflineMode = config.isOfflineMode();
               config.setAutoBrightness(doc["autoBrightness"]);
               config.setBrightness(doc["brightness"]);
               config.setAutoBrightnessStartHour(doc["autoBrightnessStartHour"]);
@@ -501,6 +503,10 @@ void ClockWebServer::begin()
               config.setScreenFlipped(doc["screenFlipped"]);
               config.setInvertColors(doc["invertColors"]);
               config.setTimezone(doc["timezone"]);
+              if (doc["offlineMode"].is<bool>())
+              {
+                config.setOfflineMode(doc["offlineMode"]);
+              }
 
               if (doc["enabledPages"].is<JsonArray>())
               {
@@ -546,6 +552,14 @@ void ClockWebServer::begin()
                   oldTempCompensationFactor != config.getTempCompensationFactor())
               {
                 handleSensorUpdates(true);
+              }
+
+              if (!oldOfflineMode && config.isOfflineMode())
+              {
+                request->send(200, "text/plain", "Entering offline mode. Rebooting...");
+                delay(1000);
+                ESP.restart();
+                return;
               }
 
               request->send(200, "text/plain", "Settings saved!");
@@ -1370,6 +1384,8 @@ String ClockWebServer::settingsProcessor(const String &var)
     return String(BRIGHTNESS_MAX);
   if (var == "AUTO_BRIGHTNESS_CHECKED")
     return config.isAutoBrightness() ? "checked" : "";
+  if (var == "OFFLINE_MODE_CHECKED")
+    return config.isOfflineMode() ? "checked" : "";
   if (var == "AUTO_BRIGHTNESS_START_HOUR")
     return String(config.getAutoBrightnessStartHour());
   if (var == "AUTO_BRIGHTNESS_START_HOUR_VALUE")
