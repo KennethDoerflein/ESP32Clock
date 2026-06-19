@@ -47,7 +47,9 @@ static constexpr bool DEFAULT_USE_CELSIUS = false;
 static constexpr bool DEFAULT_SCREEN_FLIPPED = false;
 static constexpr bool DEFAULT_INVERT_COLORS = false;
 static constexpr const char *DEFAULT_TIMEZONE = "EST5EDT,M3.2.0/2:00,M11.1.0/2:00";
+static constexpr bool DEFAULT_TIME_CORRECTION_ENABLED = true;
 static constexpr bool DEFAULT_TEMP_CORRECTION_ENABLED = true;
+static constexpr bool DEFAULT_AUTO_TEMP_CALIBRATION = true;
 static constexpr float DEFAULT_TEMP_CORRECTION = 0.0;
 static constexpr float DEFAULT_TEMP_COMPENSATION_FACTOR = 0.15;
 static constexpr bool DEFAULT_IS_DST = false;
@@ -271,6 +273,12 @@ public:
   bool isTempCorrectionEnabled() const;
 
   /**
+   * @brief Checks if auto temperature calibration on cold-boot is enabled.
+   * @return True if auto temp calibration is enabled, false otherwise.
+   */
+  bool isAutoTempCalibration() const;
+
+  /**
    * @brief Gets the temperature compensation factor.
    * @return The compensation factor (0.0 to 1.0).
    */
@@ -416,6 +424,12 @@ public:
    * @param enabled True to enable, false to disable.
    */
   void setTempCorrectionEnabled(bool enabled);
+
+  /**
+   * @brief Enables or disables auto temperature calibration.
+   * @param enabled True to enable auto temp calibration, false to disable.
+   */
+  void setAutoTempCalibration(bool enabled);
 
   /**
    * @brief Sets the temperature correction value.
@@ -745,6 +759,7 @@ private:
   bool invertColors = DEFAULT_INVERT_COLORS;
   String timezone = DEFAULT_TIMEZONE;
   bool tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
+  bool autoTempCalibration = DEFAULT_AUTO_TEMP_CALIBRATION;
   float tempCorrection = DEFAULT_TEMP_CORRECTION;
   float tempCompensationFactor = DEFAULT_TEMP_COMPENSATION_FACTOR;
   bool isDst = DEFAULT_IS_DST;

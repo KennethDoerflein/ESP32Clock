@@ -110,6 +110,7 @@ void ConfigManager::setDefaults()
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
   tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
+  autoTempCalibration = DEFAULT_AUTO_TEMP_CALIBRATION;
   tempCorrection = DEFAULT_TEMP_CORRECTION;
   tempCompensationFactor = DEFAULT_TEMP_COMPENSATION_FACTOR;
   address = DEFAULT_ADDRESS;
@@ -192,6 +193,7 @@ void ConfigManager::load()
   snoozeDuration = _preferences.getUChar("snoozeDur", DEFAULT_SNOOZE_DURATION);
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
   tempCorrectionEnabled = _preferences.getBool("tempCorrEn", DEFAULT_TEMP_CORRECTION_ENABLED);
+  autoTempCalibration = _preferences.getBool("autoTCal", DEFAULT_AUTO_TEMP_CALIBRATION);
   tempCorrection = _preferences.getFloat("tempCorr", DEFAULT_TEMP_CORRECTION);
   tempCompensationFactor = _preferences.getFloat("tempCompF", DEFAULT_TEMP_COMPENSATION_FACTOR);
 
@@ -373,6 +375,7 @@ bool ConfigManager::save()
   _preferences.putUChar("snoozeDur", snoozeDuration);
   _preferences.putUChar("dismissDur", dismissDuration);
   _preferences.putBool("tempCorrEn", tempCorrectionEnabled);
+  _preferences.putBool("autoTCal", autoTempCalibration);
   _preferences.putFloat("tempCorr", tempCorrection);
   _preferences.putFloat("tempCompF", tempCompensationFactor);
   _preferences.putString("address", address);
@@ -759,6 +762,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
     timezone = DEFAULT_TIMEZONE;
     isDst = DEFAULT_IS_DST;
     tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
+    autoTempCalibration = DEFAULT_AUTO_TEMP_CALIBRATION;
     tempCorrection = DEFAULT_TEMP_CORRECTION;
     tempCompensationFactor = DEFAULT_TEMP_COMPENSATION_FACTOR;
 
@@ -894,6 +898,12 @@ bool ConfigManager::isTempCorrectionEnabled() const
 {
   RecursiveLockGuard lock(_mutex);
   return tempCorrectionEnabled;
+}
+
+bool ConfigManager::isAutoTempCalibration() const
+{
+  RecursiveLockGuard lock(_mutex);
+  return autoTempCalibration;
 }
 float ConfigManager::getTempCompensationFactor() const
 {
@@ -1080,6 +1090,19 @@ void ConfigManager::setTempCorrectionEnabled(bool enabled)
     if (tempCorrectionEnabled != enabled)
     {
       tempCorrectionEnabled = enabled;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setAutoTempCalibration(bool enabled)
+{
+  {
+    RecursiveLockGuard lock(_mutex);
+    if (autoTempCalibration != enabled)
+    {
+      autoTempCalibration = enabled;
       _isDirty = true;
     }
   }

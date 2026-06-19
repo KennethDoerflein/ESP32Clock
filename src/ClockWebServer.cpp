@@ -417,6 +417,7 @@ void ClockWebServer::begin()
       doc["snoozeDuration"] = config.getSnoozeDuration();
       doc["dismissDuration"] = config.getDismissDuration();
       doc["tempCorrectionEnabled"] = config.isTempCorrectionEnabled();
+      doc["autoTempCalibration"] = config.isAutoTempCalibration();
       doc["tempCorrection"] = config.getTempCorrection();
       doc["tempCompensationFactor"] = config.getTempCompensationFactor();
       
@@ -487,6 +488,7 @@ void ClockWebServer::begin()
               bool oldInvertColors = config.isInvertColors();
               float oldTempCorrection = config.getTempCorrection();
               bool oldTempCorrectionEnabled = config.isTempCorrectionEnabled();
+              bool oldAutoTempCalibration = config.isAutoTempCalibration();
               float oldTempCompensationFactor = config.getTempCompensationFactor();
               config.setAutoBrightness(doc["autoBrightness"]);
               config.setBrightness(doc["brightness"]);
@@ -514,6 +516,9 @@ void ClockWebServer::begin()
               config.setSnoozeDuration(doc["snoozeDuration"]);
               config.setDismissDuration(doc["dismissDuration"]);
               config.setTempCorrectionEnabled(doc["tempCorrectionEnabled"]);
+              
+              if (doc["autoTempCalibration"].is<bool>())
+                config.setAutoTempCalibration(doc["autoTempCalibration"]);
               config.setTempCorrection(doc["tempCorrection"]);
               if (doc["tempCompensationFactor"].is<float>())
               {
@@ -537,7 +542,7 @@ void ClockWebServer::begin()
                 startNtpSync();
               }
 
-              if (oldTempCorrection != config.getTempCorrection() || oldTempCorrectionEnabled != config.isTempCorrectionEnabled() ||
+              if (oldTempCorrection != config.getTempCorrection() || oldTempCorrectionEnabled != config.isTempCorrectionEnabled() || oldAutoTempCalibration != config.isAutoTempCalibration() ||
                   oldTempCompensationFactor != config.getTempCompensationFactor())
               {
                 handleSensorUpdates(true);
@@ -1434,6 +1439,8 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.isCelsius() ? "C" : "F";
   if (var == "TEMP_CORRECTION_ENABLED_CHECKED")
     return config.isTempCorrectionEnabled() ? "checked" : "";
+  if (var == "AUTO_TEMP_CALIBRATION_CHECKED")
+    return config.isAutoTempCalibration() ? "checked" : "";
   if (var == "TEMP_CORRECTION_CONTROLS_CLASS")
     return config.isTempCorrectionEnabled() ? "" : "d-none";
   if (var == "TEMP_COMPENSATION_FACTOR")

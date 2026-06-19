@@ -1085,9 +1085,14 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   </div>
                 </div>
                 <div class="mb-3 p-3 border rounded">
-                  <div class="form-check form-switch ps-0 d-flex justify-content-between align-items-center">
-                    <label class="form-check-label" for="temp-correction-enabled">Enable Temperature Correction</label>
+                  <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="temp-correction-enabled" name="tempCorrectionEnabled" %TEMP_CORRECTION_ENABLED_CHECKED%>
+                    <label class="form-check-label" for="temp-correction-enabled">Enable Thermal Compensation</label>
+                  </div>
+                  
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="auto-temp-calibration" name="autoTempCalibration" %AUTO_TEMP_CALIBRATION_CHECKED%>
+                    <label class="form-check-label" for="auto-temp-calibration">Enable Auto Cold-Boot Calibration</label>
                   </div>
                   <div id="temp-correction-controls" class="%TEMP_CORRECTION_CONTROLS_CLASS%">
                     <hr>
@@ -1247,6 +1252,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
       const twentyFourHourEl = document.getElementById("24hour");
       const celsiusEl = document.getElementById("celsius");
       const tempCorrectionEnabledEl = document.getElementById("temp-correction-enabled");
+      const autoTempCalibrationEl = document.getElementById("auto-temp-calibration");
       const tempCorrectionEl = document.getElementById("temp-correction");
       const tempCorrectionControlsEl = document.getElementById("temp-correction-controls");
       const tempCompensationFactorEl = document.getElementById("temp-compensation-factor");
@@ -1453,6 +1459,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         }
         tempCorrectionEl.value = tempCorrection.toFixed(1);
         tempCorrectionEnabledEl.checked = settings.tempCorrectionEnabled || false;
+        autoTempCalibrationEl.checked = settings.autoTempCalibration !== undefined ? settings.autoTempCalibration : true;
         
         tempCompensationFactorEl.value = settings.tempCompensationFactor || 0.15;
         tempCompensationFactorValueEl.textContent = parseFloat(tempCompensationFactorEl.value).toFixed(2);
@@ -1524,6 +1531,7 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
           use24HourFormat: twentyFourHourEl.checked,
           useCelsius: celsiusEl.checked,
           tempCorrectionEnabled: tempCorrectionEnabledEl.checked,
+          autoTempCalibration: autoTempCalibrationEl.checked,
           screenFlipped: screenFlippedEl.checked,
           invertColors: invertColorsEl.checked,
           timezone: timezoneEl.value,

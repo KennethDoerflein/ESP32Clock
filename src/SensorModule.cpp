@@ -96,6 +96,12 @@ float calculateCorrectedHumidity(float temp_c, float humidity, float offset_c)
 static bool rtc_found = false;        // Track RTC status
 static bool core_temp_started = false; // Track whether temp_sensor_start() was called
 
+// Auto-Calibration State
+static bool auto_cal_running = false;
+static unsigned long auto_cal_start_time = 0;
+static float auto_cal_baseline_temp = 0.0;
+static bool first_run_check_done = false;
+
 /// @brief Stores the timestamp of the last sensor update for interval timing.
 static unsigned long prevSensorMillis = 0;
 
@@ -319,6 +325,23 @@ void handleSensorUpdates(bool force)
       float raw_bme_temp_c = BME.readTemperature();
       float raw_humidity = BME.readHumidity();
 
+      // --- Cold-Boot Auto-Calibration Initialization ---
+      if (!first_run_check_done && core_temp_started && rtc_found)
+      {
+        first_run_check_done = true;
+        if (ConfigManager::getInstance().isAutoTempCalibration())
+        {
+          float initial_diff = std::abs(cached_rtc_temp_c - raw_bme_temp_c);
+          if (initial_diff < 0.5f)
+          {
+            auto_cal_running = true;
+            auto_cal_baseline_temp = raw_bme_temp_c;
+            auto_cal_start_time = millis();
+            SerialLog::getInstance().print("Cold Boot Detected: Auto-Calibration started.");
+          }
+        }
+      }
+
       // Check for sensor failure
       if (isnan(raw_bme_temp_c) || isnan(raw_humidity))
       {
@@ -373,6 +396,27 @@ void handleSensorUpdates(bool force)
           else
           {
             smoothed_heat_delta = EMA_ALPHA * heat_delta + (1.0f - EMA_ALPHA) * smoothed_heat_delta;
+          }
+
+          // --- Cold-Boot Auto-Calibration Finalization ---
+          if (auto_cal_running)
+          {
+            if (millis() - auto_cal_start_time > 2700000) // 45 minutes
+            {
+              if (smoothed_heat_delta > 0.5f)
+              {
+                float new_k = (raw_bme_temp_c - auto_cal_baseline_temp) / smoothed_heat_delta;
+                if (new_k < 0.0f) new_k = 0.0f;
+                if (new_k > 1.0f) new_k = 1.0f;
+                ConfigManager::getInstance().setTempCompensationFactor(new_k);
+                SerialLog::getInstance().print("Auto-Calibration finished. New factor applied.");
+              }
+              else
+              {
+                SerialLog::getInstance().print("Auto-Calibration aborted: Insufficient heat buildup.");
+              }
+              auto_cal_running = false;
+            }
           }
 
           float k = ConfigManager::getInstance().getTempCompensationFactor();
