@@ -35,7 +35,13 @@ const uint8_t BME280_I2C_ADDRESS = 0x76;
 // EMA (Exponential Moving Average) state for smoothing the thermal delta.
 static float smoothed_heat_delta = 0.0;
 static bool ema_initialized = false;
-const float EMA_ALPHA = 0.1; // Smoothing factor: lower = smoother, slower convergence
+const float EMA_ALPHA = 0.05; // Smoothing factor: lower = smoother, slower convergence
+
+// EMA state for filtering BME280 raw sensor noise
+static float smoothed_raw_bme_temp_c = 0.0;
+static float smoothed_raw_humidity = 0.0;
+static bool bme_ema_initialized = false;
+const float BME_EMA_ALPHA = 0.2; // Fast smoothing for signal noise
 
 /**
  * @brief Calculates the corrected relative humidity based on a temperature offset.
@@ -302,6 +308,12 @@ void handleSensorUpdates(bool force)
       temp_sensor_read_celsius(&cached_core_temp_c);
     }
 
+    // Read RTC temperature early to use it in compensation logic as an enclosure ambient proxy
+    if (rtc_found)
+    {
+      cached_rtc_temp_c = RTC.getTemperature();
+    }
+
     if (bme280_found)
     {
       float raw_bme_temp_c = BME.readTemperature();
@@ -316,17 +328,41 @@ void handleSensorUpdates(bool force)
       }
       else
       {
+        // Apply EMA filter to raw BME280 readings to reduce Gaussian noise
+        if (!bme_ema_initialized)
+        {
+          smoothed_raw_bme_temp_c = raw_bme_temp_c;
+          smoothed_raw_humidity = raw_humidity;
+          bme_ema_initialized = true;
+        }
+        else
+        {
+          smoothed_raw_bme_temp_c = BME_EMA_ALPHA * raw_bme_temp_c + (1.0f - BME_EMA_ALPHA) * smoothed_raw_bme_temp_c;
+          smoothed_raw_humidity = BME_EMA_ALPHA * raw_humidity + (1.0f - BME_EMA_ALPHA) * smoothed_raw_humidity;
+        }
+        
+        // Use the smoothed raw readings for all subsequent math
+        raw_bme_temp_c = smoothed_raw_bme_temp_c;
+        raw_humidity = smoothed_raw_humidity;
+
         // Always cache the raw reading for diagnostics
         cached_raw_bme_temp_c = raw_bme_temp_c;
 
         if (core_temp_started && ConfigManager::getInstance().isTempCorrectionEnabled())
         {
-          // --- Core-temperature-based thermal compensation ---
-          // The ESP32 core temp tracks internal heat generation. The thermal
-          // gradient from core to BME280 is proportional to how much self-heating
-          // is inflating the BME reading above true ambient. A configurable
-          // fraction (k) of this gradient is subtracted as the estimated offset.
-          float heat_delta = cached_core_temp_c - raw_bme_temp_c;
+          // --- Core and RTC-based thermal compensation ---
+          // The ESP32 core temp tracks rapid internal heat generation (CPU load).
+          // The RTC temp acts as a proxy for the general enclosure air temp (warmed by display).
+          // We blend them to create an effective internal heat source temperature.
+          // Since the RTC is closer to the ESP32 than the BME, the RTC acts as a great
+          // physical proxy for the "hot zone" air temperature. We weight it heavily.
+          float effective_internal_temp = cached_core_temp_c;
+          if (rtc_found && cached_rtc_temp_c > 0.0f)
+          {
+            effective_internal_temp = (cached_core_temp_c * 0.25f) + (cached_rtc_temp_c * 0.75f);
+          }
+
+          float heat_delta = effective_internal_temp - raw_bme_temp_c;
 
           // Apply EMA smoothing to the heat delta to suppress sensor noise
           if (!ema_initialized)
@@ -380,9 +416,5 @@ void handleSensorUpdates(bool force)
       }
     }
 
-    if (rtc_found)
-    {
-      cached_rtc_temp_c = RTC.getTemperature();
-    }
   }
 }
