@@ -419,6 +419,8 @@ void ClockWebServer::begin()
       doc["dismissDuration"] = config.getDismissDuration();
       doc["tempCorrectionEnabled"] = config.isTempCorrectionEnabled();
       doc["autoTempCalibration"] = config.isAutoTempCalibration();
+      doc["lastAutoCalStatus"] = config.getLastAutoCalStatus();
+      doc["isAutoCalibrating"] = isAutoCalibrating();
       doc["tempCorrection"] = config.getTempCorrection();
       doc["tempCompensationFactor"] = config.getTempCompensationFactor();
       
@@ -1457,6 +1459,8 @@ String ClockWebServer::settingsProcessor(const String &var)
     return config.isTempCorrectionEnabled() ? "checked" : "";
   if (var == "AUTO_TEMP_CALIBRATION_CHECKED")
     return config.isAutoTempCalibration() ? "checked" : "";
+  if (var == "LAST_AUTO_CAL_STATUS")
+    return config.getLastAutoCalStatus();
   if (var == "TEMP_CORRECTION_CONTROLS_CLASS")
     return config.isTempCorrectionEnabled() ? "" : "d-none";
   if (var == "TEMP_COMPENSATION_FACTOR")

@@ -1102,6 +1102,8 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
                   <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="auto-temp-calibration" name="autoTempCalibration" %AUTO_TEMP_CALIBRATION_CHECKED%>
                     <label class="form-check-label" for="auto-temp-calibration">Enable Auto Cold-Boot Calibration</label>
+                    <span id="auto-cal-status" class="badge bg-secondary ms-2">Idle</span>
+                    <div class="small text-muted mt-1">Last Status: <span id="last-auto-cal-status">%LAST_AUTO_CAL_STATUS%</span></div>
                   </div>
                   <div id="temp-correction-controls" class="%TEMP_CORRECTION_CONTROLS_CLASS%">
                     <hr>
@@ -1471,6 +1473,20 @@ const char SETTINGS_PAGE_HTML[] PROGMEM = R"rawliteral(
         tempCorrectionEl.value = tempCorrection.toFixed(1);
         tempCorrectionEnabledEl.checked = settings.tempCorrectionEnabled || false;
         autoTempCalibrationEl.checked = settings.autoTempCalibration !== undefined ? settings.autoTempCalibration : true;
+        
+        const autoCalStatusEl = document.getElementById("auto-cal-status");
+        if (settings.isAutoCalibrating) {
+          autoCalStatusEl.textContent = "Calibrating... (~45m)";
+          autoCalStatusEl.className = "badge bg-warning text-dark ms-2";
+        } else {
+          autoCalStatusEl.textContent = "Idle";
+          autoCalStatusEl.className = "badge bg-secondary ms-2";
+        }
+        
+        const lastAutoCalStatusEl = document.getElementById("last-auto-cal-status");
+        if (settings.lastAutoCalStatus) {
+            lastAutoCalStatusEl.textContent = settings.lastAutoCalStatus;
+        }
         
         tempCompensationFactorEl.value = settings.tempCompensationFactor || 0.15;
         tempCompensationFactorValueEl.textContent = parseFloat(tempCompensationFactorEl.value).toFixed(2);

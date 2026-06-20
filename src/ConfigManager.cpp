@@ -206,6 +206,8 @@ void ConfigManager::load()
     address = _preferences.getString("zipCode", DEFAULT_ADDRESS);
   }
 
+  lastAutoCalStatus = _preferences.getString("lastCalStat", "Never");
+
   String pagesStr = _preferences.getString("pageOrder", "");
   enabledPages.clear();
   if (pagesStr.length() > 0)
@@ -382,6 +384,7 @@ bool ConfigManager::save()
   _preferences.putFloat("tempCompF", tempCompensationFactor);
   _preferences.putBool("offline", offlineMode);
   _preferences.putString("address", address);
+  _preferences.putString("lastCalStat", lastAutoCalStatus);
 
   String pagesStr = "";
   for (size_t i = 0; i < enabledPages.size(); ++i)
@@ -764,6 +767,7 @@ void ConfigManager::resetGeneralSettingsToDefaults()
     invertColors = DEFAULT_INVERT_COLORS;
     timezone = DEFAULT_TIMEZONE;
     isDst = DEFAULT_IS_DST;
+    lastAutoCalStatus = "Never";
     tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
     autoTempCalibration = DEFAULT_AUTO_TEMP_CALIBRATION;
     tempCorrection = DEFAULT_TEMP_CORRECTION;
@@ -913,6 +917,12 @@ bool ConfigManager::isAutoTempCalibration() const
 {
   RecursiveLockGuard lock(_mutex);
   return autoTempCalibration;
+}
+
+String ConfigManager::getLastAutoCalStatus() const
+{
+  RecursiveLockGuard lock(_mutex);
+  return lastAutoCalStatus;
 }
 float ConfigManager::getTempCompensationFactor() const
 {
@@ -1112,6 +1122,19 @@ void ConfigManager::setAutoTempCalibration(bool enabled)
     if (autoTempCalibration != enabled)
     {
       autoTempCalibration = enabled;
+      _isDirty = true;
+    }
+  }
+  scheduleSave();
+}
+
+void ConfigManager::setLastAutoCalStatus(const String &status)
+{
+  {
+    RecursiveLockGuard lock(_mutex);
+    if (lastAutoCalStatus != status)
+    {
+      lastAutoCalStatus = status;
       _isDirty = true;
     }
   }

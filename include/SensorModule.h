@@ -102,3 +102,9 @@ float getRawBmeTemperature();
  * @return The offset in the user's preferred unit (negative = cooling correction).
  */
 float getCompensationOffset();
+
+/**
+ * @brief Checks if the cold-boot auto-calibration is currently in progress.
+ * @return True if calibrating, false otherwise.
+ */
+bool isAutoCalibrating();

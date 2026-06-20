@@ -408,7 +408,7 @@ void ClockPage::drawTemperature(TFT_eSPI &tft)
   _sprTemp.loadFont(DSEG14ModernBold48);
 
   char tempBuf[16];
-  snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
+  snprintf(tempBuf, sizeof(tempBuf), "%.0f", round(temp));
   _sprTemp.drawString(tempBuf, 0, _sprTemp.height() / 2);
 
   int tempWidth = _sprTemp.textWidth(tempBuf);
@@ -450,7 +450,7 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
   }
   else
   {
-    snprintf(buf, sizeof(buf), "%.0f%%", humidity);
+    snprintf(buf, sizeof(buf), "%.0f%%", round(humidity));
   }
 
   _sprHumidity.fillSprite(_bgColor);

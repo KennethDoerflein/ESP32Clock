@@ -15,6 +15,7 @@
 #include "LockGuard.h"
 #include "driver/temp_sensor.h"
 #include <math.h>
+#include "Display.h"
 
 // Instantiate the global sensor objects declared in the header.
 Adafruit_BME280 BME;
@@ -35,7 +36,7 @@ const uint8_t BME280_I2C_ADDRESS = 0x76;
 // EMA (Exponential Moving Average) state for smoothing the thermal delta.
 static float smoothed_heat_delta = 0.0;
 static bool ema_initialized = false;
-const float EMA_ALPHA = 0.05; // Smoothing factor: lower = smoother, slower convergence
+const float EMA_ALPHA = 0.02; // Smoothing factor: lower = smoother, slower convergence (0.02 = ~15 min thermal inertia)
 
 // EMA state for filtering BME280 raw sensor noise
 static float smoothed_raw_bme_temp_c = 0.0;
@@ -286,6 +287,15 @@ float getCompensationOffset()
 }
 
 /**
+ * @brief Checks if the cold-boot auto-calibration is currently in progress.
+ * @return True if calibrating, false otherwise.
+ */
+bool isAutoCalibrating()
+{
+  return auto_cal_running;
+}
+
+/**
  * @brief Periodically reads sensor data and updates the cache.
  *
  * This function is designed to be called in the main loop. It uses a timer
@@ -337,6 +347,8 @@ void handleSensorUpdates(bool force)
             auto_cal_running = true;
             auto_cal_baseline_temp = raw_bme_temp_c;
             auto_cal_start_time = millis();
+            String startedStr = "Started at " + TimeManager::getInstance().getCachedTime().timestamp(DateTime::TIMESTAMP_FULL);
+            ConfigManager::getInstance().setLastAutoCalStatus(startedStr);
             SerialLog::getInstance().print("Cold Boot Detected: Auto-Calibration started.");
           }
         }
@@ -387,15 +399,26 @@ void handleSensorUpdates(bool force)
 
           float heat_delta = effective_internal_temp - raw_bme_temp_c;
 
-          // Apply EMA smoothing to the heat delta to suppress sensor noise
+          // --- Brightness-Scaled Thermal Compensation ---
+          // The display backlight is the primary heat source. When it dims or turns off, 
+          // its heating effect on the BME280 decreases significantly. We scale the 
+          // calculated heat delta by the current brightness ratio. 
+          // Based on empirical thermal tuning from 4 data points, the ESP32 core accounts 
+          // for roughly 80% of the compensation gap at night due to the difference in cooling 
+          // rates between the internal RTC and external BME.
+          int current_brightness = Display::getInstance().getActualBrightness();
+          float brightness_ratio = current_brightness / 255.0f;
+          float adjusted_heat_delta = heat_delta * (0.80f + 0.20f * brightness_ratio);
+
+          // Apply EMA smoothing to the adjusted heat delta to simulate enclosure thermal mass
           if (!ema_initialized)
           {
-            smoothed_heat_delta = heat_delta;
+            smoothed_heat_delta = adjusted_heat_delta;
             ema_initialized = true;
           }
           else
           {
-            smoothed_heat_delta = EMA_ALPHA * heat_delta + (1.0f - EMA_ALPHA) * smoothed_heat_delta;
+            smoothed_heat_delta = EMA_ALPHA * adjusted_heat_delta + (1.0f - EMA_ALPHA) * smoothed_heat_delta;
           }
 
           // --- Cold-Boot Auto-Calibration Finalization ---
@@ -409,10 +432,14 @@ void handleSensorUpdates(bool force)
                 if (new_k < 0.0f) new_k = 0.0f;
                 if (new_k > 1.0f) new_k = 1.0f;
                 ConfigManager::getInstance().setTempCompensationFactor(new_k);
+                String successStr = "Success: k=" + String(new_k, 2) + " at " + TimeManager::getInstance().getCachedTime().timestamp(DateTime::TIMESTAMP_FULL);
+                ConfigManager::getInstance().setLastAutoCalStatus(successStr);
                 SerialLog::getInstance().print("Auto-Calibration finished. New factor applied.");
               }
               else
               {
+                String abortedStr = "Aborted: low heat at " + TimeManager::getInstance().getCachedTime().timestamp(DateTime::TIMESTAMP_FULL);
+                ConfigManager::getInstance().setLastAutoCalStatus(abortedStr);
                 SerialLog::getInstance().print("Auto-Calibration aborted: Insufficient heat buildup.");
               }
               auto_cal_running = false;

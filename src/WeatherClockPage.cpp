@@ -184,7 +184,7 @@ void WeatherClockPage::drawWeather(TFT_eSPI &tft)
       temp = (temp - 32.0) * 5.0 / 9.0;
     }
     char tempBuf[10];
-    snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
+    snprintf(tempBuf, sizeof(tempBuf), "%.0f", round(temp));
     String unit = config.isCelsius() ? "C" : "F";
 
     // Manual drawing with circle
@@ -261,7 +261,7 @@ void WeatherClockPage::drawIndoorTemp(TFT_eSPI &tft)
   _sprIndoorTemp.loadFont(DSEG14ModernBold48);
 
   char tempBuf[16];
-  snprintf(tempBuf, sizeof(tempBuf), "%.0f", temp);
+  snprintf(tempBuf, sizeof(tempBuf), "%.0f", round(temp));
   _sprIndoorTemp.drawString(tempBuf, 0, _sprIndoorTemp.height() / 2);
 
   int tempWidth = _sprIndoorTemp.textWidth(tempBuf);
@@ -304,7 +304,7 @@ void WeatherClockPage::drawIndoorHumidity(TFT_eSPI &tft)
   }
   else
   {
-    snprintf(buf, sizeof(buf), "%.0f%%", humidity);
+    snprintf(buf, sizeof(buf), "%.0f%%", round(humidity));
   }
 
   _sprIndoorHumidity.fillSprite(_bgColor);
