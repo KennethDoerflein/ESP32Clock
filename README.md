@@ -22,14 +22,15 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
 
 - **Large Color Display**: A 4" 480x320 color IPS display provides a clear and vibrant user interface.
 - **Weather Forecast**: Accurate local weather data powered by Open-Meteo, including temperature, humidity, wind speed, rain chance, and current conditions.
+- **Offline Mode**: Operate the clock completely disconnected from Wi-Fi, disabling online services like NTP and weather.
 - **Web-Based Configuration**: A mobile-friendly web UI allows for easy setup and configuration without needing to re-flash the firmware.
 - **Dynamic Alarms**: Configure up to 20 alarms. Add, delete, and modify alarms directly from the web interface.
-- **Customizable UI**: Change display colors, flip the screen orientation, and toggle between 12/24-hour format and Celsius/Fahrenheit.
+- **Customizable UI**: Change display colors, flip the screen orientation, invert colors, and toggle between 12/24-hour format and Celsius/Fahrenheit.
 - **Page Management**: Enable, disable, and reorder display pages (Clock, Weather, Weather+Clock, Info) to suit your preference.
 - **WiFi & AP Mode**: Connects to your local WiFi network or starts its own Access Point (`Clock-Setup`) if credentials are not set.
 - **Automatic Time Sync**: An onboard Real-Time Clock (DS3231) with battery backup keeps accurate time, synchronized daily with NTP internet servers.
 - **Timezone Support**: Select your local timezone from a dropdown list.
-- **Temperature Sensors**: A BME280 sensor for ambient temperature and humidity, and a sensor within the DS3231 for time-drift compensation.
+- **Temperature Sensors & Calibration**: A BME280 sensor for ambient temperature and humidity, and a sensor within the DS3231 for time-drift compensation. Includes auto-calibration and manual compensation factors for enclosure heat.
 - **Smart Brightness Control**: The display backlight can be controlled manually via the web UI or set to an automatic day/night schedule.
 - **System Logging**: Integrated logging system with file rotation (`system.log`) and a live WebSocket-based log viewer in the web UI.
 - **Over-the-Air (OTA) Updates**: Update the clock's firmware directly from the web interface.
@@ -283,6 +284,7 @@ This page is divided into two tabs: "General" and "Display".
 - **Page Configuration**:
   - **Default Page**: Select which page the clock should show on startup.
   - **Enabled Pages**: Drag and drop pages to reorder them or uncheck them to hide them from the rotation.
+- **Offline Mode**: Disables Wi-Fi connectivity and all online features (Weather, NTP sync) for a completely offline operation.
 - **Brightness Settings**:
   - **Auto Brightness**: Enables a schedule-based brightness adjustment, with configurable start/end times and day/night brightness levels.
   - **Manual Brightness**: When Auto Brightness is disabled, a single slider allows you to set a fixed brightness level.
@@ -290,7 +292,12 @@ This page is divided into two tabs: "General" and "Display".
   - **24-Hour Format**: Toggles the time display between 12-hour (e.g., 3:45 PM) and 24-hour (e.g., 15:45) formats.
   - **Use Celsius (°C)**: Switches the temperature display between Celsius and Fahrenheit.
   - **Flip Display Orientation**: Rotates the display by 180 degrees.
+  - **Invert Colors**: Inverts the color palette of the screen.
 - **Timezone**: Select your local timezone from a dropdown list.
+- **Temperature Calibration**:
+  - **Auto Temperature Calibration**: Attempts to automatically calibrate the ambient temperature sensor upon a cold boot.
+  - **Manual Temperature Correction**: Allows you to set a fixed offset to the temperature reading.
+  - **Temperature Compensation Factor**: Adjusts how much the internal RTC temperature influences the ambient temperature reading to compensate for heat generated inside the enclosure.
 
 #### Display Tab
 
