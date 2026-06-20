@@ -560,6 +560,7 @@ void ClockWebServer::begin()
               {
                 request->send(200, "text/plain", "Entering offline mode. Rebooting...");
                 delay(1000);
+                SerialLog::getInstance().clearCrashLogMagic();
                 ESP.restart();
                 return;
               }
@@ -863,7 +864,7 @@ void ClockWebServer::begin()
 
             WiFiManager::getInstance().setHostname(hostname);
             request->send(200, "text/plain", "Hostname saved. Rebooting...");
-            request->onDisconnect([](){ ESP.restart(); });
+            request->onDisconnect([](){ SerialLog::getInstance().clearCrashLogMagic(); ESP.restart(); });
         } else {
             request->send(400, "text/plain", "Hostname not provided.");
         } });
@@ -871,7 +872,7 @@ void ClockWebServer::begin()
     server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
               {
       request->send(200, "text/plain", "Rebooting...");
-      request->onDisconnect([](){ ESP.restart(); }); });
+      request->onDisconnect([](){ SerialLog::getInstance().clearCrashLogMagic(); ESP.restart(); }); });
 
     server.on("/factory-reset", HTTP_GET, [](AsyncWebServerRequest *request)
               {
@@ -883,6 +884,7 @@ void ClockWebServer::begin()
       request->send(200, "text/plain", "Performing factory reset...");
       request->onDisconnect([](){ 
         ConfigManager::getInstance().factoryReset();
+        SerialLog::getInstance().clearCrashLogMagic();
         ESP.restart(); 
       }); });
 
@@ -896,6 +898,7 @@ void ClockWebServer::begin()
       request->send(200, "text/plain", "Performing factory reset and keeping WiFi credentials...");
       request->onDisconnect([](){ 
         ConfigManager::getInstance().factoryResetExceptWiFi();
+        SerialLog::getInstance().clearCrashLogMagic();
         ESP.restart(); 
       }); });
 
@@ -924,6 +927,7 @@ void ClockWebServer::begin()
             {
               request->send(200, "text/plain", "Update successful! Rebooting...");
               delay(1000); // Give client time to receive response
+              SerialLog::getInstance().clearCrashLogMagic();
               ESP.restart();
             }
             else
@@ -1202,6 +1206,7 @@ void ClockWebServer::onWifiStatusRequest(AsyncWebServerRequest *request)
     if (wifiManager.isPendingReboot())
     {
       delay(500); // Give the client a moment to receive the response
+      SerialLog::getInstance().clearCrashLogMagic();
       ESP.restart();
     }
     wifiManager.resetConnectionTestStatus();

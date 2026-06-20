@@ -556,6 +556,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 firmwareHttp.end();
                 delete updateInfo;
                 delay(1000); // Give system time to flush logs before restart
+                SerialLog::getInstance().clearCrashLogMagic();
                 ESP.restart();
                 // Never reached, but include for safety
                 vTaskDelete(NULL);

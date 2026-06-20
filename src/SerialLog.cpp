@@ -643,3 +643,8 @@ extern "C" void vApplicationMallocFailedHook(void)
   esp_restart();
 }
 
+void SerialLog::clearCrashLogMagic()
+{
+  g_crashLog.magic = 0;
+}
+

@@ -241,6 +241,7 @@ void enterSafeMode()
             resetBootCounter();
             request->send(200, "text/plain", "Update successful! Rebooting...");
             delay(1000);
+            SerialLog::getInstance().clearCrashLogMagic();
             ESP.restart();
           }
           else
@@ -255,7 +256,7 @@ void enterSafeMode()
   safeServer.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
                 {
     request->send(200, "text/plain", "Rebooting...");
-    request->onDisconnect([](){ ESP.restart(); }); });
+    request->onDisconnect([](){ SerialLog::getInstance().clearCrashLogMagic(); ESP.restart(); }); });
 
   // Catch-all for captive portal redirect (AP mode only)
   if (!wifiConnected)
@@ -302,6 +303,7 @@ void triggerFactoryReset(const char *source, bool needsConfigInit)
   }
 
   ConfigManager::getInstance().factoryReset();
+  SerialLog::getInstance().clearCrashLogMagic();
   ESP.restart(); // The device will restart into a clean state.
 }
 

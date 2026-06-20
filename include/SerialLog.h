@@ -86,6 +86,12 @@ public:
   void logResetReason();
 
   /**
+   * @brief Clears the crash log magic to indicate an intentional reboot.
+   * This prevents the next boot from treating the shutdown as a crash.
+   */
+  void clearCrashLogMagic();
+
+  /**
    * @brief Registers crash/shutdown handlers for diagnostic logging.
    * Must be called once during setup().
    */

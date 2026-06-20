@@ -585,6 +585,7 @@ void WiFiManager::saveCredentialsAndReboot(const String &ssid, const String &pas
   config.save();
 
   // A reboot is the most reliable way to apply new WiFi credentials
+  SerialLog::getInstance().clearCrashLogMagic();
   ESP.restart();
 }
 
