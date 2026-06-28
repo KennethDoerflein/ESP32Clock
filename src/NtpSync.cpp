@@ -59,6 +59,8 @@ static int retryCount = 0;
 static unsigned long lastSyncAttemptMs = 0;
 /// @brief The current delay to wait before the next non-blocking retry.
 static unsigned long currentRetryDelay = 0;
+/// @brief The target delay for the current attempt, including calculated jitter.
+static unsigned long targetWaitDelay = 0;
 
 // --- Pre-sync snapshot variables (Layer 3: Three-Source Diagnostics) ---
 /// @brief System clock epoch captured at the start of an NTP sync.
@@ -181,10 +183,6 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
  */
 bool getNTPData(struct tm &timeinfo)
 {
-  // Refresh timezone in case user changed it
-  setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
-  tzset();
-
   // ONLY return true if the background SNTP daemon has successfully received 
   // a packet from the network and updated the internal system clock. 
   // If we just check getLocalTime(), it will return true immediately even with 
@@ -218,20 +216,22 @@ void startNtpSync()
 
   // Reset the SNTP sync status to ensure we detect a new network update.
   sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
-  // Restart the SNTP client to force an immediate network query.
-  // Note: configTime(0,0,...) internally overwrites the TZ env variable with
-  // UTC offsets. We must restore the correct timezone immediately afterward
-  // to prevent localtime_r() on Core 1 from briefly returning UTC, which
-  // causes a visible time jump (screen flash) on the display.
-  configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
-  setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
-  tzset();
+  // Restart the SNTP client to force an immediate network query safely without modifying TZ.
+  if (sntp_enabled()) {
+      sntp_stop();
+  }
+  sntp_setoperatingmode(SNTP_OPMODE_POLL);
+  sntp_setservername(0, (char*)NTP_SERVER);
+  sntp_setservername(1, (char*)BACKUP_NTP_SERVER);
+  sntp_setservername(2, (char*)BACKUP2_NTP_SERVER);
+  sntp_init();
 
   ntpState = NTP_SYNC_IN_PROGRESS;
   retryCount = 0;
   // Set lastSyncAttemptMs to 0 to trigger an immediate first attempt in updateNtpSync
   lastSyncAttemptMs = 0;
   currentRetryDelay = baseDelayMs;
+  targetWaitDelay = 0;
 }
 
 /**
@@ -247,7 +247,7 @@ NtpSyncState updateNtpSync()
 
   unsigned long currentMillis = millis();
   // Check if it's time for the next attempt
-  if (lastSyncAttemptMs != 0 && currentMillis - lastSyncAttemptMs < currentRetryDelay)
+  if (lastSyncAttemptMs != 0 && currentMillis - lastSyncAttemptMs < targetWaitDelay)
   {
     return NTP_SYNC_IN_PROGRESS; // Not time yet, still in progress
   }
@@ -275,9 +275,9 @@ NtpSyncState updateNtpSync()
 
   // Calculate delay for the next attempt with exponential backoff and jitter
   unsigned long jitter = random(jitterMaxMs + 1);
-  unsigned long nextDelay = currentRetryDelay + jitter;
+  targetWaitDelay = currentRetryDelay + jitter;
 
-  SerialLog::getInstance().printf("Failed to obtain time. Retrying in approx. %.2f seconds...\n", nextDelay / 1000.0);
+  SerialLog::getInstance().printf("Failed to obtain time. Retrying in approx. %.2f seconds...\n", targetWaitDelay / 1000.0);
 
   // Exponentially increase the base delay for the *next* cycle
   currentRetryDelay *= 2;
@@ -296,11 +296,15 @@ bool syncTime()
 {
   // Reset the SNTP sync status to ensure we detect a new network update.
   sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
-  // Restart the SNTP client to force an immediate network query.
-  // Restore TZ immediately — see startNtpSync() comment for rationale.
-  configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
-  setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
-  tzset();
+  // Restart the SNTP client to force an immediate network query safely without modifying TZ.
+  if (sntp_enabled()) {
+      sntp_stop();
+  }
+  sntp_setoperatingmode(SNTP_OPMODE_POLL);
+  sntp_setservername(0, (char*)NTP_SERVER);
+  sntp_setservername(1, (char*)BACKUP_NTP_SERVER);
+  sntp_setservername(2, (char*)BACKUP2_NTP_SERVER);
+  sntp_init();
 
   unsigned long delayForNextAttempt = baseDelayMs;
   struct tm timeinfo;
