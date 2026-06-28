@@ -318,7 +318,9 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
   http.useHTTP10(true);    // Disable chunked transfer encoding for stream safety
   http.setTimeout(10000);  // 10s HTTP timeout
 
+  esp_task_wdt_reset(); // Feed WDT before blocking TLS handshake + HTTP request
   int httpCode = http.GET();
+  esp_task_wdt_reset(); // Feed WDT after network I/O completes
   bool success = false;
 
   if (httpCode == 200)
@@ -469,6 +471,8 @@ bool WeatherService::resolveLocation(const String &query, String &resolvedAddres
     return true;
   }
 
+  esp_task_wdt_reset(); // Feed WDT between geocoding attempts
+
   int commaIndex = query.indexOf(',');
   if (commaIndex != -1)
   {
@@ -500,6 +504,7 @@ void WeatherService::updateLocation()
     ConfigManager::getInstance().setLat(lat);
     ConfigManager::getInstance().setLon(lon);
     SerialLog::getInstance().printf("Location resolved: %s (%.4f, %.4f)\n", resolved.c_str(), lat, lon);
+    esp_task_wdt_reset(); // Feed WDT before chained weather update
     updateWeather();
   }
   else
@@ -539,7 +544,7 @@ void WeatherService::updateWeather()
 
   url = "https://api.open-meteo.com/v1/forecast?latitude=";
   url += String(lat, 4);
-  url += "&longitude=";;
+  url += "&longitude=";
   url += String(lon, 4);
   url += "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,cloud_cover,pressure_msl,wind_direction_10m,wind_gusts_10m,uv_index,visibility,precipitation_probability&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&forecast_days=1&timezone=auto";
 
@@ -550,7 +555,9 @@ void WeatherService::updateWeather()
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS); // Good practice
   http.useHTTP10(true);                                  // Disable chunked transfer encoding for stream safety
   http.setTimeout(10000);                                // 10s HTTP timeout
+  esp_task_wdt_reset(); // Feed WDT before blocking TLS handshake + HTTP request
   int httpCode = http.GET();
+  esp_task_wdt_reset(); // Feed WDT after network I/O completes
 
   if (httpCode == 200)
   {
@@ -577,6 +584,7 @@ void WeatherService::updateWeather()
     filter["daily"]["sunset"] = true;
 
     String payload = http.getString();
+    esp_task_wdt_reset(); // Feed WDT after reading response body
     DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
     if (!error)
@@ -645,16 +653,15 @@ void WeatherService::updateWeather()
     {
       SerialLog::getInstance().printf("Weather JSON Error: %s\n", error.c_str());
       LockGuard lock(_mutex);
-      _failureCount++;
+      if (_failureCount < UINT8_MAX) _failureCount++;
     }
   }
   else
   {
     String errorMsg = http.errorToString(httpCode);
-    String payload = http.getString();
-    SerialLog::getInstance().printf("Weather HTTP Failed: %d (%s)\nResponse: %s\n", httpCode, errorMsg.c_str(), payload.c_str());
+    SerialLog::getInstance().printf("Weather HTTP Failed: %d (%s)\n", httpCode, errorMsg.c_str());
     LockGuard lock(_mutex);
-    _failureCount++;
+    if (_failureCount < UINT8_MAX) _failureCount++;
   }
   http.end();
 }
