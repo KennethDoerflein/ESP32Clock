@@ -446,6 +446,7 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
     SerialLog::getInstance().printf("Geocoding HTTP Failed: %d\n", httpCode);
   }
   http.end();
+  client.stop();
   return success;
 }
 
@@ -616,6 +617,7 @@ void WeatherService::updateWeather()
 
     String payload = http.getString();
     http.end(); // Release connection early so we free network resources immediately
+    client.stop(); // Explicitly close TLS socket to prevent destructor from closing a stale/reused fd
     esp_task_wdt_reset(); // Feed WDT after reading response body
     DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
@@ -705,5 +707,6 @@ void WeatherService::updateWeather()
       SerialLog::getInstance().print("Weather: data invalidated (too many consecutive failures)\n");
     }
     http.end();
+    client.stop();
   }
 }
