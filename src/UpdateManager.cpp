@@ -165,8 +165,8 @@ String UpdateManager::checkForUpdate()
         }
     }
 
-    HTTPClient http;
     WiFiClientSecure client;
+    HTTPClient http;
     client.setInsecure();
     client.setTimeout(10000);
 
@@ -247,8 +247,8 @@ String UpdateManager::handleGithubUpdate()
     strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
     SerialLog::getInstance().printf("System time: %s\n", timeStr);
 
-    HTTPClient http;
     WiFiClientSecure client;
+    HTTPClient http;
     client.setInsecure();
     client.setTimeout(10000);
 
@@ -364,8 +364,8 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
 
     if (OTA_KEY_CONFIGURED && !updateInfo->signatureUrl.isEmpty())
     {
-        HTTPClient http;
         WiFiClientSecure client;
+        HTTPClient http;
         client.setInsecure();
         client.setTimeout(10000);
         http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);

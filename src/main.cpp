@@ -642,10 +642,7 @@ void setup()
       0 // Core 0
   );
 
-  // Reset the boot counter to 0 — setup completed successfully.
-  // This proves the firmware is stable and prevents safe mode on next boot.
-  resetBootCounter();
-  logger.print("Boot counter reset. Firmware is stable.\n");
+  logger.print("Setup complete. Boot counter will be reset after 30s of stable uptime.\n");
 
   logger.print("--- Setup Complete ---\n");
 }
@@ -658,8 +655,17 @@ void loop()
 {
   esp_task_wdt_reset(); // Feed the watchdog
 
-  // Implement a non-blocking delay to prevent watchdog timeouts.
+  // Defer resetting the boot counter until the firmware has run stably for 30 seconds.
+  static bool bootCounterResetDone = false;
   unsigned long currentMillis = millis();
+  if (!bootCounterResetDone && currentMillis > 30000)
+  {
+    resetBootCounter();
+    SerialLog::getInstance().print("Uptime reached 30s. Boot counter reset. Firmware is stable.\n");
+    bootCounterResetDone = true;
+  }
+
+  // Implement a non-blocking delay to prevent watchdog timeouts.
   if (currentMillis - g_lastLoopTime < LOOP_INTERVAL)
   {
     delay(1); // Yield to other tasks.

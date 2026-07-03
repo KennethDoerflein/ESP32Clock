@@ -10,6 +10,8 @@
 #include <esp_task_wdt.h>
 
 static const unsigned long WEATHER_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
+static const uint32_t MIN_HEAP_FOR_NETWORK = 40000; // Minimum free heap (bytes) to attempt TLS
+static const uint8_t MAX_CONSECUTIVE_FAILURES = 6; // Invalidate stale data after this many failures
 
 // Helper to convert WMO Weather Codes to String Condition
 const char *WeatherService::getConditionFromWMO(int code)
@@ -128,7 +130,7 @@ void WeatherService::begin()
       this,                // Task input parameter
       1,                   // Priority
       &_weatherTaskHandle, // Task handle
-      0                    // Core 0
+      1                    // Core 1 (prevents IDLE0 starvation on Core 0)
   );
   SerialLog::getInstance().print("Weather task created (persistent).\n");
 }
@@ -306,21 +308,34 @@ bool checkWordPresence(const String &text, const String &word)
 // Helper function for the search logic
 bool performGeocodingSearch(String url, String context, String &resolvedAddress, float &lat, float &lon)
 {
-  HTTPClient http;
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    SerialLog::getInstance().print("Geocoding: WiFi not connected, aborting\n");
+    return false;
+  }
+
+  if (ESP.getFreeHeap() < MIN_HEAP_FOR_NETWORK)
+  {
+    SerialLog::getInstance().printf("Geocoding: heap too low (%u), aborting\n", ESP.getFreeHeap());
+    return false;
+  }
+
   WiFiClientSecure client;
+  HTTPClient http;
   client.setInsecure();
-  client.setTimeout(10000);  // 10s cap on TLS handshake (milliseconds)
+  client.setTimeout(5000);  // 5s cap on TLS handshake (milliseconds)
 
   SerialLog::getInstance().printf("Resolving Location: %s\n", url.c_str());
 
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
   http.useHTTP10(true);    // Disable chunked transfer encoding for stream safety
-  http.setTimeout(10000);  // 10s HTTP timeout
+  http.setTimeout(5000);   // 5s HTTP timeout
 
-  esp_task_wdt_reset(); // Feed WDT before blocking TLS handshake + HTTP request
+  esp_task_wdt_delete(NULL); // Unenroll before blocking I/O — TLS handshake may exceed WDT timeout
   int httpCode = http.GET();
-  esp_task_wdt_reset(); // Feed WDT after network I/O completes
+  esp_task_wdt_add(NULL);    // Re-enroll after blocking I/O
+  esp_task_wdt_reset();      // Feed immediately
   bool success = false;
 
   if (httpCode == 200)
@@ -518,6 +533,21 @@ void WeatherService::updateWeather()
   if (WiFi.status() != WL_CONNECTED)
     return;
 
+  // Guard: ensure sufficient heap for TLS (~40KB needed for mbedTLS buffers)
+  uint32_t freeHeap = ESP.getFreeHeap();
+  if (freeHeap < MIN_HEAP_FOR_NETWORK)
+  {
+    SerialLog::getInstance().printf("Weather: heap too low (%u), skipping update\n", freeHeap);
+    LockGuard lock(_mutex);
+    if (_failureCount < UINT8_MAX) _failureCount++;
+    if (_failureCount >= MAX_CONSECUTIVE_FAILURES && _currentWeather.isValid)
+    {
+      _currentWeather.isValid = false;
+      SerialLog::getInstance().print("Weather: data invalidated (too many consecutive failures)\n");
+    }
+    return;
+  }
+
   float lat = ConfigManager::getInstance().getLat();
   float lon = ConfigManager::getInstance().getLon();
 
@@ -533,10 +563,10 @@ void WeatherService::updateWeather()
   }
 
   // Fetch from Open-Meteo
-  HTTPClient http;
   WiFiClientSecure client;
+  HTTPClient http;
   client.setInsecure();
-  client.setTimeout(10000);  // 10s cap on TLS handshake (milliseconds)
+  client.setTimeout(5000);  // 5s cap on TLS handshake (milliseconds)
 
   // Use reserve to prevent reallocations
   String url;
@@ -549,15 +579,16 @@ void WeatherService::updateWeather()
   url += "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,cloud_cover,pressure_msl,wind_direction_10m,wind_gusts_10m,uv_index,visibility,precipitation_probability&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&forecast_days=1&timezone=auto";
 
   SerialLog::getInstance().printf("Fetching Weather: %s\n", url.c_str());
-  SerialLog::getInstance().printf("Free Heap before Weather Update: %u\n", ESP.getFreeHeap());
+  SerialLog::getInstance().printf("Free Heap before Weather Update: %u\n", freeHeap);
 
   http.begin(client, url);
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS); // Good practice
   http.useHTTP10(true);                                  // Disable chunked transfer encoding for stream safety
-  http.setTimeout(10000);                                // 10s HTTP timeout
-  esp_task_wdt_reset(); // Feed WDT before blocking TLS handshake + HTTP request
+  http.setTimeout(5000);                                 // 5s HTTP timeout
+  esp_task_wdt_delete(NULL); // Unenroll before blocking I/O — TLS handshake may exceed WDT timeout
   int httpCode = http.GET();
-  esp_task_wdt_reset(); // Feed WDT after network I/O completes
+  esp_task_wdt_add(NULL);    // Re-enroll after blocking I/O
+  esp_task_wdt_reset();      // Feed immediately
 
   if (httpCode == 200)
   {
@@ -584,6 +615,7 @@ void WeatherService::updateWeather()
     filter["daily"]["sunset"] = true;
 
     String payload = http.getString();
+    http.end(); // Release connection early so we free network resources immediately
     esp_task_wdt_reset(); // Feed WDT after reading response body
     DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
@@ -654,6 +686,11 @@ void WeatherService::updateWeather()
       SerialLog::getInstance().printf("Weather JSON Error: %s\n", error.c_str());
       LockGuard lock(_mutex);
       if (_failureCount < UINT8_MAX) _failureCount++;
+      if (_failureCount >= MAX_CONSECUTIVE_FAILURES && _currentWeather.isValid)
+      {
+        _currentWeather.isValid = false;
+        SerialLog::getInstance().print("Weather: data invalidated (too many consecutive failures)\n");
+      }
     }
   }
   else
@@ -662,6 +699,11 @@ void WeatherService::updateWeather()
     SerialLog::getInstance().printf("Weather HTTP Failed: %d (%s)\n", httpCode, errorMsg.c_str());
     LockGuard lock(_mutex);
     if (_failureCount < UINT8_MAX) _failureCount++;
+    if (_failureCount >= MAX_CONSECUTIVE_FAILURES && _currentWeather.isValid)
+    {
+      _currentWeather.isValid = false;
+      SerialLog::getInstance().print("Weather: data invalidated (too many consecutive failures)\n");
+    }
+    http.end();
   }
-  http.end();
 }
