@@ -954,15 +954,32 @@ void ClockWebServer::begin()
 
     server.on("/api/log/download", HTTP_GET, [](AsyncWebServerRequest *request)
               {
+        SerialLog::getInstance().lock();
         if (!LittleFS.exists(SerialLog::getLogFilePath()))
         {
+          SerialLog::getInstance().unlock();
           request->send(404, "text/plain", "Log file not found");
           return;
         }
-        AsyncWebServerResponse *response = request->beginResponse(LittleFS, SerialLog::getLogFilePath(), "text/plain", true);
+        AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+            SerialLog::getInstance().lock();
+            File f = LittleFS.open(SerialLog::getLogFilePath(), "r");
+            size_t len = 0;
+            if (f) {
+                if (index < f.size()) {
+                    f.seek(index);
+                    len = f.read(buffer, maxLen);
+                }
+                f.close();
+            }
+            SerialLog::getInstance().unlock();
+            return len;
+        });
+        
+        SerialLog::getInstance().unlock();
         if (response == nullptr)
         {
-          request->send(500, "text/plain", "Internal Server Error: Could not open log file");
+          request->send(500, "text/plain", "Internal Server Error: Could not create response");
           return;
         }
         response->addHeader("Content-Disposition", "attachment; filename=\"system.log\"");
@@ -975,15 +992,32 @@ void ClockWebServer::begin()
 
     server.on("/api/crash/download", HTTP_GET, [](AsyncWebServerRequest *request)
               {
+        SerialLog::getInstance().lock();
         if (!LittleFS.exists(SerialLog::getCrashLogFilePath()))
         {
+          SerialLog::getInstance().unlock();
           request->send(404, "text/plain", "Crash log file not found");
           return;
         }
-        AsyncWebServerResponse *response = request->beginResponse(LittleFS, SerialLog::getCrashLogFilePath(), "text/plain", true);
+        AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+            SerialLog::getInstance().lock();
+            File f = LittleFS.open(SerialLog::getCrashLogFilePath(), "r");
+            size_t len = 0;
+            if (f) {
+                if (index < f.size()) {
+                    f.seek(index);
+                    len = f.read(buffer, maxLen);
+                }
+                f.close();
+            }
+            SerialLog::getInstance().unlock();
+            return len;
+        });
+
+        SerialLog::getInstance().unlock();
         if (response == nullptr)
         {
-          request->send(500, "text/plain", "Internal Server Error: Could not open crash log file");
+          request->send(500, "text/plain", "Internal Server Error: Could not create response");
           return;
         }
         response->addHeader("Content-Disposition", "attachment; filename=\"crash.log\"");
@@ -991,6 +1025,7 @@ void ClockWebServer::begin()
 
     server.on("/api/crash/clear", HTTP_POST, [](AsyncWebServerRequest *request)
               {
+        SerialLog::getInstance().lock();
         if (LittleFS.exists(SerialLog::getCrashLogFilePath()))
         {
           LittleFS.remove(SerialLog::getCrashLogFilePath());
@@ -1000,6 +1035,7 @@ void ClockWebServer::begin()
         {
           LittleFS.remove(oldCrashPath);
         }
+        SerialLog::getInstance().unlock();
         request->send(200, "text/plain", "Crash log cleared successfully."); });
 
     server.on("/api/crash/coredump", HTTP_GET, [](AsyncWebServerRequest *request)

@@ -36,17 +36,11 @@ void ConfigManager::loop()
   if (UpdateManager::getInstance().isUpdateInProgress())
     return;
 
-  bool pending = false;
+  RecursiveLockGuard lock(_mutex);
+  if (_savePending && (millis() - _saveDebounceTimer >= SAVE_DEBOUNCE_DELAY))
   {
-    RecursiveLockGuard lock(_mutex);
-    pending = _savePending && (millis() - _saveDebounceTimer >= SAVE_DEBOUNCE_DELAY);
-  }
-
-  if (pending)
-  {
-    save();
-    RecursiveLockGuard lock(_mutex);
     _savePending = false;
+    save();
   }
 }
 

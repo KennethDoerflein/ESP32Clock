@@ -103,6 +103,16 @@ public:
    */
   void cleanupClients();
 
+  /**
+   * @brief Explicitly lock the logger's mutex to synchronize external file operations.
+   */
+  void lock();
+
+  /**
+   * @brief Explicitly unlock the logger's mutex.
+   */
+  void unlock();
+
 private:
   /**
    * @brief Private constructor to enforce the singleton pattern.

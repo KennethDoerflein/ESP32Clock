@@ -178,6 +178,7 @@ String UpdateManager::checkForUpdate()
     {
         result["error"] = "Error checking for updates. HTTP code: " + String(httpCode);
         http.end();
+        client.stop();
         String out;
         serializeJson(result, out);
         return out;
@@ -185,6 +186,7 @@ String UpdateManager::checkForUpdate()
 
     String payload = http.getString();
     http.end();
+    client.stop();
 
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
@@ -260,11 +262,13 @@ String UpdateManager::handleGithubUpdate()
     {
         String errorMsg = "Error checking for updates. HTTP code: " + String(httpCode) + " " + http.errorToString(httpCode);
         http.end();
+        client.stop();
         return errorMsg;
     }
 
     String payload = http.getString();
     http.end();
+    client.stop();
 
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
@@ -395,6 +399,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             SerialLog::getInstance().printf("Failed to download signature: HTTP %d (%s)\n", httpCode, http.errorToString(httpCode).c_str());
         }
         http.end();
+        client.stop();
 
         if (!hasSignature)
         {
@@ -402,6 +407,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             getInstance()._lastError = "Failed to download or parse signature file";
             delete updateInfo;
             getInstance()._updateInProgress = false;
+            esp_task_wdt_delete(NULL);
             vTaskDelete(NULL);
             return;
         }
@@ -442,8 +448,10 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 SerialLog::getInstance().print("Failed to allocate firmware buffer\n");
                 getInstance()._lastError = "Out of memory for firmware buffer";
                 firmwareHttp.end();
+                firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
+                esp_task_wdt_delete(NULL);
                 vTaskDelete(NULL);
                 return;
             }
@@ -476,8 +484,10 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 SerialLog::getInstance().print("Failed to compute firmware hash\n");
                 free(firmwareBuffer);
                 firmwareHttp.end();
+                firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
+                esp_task_wdt_delete(NULL);
                 vTaskDelete(NULL);
                 return;
             }
@@ -492,8 +502,10 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 getInstance()._lastError = "Signature verification failed";
                 free(firmwareBuffer);
                 firmwareHttp.end();
+                firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
+                esp_task_wdt_delete(NULL);
                 vTaskDelete(NULL);
                 return;
             }
@@ -506,8 +518,10 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 Update.printError(Serial);
                 free(firmwareBuffer);
                 firmwareHttp.end();
+                firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
+                esp_task_wdt_delete(NULL);
                 vTaskDelete(NULL);
                 return;
             }
@@ -520,8 +534,10 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 SerialLog::getInstance().printf("Write failed: wrote %d of %d\n", written, firmwareLen);
                 Update.abort();
                 firmwareHttp.end();
+                firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
+                esp_task_wdt_delete(NULL);
                 vTaskDelete(NULL);
                 return;
             }
@@ -535,8 +551,10 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             {
                 Update.printError(Serial);
                 firmwareHttp.end();
+                firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
+                esp_task_wdt_delete(NULL);
                 vTaskDelete(NULL);
                 return;
             }
@@ -554,11 +572,13 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             {
                 SerialLog::getInstance().print("Update successful! Rebooting...\n");
                 firmwareHttp.end();
+                firmwareClient.stop();
                 delete updateInfo;
                 delay(1000); // Give system time to flush logs before restart
                 SerialLog::getInstance().clearCrashLogMagic();
                 ESP.restart();
                 // Never reached, but include for safety
+                esp_task_wdt_delete(NULL);
                 vTaskDelete(NULL);
             }
             else
@@ -580,6 +600,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
     }
 
     firmwareHttp.end();
+    firmwareClient.stop();
     delete updateInfo;
     
     esp_task_wdt_delete(NULL); // Remove from watchdog before deleting task

@@ -568,6 +568,16 @@ void SerialLog::cleanupClients()
   _ws.cleanupClients();
 }
 
+void SerialLog::lock()
+{
+  xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
+}
+
+void SerialLog::unlock()
+{
+  xSemaphoreGiveRecursive(_mutex);
+}
+
 // --- Diagnostic Crash Hooks ---
 // IMPORTANT: These handlers execute in crash/fault context. They must NEVER
 // take a mutex (deadlock risk) or call any function that allocates heap memory.
