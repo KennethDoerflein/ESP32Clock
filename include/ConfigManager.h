@@ -86,10 +86,10 @@ public:
   }
 
   /**
-   * @brief Initializes the ConfigManager.
+   * @brief Initializes the configuration manager.
    *
-   * This method mounts the LittleFS filesystem and loads the configuration
-   * from the JSON file. If the file doesn't exist, it creates one with
+   * This method mounts the LittleFS filesystem for general configuration
+   * and initializes the NVS Preferences for alarm persistence. If the file doesn't exist, it creates one with
    * default values. This should be called once at startup.
    */
   void begin();

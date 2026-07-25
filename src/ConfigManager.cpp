@@ -15,6 +15,7 @@
 #include "Constants.h"
 #include "LockGuard.h"
 #include "UpdateManager.h"
+#include "TimeManager.h"
 
 /**
  * @brief Private constructor to enforce the singleton pattern.
@@ -296,7 +297,7 @@ void ConfigManager::load()
       uint32_t snoozeUntil = _preferences.getUInt(key, 0);
       alarm.setSnoozeState(snoozed, snoozeUntil);
       snprintf(key, sizeof(key), "a_%d_lastDis", i);
-      alarm.setLastDismissedDay(_preferences.getUChar(key, 8));
+      alarm.setLastDismissedDayEpoch(_preferences.getUInt(key, 0));
       _alarms.push_back(alarm);
     }
     _nextAlarmId = LEGACY_ALARMS_COUNT;
@@ -329,7 +330,7 @@ void ConfigManager::load()
       uint32_t snoozeUntil = _preferences.getUInt(key, 0);
       alarm.setSnoozeState(snoozed, snoozeUntil);
       snprintf(key, sizeof(key), "a_%d_lastDis", i);
-      alarm.setLastDismissedDay(_preferences.getUChar(key, 8));
+      alarm.setLastDismissedDayEpoch(_preferences.getUInt(key, 0));
       _alarms.push_back(alarm);
     }
   }
@@ -469,7 +470,7 @@ bool ConfigManager::save()
     snprintf(key, sizeof(key), "a_%zu_snzUntil", i);
     _preferences.putUInt(key, _alarms[i].getSnoozeUntil());
     snprintf(key, sizeof(key), "a_%zu_lastDis", i);
-    _preferences.putUChar(key, _alarms[i].getLastDismissedDay());
+    _preferences.putUInt(key, _alarms[i].getLastDismissedDayEpoch());
   }
 
   SerialLog::getInstance().print("Configuration saved.");
@@ -624,15 +625,27 @@ void ConfigManager::replaceAlarms(const std::vector<Alarm> &newAlarms)
   {
     RecursiveLockGuard lock(_mutex);
     _alarms.clear();
+    _alarms.shrink_to_fit();
+    _alarms.reserve(newAlarms.size());
     for (const auto &incomingAlarm : newAlarms)
     {
       Alarm alarm = incomingAlarm;
       // If the ID is invalid (new alarm from frontend), assign a new ID
       if (alarm.getId() == 255 || alarm.getId() < 0)
-      { // Using uint8_t, 255 might be -1 casted, or we check against known invalid
-        // Assuming frontend sends ID as int, but Alarm stores as uint8_t.
-        // If frontend sends -1, it becomes 255 in uint8_t
-        alarm.setId(_nextAlarmId++);
+      {
+        int attempt = 0;
+        while (attempt < 254) {
+          bool conflict = false;
+          int candId = _nextAlarmId % 254;
+          for (const auto& a : _alarms) {
+            if (a.getId() == candId) { conflict = true; break; }
+          }
+          if (!conflict) break;
+          _nextAlarmId++;
+          attempt++;
+        }
+        alarm.setId(_nextAlarmId % 254);
+        _nextAlarmId++;
       }
       _alarms.push_back(alarm);
     }
@@ -1435,8 +1448,11 @@ void ConfigManager::setTimezone(const String &tz)
     if (timezone != tz)
     {
       timezone = tz;
-      setenv("TZ", timezone.c_str(), 1);
-      tzset();
+      {
+        RecursiveLockGuard timeLock(TimeManager::getInstance().getI2CMutex());
+        setenv("TZ", timezone.c_str(), 1);
+        tzset();
+      }
       _isDirty = true;
     }
   }

@@ -54,6 +54,11 @@ public:
     bool endUpdate();
 
     /**
+     * @brief Aborts an in-progress update.
+     */
+    void abortUpdate();
+
+    /**
      * @brief Checks GitHub for a new firmware version without downloading.
      * @return A JSON string with the check result: {"available":bool,"currentVersion":"...","newVersion":"...","error":"..."}
      */
@@ -99,6 +104,7 @@ private:
     };
 
     static void runGithubUpdateTask(void *pvParameters);
+    static void doRunGithubUpdateTask(void *pvParameters);
     bool downloadAndVerifyFile(WiFiClientSecure &client, const String &url,
                                uint8_t *buffer, size_t bufferSize, size_t &bytesRead);
     bool verifyFirmwareSignature(const uint8_t *firmwareData, size_t firmwareLen,

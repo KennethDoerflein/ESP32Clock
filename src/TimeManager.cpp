@@ -40,7 +40,12 @@ DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
   // Check today
   if (alarm.getHour() > now.hour() || (alarm.getHour() == now.hour() && alarm.getMinute() > now.minute()))
   {
-    if (alarm.getDays() == 0 || (alarm.getDays() & (1 << now.dayOfTheWeek())))
+    // If it's a repeating alarm and we already dismissed it today, don't schedule it for today!
+    if (alarm.getDays() != 0 && alarm.getLastDismissedDayEpoch() == now.unixtime() / 86400)
+    {
+      // Skip today, fall through to future days
+    }
+    else if (alarm.getDays() == 0 || (alarm.getDays() & (1 << now.dayOfTheWeek())))
     {
       DateTime candidate(now.year(), now.month(), now.day(), alarm.getHour(), alarm.getMinute(), 0);
       // For biweekly alarms, verify this is the correct week
@@ -123,7 +128,8 @@ void TimeManager::syncSystemClockFromRTC()
 {
   // Don't fight with an active NTP sync — the SNTP daemon is updating
   // the system clock in the background.
-  if (isNtpSyncInProgress())
+  // Don't fight with an active NTP sync or the background SNTP daemon
+  if (isNtpSyncInProgress() || WiFi.status() == WL_CONNECTED)
   {
     return;
   }
@@ -141,9 +147,11 @@ void TimeManager::syncSystemClockFromRTC()
 
   if (abs(drift) >= 2)
   {
+    struct timeval current_tv;
+    gettimeofday(&current_tv, nullptr);
     struct timeval tv;
     tv.tv_sec = rtcEpoch;
-    tv.tv_usec = 0;
+    tv.tv_usec = current_tv.tv_usec;
     settimeofday(&tv, nullptr);
 
     SerialLog::getInstance().printf(
@@ -209,12 +217,14 @@ bool TimeManager::update()
   lastUpdate = currentMillis;
 
   DateTime now = getRTCTime();
-  // Only trigger a full update if the second has actually changed.
-  if (now.second() == _lastDecodedSecond)
+  // Only trigger a full update if the second has actually changed, or if 1000ms has passed (fallback if RTC fails).
+  static unsigned long lastSecondTick = 0;
+  if (now.second() == _lastDecodedSecond && (currentMillis - lastSecondTick) < 1000)
   {
     return false;
   }
   _lastDecodedSecond = now.second();
+  lastSecondTick = currentMillis;
 
   // Cache the time snapshot for consistent rendering within this frame (Local Time).
   // This prevents race conditions where the RTC may return a different
@@ -262,29 +272,12 @@ bool TimeManager::update()
 }
 
 /**
- * @brief Performs a blocking NTP sync and updates the last sync date.
+ * @brief Triggers a non-blocking NTP sync.
  */
 void TimeManager::syncWithNTP()
 {
-  // This will be the initial, blocking sync
-  if (syncTime())
-  {
-    // If the sync was successful, update the last sync date.
-    DateTime now = getRTCTime();
-    RecursiveLockGuard lock(_mutex);
-    // Store the date as a single integer (e.g., 20231026) for easy comparison.
-    uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
-    lastSyncDate = ymd;
-    SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
-  }
-  else
-  {
-    // The blocking sync failed (SNTP daemon may not have a response yet).
-    // Start the non-blocking sync state machine so the logicTask keeps
-    // retrying via updateNtp() until we get a valid time.
-    SerialLog::getInstance().print("Initial NTP sync failed. Starting non-blocking retry...\n");
-    startNtpSync();
-  }
+  SerialLog::getInstance().print("TimeManager: Starting background NTP sync...\n");
+  startNtpSync();
 }
 
 /**
@@ -299,11 +292,13 @@ bool TimeManager::updateNtp()
   if (state == NTP_SYNC_SUCCESS)
   {
     SerialLog::getInstance().print("TimeManager: NTP sync successful.\n");
-    DateTime now = getRTCTime();
-    RecursiveLockGuard lock(_mutex);
-    uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
-    lastSyncDate = ymd;
-    SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
+    DateTime now = getLocalTime();
+    {
+      RecursiveLockGuard lock(_mutex);
+      uint32_t ymd = (uint32_t)now.year() * 10000u + (uint32_t)now.month() * 100u + (uint32_t)now.day();
+      lastSyncDate = ymd;
+      SerialLog::getInstance().printf("Marked lastSyncDate = %lu\n", (unsigned long)lastSyncDate);
+    }
     resetNtpSync();
     return true;
   }
@@ -324,7 +319,11 @@ bool TimeManager::updateNtp()
  */
 void TimeManager::getFormattedTime(char *buf, size_t bufSize) const
 {
-  DateTime now = getCachedTime();
+  getFormattedTime(buf, bufSize, getCachedTime());
+}
+
+void TimeManager::getFormattedTime(char *buf, size_t bufSize, const DateTime &now) const
+{
   if (is24HourFormat())
   {
     snprintf(buf, bufSize, "%02d:%02d", now.hour(), now.minute());
@@ -351,7 +350,11 @@ String TimeManager::getFormattedTime() const
  */
 void TimeManager::getFormattedSeconds(char *buf, size_t bufSize) const
 {
-  DateTime now = getCachedTime();
+  getFormattedSeconds(buf, bufSize, getCachedTime());
+}
+
+void TimeManager::getFormattedSeconds(char *buf, size_t bufSize, const DateTime &now) const
+{
   snprintf(buf, bufSize, "%02d", now.second());
 }
 
@@ -368,7 +371,11 @@ String TimeManager::getFormattedSeconds() const
  */
 void TimeManager::getFormattedDate(char *buf, size_t bufSize) const
 {
-  DateTime now = getCachedTime();
+  getFormattedDate(buf, bufSize, getCachedTime());
+}
+
+void TimeManager::getFormattedDate(char *buf, size_t bufSize, const DateTime &now) const
+{
   static const char *monthNames[] = {
       "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
       "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
@@ -388,12 +395,16 @@ String TimeManager::getFormattedDate() const
  */
 void TimeManager::getTOD(char *buf, size_t bufSize) const
 {
+  getTOD(buf, bufSize, getCachedTime());
+}
+
+void TimeManager::getTOD(char *buf, size_t bufSize, const DateTime &now) const
+{
   if (is24HourFormat())
   {
     buf[0] = '\0';
     return;
   }
-  DateTime now = getCachedTime();
   snprintf(buf, bufSize, "%s", (now.hour() < 12) ? "AM" : "PM");
 }
 
@@ -410,7 +421,11 @@ String TimeManager::getTOD() const
  */
 void TimeManager::getDayOfWeek(char *buf, size_t bufSize) const
 {
-  DateTime now = getCachedTime();
+  getDayOfWeek(buf, bufSize, getCachedTime());
+}
+
+void TimeManager::getDayOfWeek(char *buf, size_t bufSize, const DateTime &now) const
+{
   static const char *dayNames[] = {
       "SUN", "MON", "TUE", "WED",
       "THU", "FRI", "SAT"};
@@ -466,7 +481,7 @@ void TimeManager::checkDailySync()
   {
     RecursiveLockGuard lock(_mutex);
     // If the last sync was on a different day, trigger a sync.
-    if (lastSyncDate < today)
+    if (lastSyncDate != today)
     {
       // Stamp lastSyncDate immediately to prevent this from firing again
       // on every logicTask iteration (every 10ms) for the rest of the day.
@@ -534,7 +549,12 @@ void TimeManager::checkDST()
   // localtime_r is then authoritative for determining the correct DST state.
   time_t epoch = (time_t)utc.unixtime();
   struct tm resolved;
-  localtime_r(&epoch, &resolved);
+  {
+    RecursiveLockGuard lock(_mutex);
+    if (localtime_r(&epoch, &resolved) == nullptr) {
+        return; // Epoch was invalid
+    }
+  }
 
   bool newDstState = resolved.tm_isdst > 0;
 
@@ -558,9 +578,13 @@ DateTime TimeManager::getLocalTime() const
   // manual struct-to-time_t conversion (and avoids the non-standard timegm).
   time_t now_utc = (time_t)utc.unixtime();
 
-  // localtime_r converts the UTC epoch to local time using the TZ variable.
   struct tm t_local;
-  localtime_r(&now_utc, &t_local);
+  {
+    RecursiveLockGuard lock(_mutex);
+    if (localtime_r(&now_utc, &t_local) == nullptr) {
+        return utc; // Fallback
+    }
+  }
 
   return DateTime(t_local.tm_year + 1900, t_local.tm_mon + 1, t_local.tm_mday,
                   t_local.tm_hour, t_local.tm_min, t_local.tm_sec);
@@ -581,11 +605,19 @@ void TimeManager::updateSnoozeStates()
     {
       if (alarm.updateSnooze())
       {
-        // Snooze is over, re-trigger the alarm
-        AlarmManager::getInstance().trigger(alarm.getId());
-        // Persist the unsnoozed state by ID, as index might have changed
-        config.setAlarmById(alarm.getId(), alarm);
-        config.save();
+        // Snooze is over, re-trigger the alarm.
+        // If it succeeds, clear the snooze state. If it fails (e.g., another
+        // alarm is already ringing), leave it snoozed so it retries later.
+        if (AlarmManager::getInstance().trigger(alarm.getId()))
+        {
+          // Atomically read-modify-write the alarm to preserve concurrent changes
+          Alarm freshAlarm = config.getAlarmById(alarm.getId());
+          if (freshAlarm.getId() != 255)
+          {
+            freshAlarm.setSnoozeState(false, 0);
+            config.setAlarmById(alarm.getId(), freshAlarm);
+          }
+        }
         break; // Only trigger one alarm at a time
       }
     }
@@ -647,17 +679,28 @@ DateTime TimeManager::getRTCTime() const
     return DateTime();
   }
 
-  // Monotonicity check: time should not jump backward by more than 2 seconds.
+  // Monotonicity check: time should not jump by more than 5 seconds.
   // A small backward jump (1-2s) can happen legitimately due to NTP corrections.
   if (_lastValidRtcTime.isValid() && _lastValidRtcTime.year() >= 2024)
   {
     int32_t timeDelta = (int32_t)read2.unixtime() - (int32_t)_lastValidRtcTime.unixtime();
-    if (timeDelta < -2)
+    static int consecutiveJumps = 0;
+    if (abs((int)timeDelta) > 5)
     {
-      SerialLog::getInstance().printf(
-          "WARNING: RTC time jumped backward by %ld seconds. Using last known-good.\n",
-          (long)abs(timeDelta));
-      return _lastValidRtcTime;
+      consecutiveJumps++;
+      if (consecutiveJumps < 3)
+      {
+        SerialLog::getInstance().printf(
+            "WARNING: RTC time jumped by %ld seconds. Rejecting.\n",
+            (long)timeDelta);
+        return _lastValidRtcTime;
+      }
+      SerialLog::getInstance().printf("WARNING: RTC time jumped by %ld seconds. Accepting after consecutive reads.\n", (long)timeDelta);
+      consecutiveJumps = 0;
+    }
+    else
+    {
+      consecutiveJumps = 0;
     }
   }
 
@@ -701,47 +744,102 @@ bool TimeManager::isTimeSet() const
 
 void TimeManager::checkMissedAlarms()
 {
-  if (AlarmManager::getInstance().isRinging())
+  time_t nowEpoch = (time_t)getRTCTime().unixtime();
+  checkMissedAlarmsWindow(nowEpoch - 90 * 60, nowEpoch);
+}
+
+void TimeManager::checkMissedAlarmsWindow(time_t startEpoch, time_t endEpoch)
+{
+  if (AlarmManager::getInstance().isRinging() || AlarmManager::getInstance().isResumePending())
   {
     return;
   }
 
-  SerialLog::getInstance().print("Checking for missed alarms on boot...\n");
+  if (endEpoch - startEpoch > 90 * 60)
+  {
+    startEpoch = endEpoch - 90 * 60;
+  }
+  if (startEpoch >= endEpoch) return;
 
-  // Work in UTC epoch space since the RTC stores UTC.
-  time_t nowEpoch = (time_t)getRTCTime().unixtime();
-  const uint32_t lookbehindSeconds = 30 * 60;
-  time_t startEpoch = nowEpoch - lookbehindSeconds;
+  SerialLog::getInstance().printf("Checking for missed alarms from %lu to %lu...\n", (unsigned long)startEpoch, (unsigned long)endEpoch);
 
-  int8_t mostRecentMissedAlarmId = -1;
+  int8_t earliestMissedAlarmId = -1;
   auto &config = ConfigManager::getInstance();
   std::vector<Alarm> alarms = config.getAllAlarms();
 
-  // Iterate minute-by-minute in UTC epoch space.
-  // Convert each moment to local time before calling shouldRing(),
-  // since alarm hour/minute are stored in local time.
-  for (time_t t = startEpoch; t <= nowEpoch; t += 60)
+  struct tm prev_t_local = {0};
+  bool first = true;
+
+  for (time_t t = startEpoch; t <= endEpoch; t += 60)
   {
     struct tm t_local;
-    localtime_r(&t, &t_local);
+    {
+      RecursiveLockGuard lock(_mutex);
+      if (localtime_r(&t, &t_local) == nullptr) {
+          continue; // Skip invalid time
+      }
+    }
     DateTime checkLocal(
         t_local.tm_year + 1900, t_local.tm_mon + 1, t_local.tm_mday,
         t_local.tm_hour, t_local.tm_min, t_local.tm_sec);
+
+    // Detect skipped hour due to DST spring forward
+    if (!first && t_local.tm_hour != prev_t_local.tm_hour)
+    {
+      int expected_hour = (prev_t_local.tm_hour + 1) % 24;
+      if (t_local.tm_hour != expected_hour)
+      {
+          int day_offset = (expected_hour == 0) ? 1 : 0;
+          for (int m = 0; m < 60; m++)
+          {
+            struct tm target_tm = prev_t_local;
+            target_tm.tm_mday += day_offset;
+            target_tm.tm_hour = expected_hour;
+            target_tm.tm_min = m;
+            target_tm.tm_sec = 0;
+            target_tm.tm_isdst = -1;
+            mktime(&target_tm);
+
+            DateTime checkSkipped(
+              target_tm.tm_year + 1900, target_tm.tm_mon + 1, target_tm.tm_mday,
+              target_tm.tm_hour, target_tm.tm_min, target_tm.tm_sec);
+
+            for (const auto &alarm : alarms)
+            {
+              if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkSkipped))
+              {
+                if (earliestMissedAlarmId == -1) earliestMissedAlarmId = alarm.getId();
+              }
+            }
+          }
+      }
+    }
 
     for (const auto &alarm : alarms)
     {
       if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkLocal))
       {
-        // Record the most recent candidate; overwrite as we find later ones.
-        mostRecentMissedAlarmId = alarm.getId();
+        if (earliestMissedAlarmId == -1)
+        {
+          earliestMissedAlarmId = alarm.getId();
+        }
       }
     }
+    if (earliestMissedAlarmId != -1)
+    {
+      break;
+    }
+    prev_t_local = t_local;
+    first = false;
   }
 
-  if (mostRecentMissedAlarmId != -1)
+  if (earliestMissedAlarmId != -1)
   {
-    SerialLog::getInstance().printf("Found missed alarm %d. Triggering now.\n", mostRecentMissedAlarmId);
-    AlarmManager::getInstance().trigger(mostRecentMissedAlarmId);
+    SerialLog::getInstance().printf("Found missed alarm %d. Triggering now.\n", earliestMissedAlarmId);
+    if (!AlarmManager::getInstance().trigger(earliestMissedAlarmId))
+    {
+       dismissAlarm(earliestMissedAlarmId);
+    }
   }
   else
   {
@@ -749,30 +847,27 @@ void TimeManager::checkMissedAlarms()
   }
 }
 
+void TimeManager::dismissAlarm(uint8_t alarmId)
+{
+  auto &config = ConfigManager::getInstance();
+  Alarm alarm = config.getAlarmById(alarmId);
+  if (alarm.getId() != 255)
+  {
+    if (alarm.getDays() == 0 && !alarm.isSnoozed())
+    {
+      alarm.setEnabled(false);
+      config.setAlarmById(alarmId, alarm);
+    }
+    else if (alarm.getDays() != 0 && !alarm.isSnoozed())
+    {
+      alarm.dismiss(getLocalTime());
+      config.setAlarmById(alarmId, alarm);
+    }
+  }
+}
+
 void TimeManager::handleAlarm()
 {
-  RecursiveLockGuard lock(_mutex);
-  if (RTC.alarmFired(1))
-  {
-    RTC.clearAlarm(1);
-    SerialLog::getInstance().printf("RTC alarm 1 fired for alarm ID %d\n", _rtcAlarm1Id);
-    if (_rtcAlarm1Id != -1)
-    {
-      AlarmManager::getInstance().trigger(_rtcAlarm1Id);
-    }
-  }
-
-  if (RTC.alarmFired(2))
-  {
-    RTC.clearAlarm(2);
-    SerialLog::getInstance().printf("RTC alarm 2 fired for alarm ID %d\n", _rtcAlarm2Id);
-    if (_rtcAlarm2Id != -1)
-    {
-      AlarmManager::getInstance().trigger(_rtcAlarm2Id);
-    }
-  }
-
-  // Update hardware alarms
   setNextAlarms();
 }
 
@@ -834,6 +929,24 @@ std::vector<NextAlarmTime> TimeManager::getNextAlarms(int count) const
 void TimeManager::setNextAlarms()
 {
   RecursiveLockGuard lock(_mutex);
+  if (RTC.alarmFired(1))
+  {
+    RTC.clearAlarm(1);
+    SerialLog::getInstance().printf("RTC alarm 1 fired for alarm ID %d\n", _rtcAlarm1Id);
+    if (_rtcAlarm1Id != -1)
+    {
+      AlarmManager::getInstance().trigger(_rtcAlarm1Id);
+    }
+  }
+  if (RTC.alarmFired(2))
+  {
+    RTC.clearAlarm(2);
+    SerialLog::getInstance().printf("RTC alarm 2 fired for alarm ID %d\n", _rtcAlarm2Id);
+    if (_rtcAlarm2Id != -1)
+    {
+      AlarmManager::getInstance().trigger(_rtcAlarm2Id);
+    }
+  }
   clearRtcAlarms();
 
   // Update cache first to ensure we have latest (local times)

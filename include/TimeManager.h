@@ -107,6 +107,7 @@ public:
    * @param bufSize Size of the buffer.
    */
   void getFormattedTime(char *buf, size_t bufSize) const;
+  void getFormattedTime(char *buf, size_t bufSize, const DateTime &now) const;
 
   /**
    * @brief Gets the current date, formatted for display.
@@ -120,6 +121,7 @@ public:
    * @param bufSize Size of the buffer.
    */
   void getFormattedDate(char *buf, size_t bufSize) const;
+  void getFormattedDate(char *buf, size_t bufSize, const DateTime &now) const;
 
   /**
    * @brief Gets the current day of the week.
@@ -133,6 +135,7 @@ public:
    * @param bufSize Size of the buffer.
    */
   void getDayOfWeek(char *buf, size_t bufSize) const;
+  void getDayOfWeek(char *buf, size_t bufSize, const DateTime &now) const;
 
   /**
    * @brief Gets the time of day period (AM/PM).
@@ -146,6 +149,7 @@ public:
    * @param bufSize Size of the buffer.
    */
   void getTOD(char *buf, size_t bufSize) const;
+  void getTOD(char *buf, size_t bufSize, const DateTime &now) const;
 
   /**
    * @brief Gets the seconds of the current time, formatted for display.
@@ -159,6 +163,7 @@ public:
    * @param bufSize Size of the buffer.
    */
   void getFormattedSeconds(char *buf, size_t bufSize) const;
+  void getFormattedSeconds(char *buf, size_t bufSize, const DateTime &now) const;
 
   /**
    * @brief Gets the cached time snapshot from the last update() call.
@@ -254,6 +259,16 @@ public:
    * @note This is intended to be called once at boot.
    */
   void checkMissedAlarms();
+
+  /**
+   * @brief Checks for missed alarms within a specific time window.
+   */
+  void checkMissedAlarmsWindow(time_t startEpoch, time_t endEpoch);
+
+  /**
+   * @brief Dismisses an alarm (disables if one-time, updates dismiss day if recurring).
+   */
+  void dismissAlarm(uint8_t alarmId);
 
   /**
    * @brief Gets the next upcoming alarms.

@@ -18,6 +18,7 @@
  */
 uint16_t hexToRGB565(String hex)
 {
+  if (hex.length() < 2) return 0;
   long color = strtol(hex.c_str() + 1, NULL, 16);
   byte r = (color >> 16) & 0xFF;
   byte g = (color >> 8) & 0xFF;

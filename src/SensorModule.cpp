@@ -321,7 +321,15 @@ void handleSensorUpdates(bool force)
     // Read the core temp sensor FIRST so it's available for compensation.
     if (core_temp_started)
     {
-      temp_sensor_read_celsius(&cached_core_temp_c);
+      float temp_c = 0.0f;
+      if (temp_sensor_read_celsius(&temp_c) == ESP_OK)
+      {
+        cached_core_temp_c = temp_c;
+      }
+      else
+      {
+        SerialLog::getInstance().print("WARNING: Failed to read internal core temperature\n");
+      }
     }
 
     // Read RTC temperature early to use it in compensation logic as an enclosure ambient proxy

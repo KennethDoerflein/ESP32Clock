@@ -20,7 +20,7 @@
 /**
  * @brief Private constructor to enforce the singleton pattern.
  */
-DisplayManager::DisplayManager() : _tft(nullptr), _currentPage(nullptr), _alarmSprite(nullptr) {}
+DisplayManager::DisplayManager() : _tft(nullptr), _currentPage(nullptr), _currentPageIndex(-1), _alarmSprite(nullptr) {}
 
 /**
  * @brief Initializes the DisplayManager.
@@ -139,6 +139,17 @@ void DisplayManager::cyclePage()
 void DisplayManager::update()
 {
   Display::getInstance().lock();
+
+  auto &alarmManager = AlarmManager::getInstance();
+  auto &config = ConfigManager::getInstance();
+  bool isAlarmActive = alarmManager.isRinging() || config.isAnyAlarmSnoozed();
+
+  if (!isAlarmActive && _wasAlarmActive)
+  {
+    _wasAlarmActive = false;
+    _partialRefresh = true; // Ensure the underlying clock page is fully redrawn to erase the overlay
+  }
+
   if (_fullRefresh)
   {
     if (_currentPage)
@@ -294,13 +305,6 @@ void DisplayManager::renderAlarmOverlay()
 
   if (!isAlarmActive)
   {
-    if (_wasAlarmActive)
-    {
-      // Clear the overlay
-      clearAlarmOverlay();
-      _wasAlarmActive = false;
-      requestPartialRefresh();
-    }
     return;
   }
 
@@ -366,12 +370,15 @@ void DisplayManager::renderAlarmOverlay()
     _dismissProgress = 0.0f;
   }
 
-  int screenWidth = _tft->width();
-  int screenHeight = _tft->height();
-  int x = (screenWidth - _alarmSprite->width()) / 2;
-  int y = (screenHeight - _alarmSprite->height()) / 2;
+  if (showButton)
+  {
+    int screenWidth = _tft->width();
+    int screenHeight = _tft->height();
+    int x = (screenWidth - _alarmSprite->width()) / 2;
+    int y = (screenHeight - _alarmSprite->height()) / 2;
 
-  _alarmSprite->pushSprite(x, y);
+    _alarmSprite->pushSprite(x, y);
+  }
 }
 
 void DisplayManager::setDismissProgress(float progress)
@@ -379,29 +386,9 @@ void DisplayManager::setDismissProgress(float progress)
   _dismissProgress = progress;
 }
 
-void DisplayManager::clearAlarmOverlay()
-{
-  if (_alarmSprite)
-  {
-    // Calculate position (must match renderAlarmOverlay)
-    int screenWidth = _tft->width();
-    int screenHeight = _tft->height();
-    int x = (screenWidth - _alarmSprite->width()) / 2;
-    int y = (screenHeight - _alarmSprite->height()) / 2;
-
-    uint16_t bgColor = hexToRGB565(ConfigManager::getInstance().getBackgroundColor().c_str());
-    _tft->fillRect(x, y, _alarmSprite->width(), _alarmSprite->height(), bgColor);
-  }
-}
-
 void DisplayManager::showAlarmScreen()
 {
   // Deprecated/Unused with new overlay logic, but kept for interface compatibility
 }
 
-void DisplayManager::drawDismissProgressBar(float progress)
-{
-  // Delegated to renderAlarmOverlay via state
-  setDismissProgress(progress);
-  renderAlarmOverlay();
-}
+

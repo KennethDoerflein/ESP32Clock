@@ -23,7 +23,7 @@ void WeatherPage::update()
 {
   // Check if weather data changed
   WeatherData current = WeatherService::getInstance().getCurrentWeather();
-  if (current.isValid && (abs(current.temp - _lastWeatherData.temp) > 0.1 || current.condition != _lastWeatherData.condition))
+  if (current.isValid != _lastWeatherData.isValid || (current.isValid && (abs(current.temp - _lastWeatherData.temp) > 0.1 || current.condition != _lastWeatherData.condition)))
   {
     _needsRedraw = true;
   }

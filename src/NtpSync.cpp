@@ -49,8 +49,10 @@ const unsigned long maxDelayMs = 30000;
 const int jitterMaxMs = 1000;
 
 // --- Non-Blocking NTP Sync State ---
-/// @brief Mutex protecting all NTP sync state (accessed from async web task and Core 0 logicTask).
-static SemaphoreHandle_t ntpMutex = xSemaphoreCreateMutex();
+static SemaphoreHandle_t getNtpMutex() {
+  static SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
+  return mutex;
+}
 /// @brief Current state of the non-blocking synchronization process.
 static NtpSyncState ntpState = NTP_SYNC_IDLE;
 /// @brief Counter for the number of retries in the current non-blocking sync.
@@ -76,7 +78,7 @@ static unsigned long millisAtSyncStart = 0;
  */
 bool isNtpSyncInProgress()
 {
-  LockGuard lock(ntpMutex);
+  LockGuard lock(getNtpMutex());
   return ntpState == NTP_SYNC_IN_PROGRESS;
 }
 
@@ -91,11 +93,17 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
 {
   auto &logger = SerialLog::getInstance();
 
-  // The system clock is already synced by SNTP. 
+  // The system clock is already synced by SNTP.
   // We want to store UTC in the hardware RTC.
-  time_t now = time(nullptr);
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  time_t now = tv.tv_sec;
+  if (tv.tv_usec >= 500000) {
+      now++;
+  }
+  
   struct tm utc_tm;
-  gmtime_r(&now, &utc_tm);
+  if (gmtime_r(&now, &utc_tm) == nullptr) return;
 
   DateTime time_to_set(
       utc_tm.tm_year + 1900,
@@ -104,6 +112,9 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
       utc_tm.tm_hour,
       utc_tm.tm_min,
       utc_tm.tm_sec);
+
+  // Save old RTC time before adjusting it to accurately check for time jumps and calculate drift
+  DateTime oldRtcTime = TimeManager::getInstance().getRTCTime();
 
   // --- Layer 3: Three-Source Diagnostic Dashboard ---
   // Back-calculate what each clock read at the moment the sync started,
@@ -144,7 +155,6 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
   else
   {
     // Fallback: no pre-sync snapshot (e.g., blocking sync at boot)
-    DateTime oldRtcTime = TimeManager::getInstance().getRTCTime();
     if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
     {
       int32_t driftSeconds = (int32_t)oldRtcTime.unixtime() - (int32_t)time_to_set.unixtime();
@@ -173,6 +183,16 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
   logger.printf("RTC synchronized with NTP time (UTC): %04d-%02d-%02d %02d:%02d:%02d\n",
                 time_to_set.year(), time_to_set.month(), time_to_set.day(),
                 time_to_set.hour(), time_to_set.minute(), time_to_set.second());
+
+  // Check for missed alarms if the time jumped forward significantly (>60s)
+  int32_t jumpSeconds = (int32_t)time_to_set.unixtime() - (int32_t)oldRtcTime.unixtime();
+  if (jumpSeconds > 60)
+  {
+    TimeManager::getInstance().checkMissedAlarmsWindow(oldRtcTime.unixtime(), time_to_set.unixtime());
+  }
+
+  // Update hardware alarms since the system time was just corrected
+  TimeManager::getInstance().setNextAlarms();
 }
 
 /**
@@ -199,7 +219,7 @@ bool getNTPData(struct tm &timeinfo)
  */
 void startNtpSync()
 {
-  LockGuard lock(ntpMutex);
+  LockGuard lock(getNtpMutex());
   if (ntpState == NTP_SYNC_IN_PROGRESS)
   {
     return;
@@ -228,10 +248,10 @@ void startNtpSync()
 
   ntpState = NTP_SYNC_IN_PROGRESS;
   retryCount = 0;
-  // Set lastSyncAttemptMs to 0 to trigger an immediate first attempt in updateNtpSync
-  lastSyncAttemptMs = 0;
+  // Wait a short time for SNTP to get data before checking
+  lastSyncAttemptMs = millis();
   currentRetryDelay = baseDelayMs;
-  targetWaitDelay = 0;
+  targetWaitDelay = 100; // 100ms initial wait
 }
 
 /**
@@ -239,7 +259,7 @@ void startNtpSync()
  */
 NtpSyncState updateNtpSync()
 {
-  LockGuard lock(ntpMutex);
+  LockGuard lock(getNtpMutex());
   if (ntpState != NTP_SYNC_IN_PROGRESS)
   {
     return ntpState;
@@ -290,93 +310,12 @@ NtpSyncState updateNtpSync()
 }
 
 /**
- * @brief Performs a blocking synchronization of the RTC with an NTP server.
- */
-bool syncTime()
-{
-  // Reset the SNTP sync status to ensure we detect a new network update.
-  sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
-  // Restart the SNTP client to force an immediate network query safely without modifying TZ.
-  if (sntp_enabled()) {
-      sntp_stop();
-  }
-  sntp_setoperatingmode(SNTP_OPMODE_POLL);
-  sntp_setservername(0, (char*)NTP_SERVER);
-  sntp_setservername(1, (char*)BACKUP_NTP_SERVER);
-  sntp_setservername(2, (char*)BACKUP2_NTP_SERVER);
-  sntp_init();
-
-  unsigned long delayForNextAttempt = baseDelayMs;
-  struct tm timeinfo;
-
-  for (int i = 1; i <= maxRetries; i++)
-  {
-    SerialLog::getInstance().printf("Fetching NTP time (Attempt %d/%d)...\n", i, maxRetries);
-
-    esp_task_wdt_reset(); // Feed before the potentially blocking getNTPData
-    if (getNTPData(timeinfo))
-    {
-      _processSuccessfulNtpSync(timeinfo);
-      return true;
-    }
-
-    if (i < maxRetries)
-    {
-      // Add a random jitter to the delay to prevent multiple devices from retrying in lockstep.
-      unsigned long jitter = random(jitterMaxMs + 1);
-      unsigned long totalDelay = delayForNextAttempt + jitter;
-
-      SerialLog::getInstance().printf("Failed to obtain time. Retrying in %.2f seconds...\n", totalDelay / 1000.0);
-      
-      // Use a loop for the delay to keep the watchdog fed if the delay is long
-      unsigned long startDelay = millis();
-      while (millis() - startDelay < totalDelay) {
-        esp_task_wdt_reset();
-        delay(10);
-      }
-
-      delayForNextAttempt *= 2;
-      if (delayForNextAttempt > maxDelayMs)
-      {
-        delayForNextAttempt = maxDelayMs;
-      }
-    }
-  }
-
-  SerialLog::getInstance().printf("Failed to sync time with NTP server after all retries.\n");
-  return false;
-}
-
-/**
  * @brief Resets the state of the non-blocking NTP synchronization.
  */
 void resetNtpSync()
 {
-  LockGuard lock(ntpMutex);
+  LockGuard lock(getNtpMutex());
   ntpState = NTP_SYNC_IDLE;
   SerialLog::getInstance().print("NTP sync state reset to IDLE.");
 }
-
-DateTime getNtpTime()
-{
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo))
-  {
-    SerialLog::getInstance().print("Failed to obtain NTP time.\n");
-    return DateTime(); // Return an invalid DateTime
-  }
-
-  // The system clock returns local time via getLocalTime().
-  // Convert to UTC to match the RTC (which stores UTC).
-  time_t now = time(nullptr);
-  struct tm utc_tm;
-  gmtime_r(&now, &utc_tm);
-
-  return DateTime(
-      utc_tm.tm_year + 1900,
-      utc_tm.tm_mon + 1,
-      utc_tm.tm_mday,
-      utc_tm.tm_hour,
-      utc_tm.tm_min,
-      utc_tm.tm_sec);
-}
+

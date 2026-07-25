@@ -9,6 +9,7 @@
  */
 #include "SerialLog.h"
 #include "UpdateManager.h"
+#include "TimeManager.h"
 #include "LockGuard.h"
 #include <esp_attr.h>
 #include <esp_system.h>
@@ -28,6 +29,7 @@ struct RtcCrashLog
 };
 
 RTC_NOINIT_ATTR RtcCrashLog g_crashLog;
+static portMUX_TYPE g_crashLogMux = portMUX_INITIALIZER_UNLOCKED;
 
 // Initialize static members
 const char *SerialLog::LOG_FILE_PATH = "/system.log";
@@ -157,7 +159,10 @@ static void getTimestamp(char* buf, size_t maxLen)
 {
   time_t now = time(nullptr);
   struct tm t;
-  localtime_r(&now, &t);
+  {
+    RecursiveLockGuard lock(TimeManager::getInstance().getI2CMutex());
+    localtime_r(&now, &t);
+  }
 
   // Retrieve current task name safely
   const char *taskName = "unknown";
@@ -182,12 +187,12 @@ static void getTimestamp(char* buf, size_t maxLen)
 
 void SerialLog::print(const String &message)
 {
+  char tsBuf[64];
+  getTimestamp(tsBuf, sizeof(tsBuf));
+
   RecursiveLockGuard lock(_mutex);
   if (!_consoleLoggingEnabled && !_fileLoggingEnabled)
     return;
-
-  char tsBuf[64];
-  getTimestamp(tsBuf, sizeof(tsBuf));
   
   bool needsNewline = !message.endsWith("\n");
   
@@ -218,6 +223,9 @@ void SerialLog::print(const String &message)
  */
 void SerialLog::printf(const char *format, ...)
 {
+  char tsBuf[64];
+  getTimestamp(tsBuf, sizeof(tsBuf));
+
   RecursiveLockGuard lock(_mutex);
 
   // Avoid doing vsnprintf if neither log target is enabled
@@ -229,9 +237,6 @@ void SerialLog::printf(const char *format, ...)
   va_start(args, format);
   vsnprintf(msgBuf, sizeof(msgBuf), format, args);
   va_end(args);
-
-  char tsBuf[64];
-  getTimestamp(tsBuf, sizeof(tsBuf));
   
   size_t msgLen = strlen(msgBuf);
   bool needsNewline = (msgLen > 0 && msgBuf[msgLen - 1] != '\n');
@@ -268,6 +273,7 @@ void SerialLog::logToFile(const char *message)
   // We do this here to capture the formatted message.
   if (g_crashLog.magic == CRASH_LOG_MAGIC)
   {
+    portENTER_CRITICAL(&g_crashLogMux);
     if (g_crashLog.head >= CRASH_LOG_SIZE)
     {
       g_crashLog.head = 0;
@@ -294,6 +300,7 @@ void SerialLog::logToFile(const char *message)
       if (g_crashLog.head == 0)
         g_crashLog.wrapped = true;
     }
+    portEXIT_CRITICAL(&g_crashLogMux);
   }
 
   // Mutex is already held by print/printf/loop
@@ -319,31 +326,53 @@ void SerialLog::flush()
   if (_logBuffer.length() == 0)
     return;
 
-  File logFile = LittleFS.open(LOG_FILE_PATH, "a");
-  if (logFile)
-  {
-    if (logFile.size() >= MAX_LOG_SIZE)
-    {
-      logFile.close();
-      rotateLogFile(); // This assumes rotating doesn't need the mutex or is fast
-      logFile = LittleFS.open(LOG_FILE_PATH, "a");
-    }
+  bool needsRotation = false;
 
+  {
+    File logFile = LittleFS.open(LOG_FILE_PATH, "a");
+    if (logFile)
+    {
+      if (logFile.size() >= MAX_LOG_SIZE)
+      {
+        needsRotation = true;
+      }
+      else
+      {
+        logFile.print(_logBuffer);
+        _logBuffer = "";
+        _lastFlushTime = millis();
+      }
+      logFile.close();
+    }
+    else
+    {
+      // If file open fails, clear the buffer early to prevent OOM.
+      // 1024 bytes is enough to hold recent context without risking heap exhaustion.
+      if (_logBuffer.length() > 1024)
+      {
+        _logBuffer = "";
+      }
+      return;
+    }
+  }
+
+  if (needsRotation)
+  {
+    rotateLogFile(); // This assumes rotating doesn't need the mutex or is fast
+    File logFile = LittleFS.open(LOG_FILE_PATH, "a");
     if (logFile)
     {
       logFile.print(_logBuffer);
-      logFile.close();
       _logBuffer = "";
       _lastFlushTime = millis();
+      logFile.close();
     }
-  }
-  else
-  {
-    // If file open fails, clear the buffer early to prevent OOM.
-    // 1024 bytes is enough to hold recent context without risking heap exhaustion.
-    if (_logBuffer.length() > 1024)
+    else
     {
-      _logBuffer = "";
+      if (_logBuffer.length() > 1024)
+      {
+        _logBuffer = "";
+      }
     }
   }
 }
@@ -378,11 +407,12 @@ void SerialLog::rotateLogFile()
     LittleFS.rename(LOG_FILE_PATH, oldLogPath);
   }
 
-  // Immediately create a new empty log file to minimize the window where it doesn't exist
-  File logFile = LittleFS.open(LOG_FILE_PATH, "w");
-  if (logFile)
   {
-    logFile.close();
+    File logFile = LittleFS.open(LOG_FILE_PATH, "w");
+    if (logFile)
+    {
+      logFile.close();
+    }
   }
 }
 
@@ -391,6 +421,7 @@ void SerialLog::rotateLogFile()
  */
 void SerialLog::logResetReason()
 {
+  RecursiveLockGuard lock(_mutex);
   esp_reset_reason_t reason = esp_reset_reason();
   String reasonStr;
 
@@ -452,57 +483,69 @@ void SerialLog::logResetReason()
 
     if (g_crashLog.head > 0 || g_crashLog.wrapped)
     {
-      // Open the crash log file in LittleFS for appending the crash details
-      File crashFile = LittleFS.open(CRASH_FILE_PATH, "a");
-      if (crashFile)
+      bool rotateNeeded = false;
       {
-        char bootTime[64];
-        getTimestamp(bootTime, sizeof(bootTime));
-        crashFile.printf("\n=========================================\n");
-        crashFile.printf("CRASH DETECTED ON BOOT: %s", bootTime);
-        crashFile.printf("RESET REASON: %s\n", reasonStr.c_str());
-        crashFile.printf("-----------------------------------------\n");
-      }
+        // Open the crash log file in LittleFS for appending the crash details
+        File crashFile = LittleFS.open(CRASH_FILE_PATH, "a");
+        if (crashFile)
+        {
+          char bootTime[64];
+          getTimestamp(bootTime, sizeof(bootTime));
+          crashFile.printf("\n=========================================\n");
+          crashFile.printf("CRASH DETECTED ON BOOT: %s", bootTime);
+          crashFile.printf("RESET REASON: %s\n", reasonStr.c_str());
+          crashFile.printf("-----------------------------------------\n");
+        }
 
-      print("--- CRASH DUMP FROM PREVIOUS SESSION ---\n");
+        print("--- CRASH DUMP FROM PREVIOUS SESSION ---\n");
 
-      String dump = "";
-      dump.reserve(512);
-      size_t start = g_crashLog.wrapped ? g_crashLog.head : 0;
-      size_t count = g_crashLog.wrapped ? CRASH_LOG_SIZE : g_crashLog.head;
+        String dump = "";
+        dump.reserve(512);
+        size_t start = g_crashLog.wrapped ? g_crashLog.head : 0;
+        size_t count = g_crashLog.wrapped ? CRASH_LOG_SIZE : g_crashLog.head;
 
-      for (size_t i = 0; i < count; i++)
-      {
-        char c = g_crashLog.buffer[(start + i) % CRASH_LOG_SIZE];
-        if (c == '\0') continue; // Skip nulls
-        dump += c;
-        if (dump.length() >= 512)
+        for (size_t i = 0; i < count; i++)
+        {
+          char c = g_crashLog.buffer[(start + i) % CRASH_LOG_SIZE];
+          if (c == '\0') continue; // Skip nulls
+          dump += c;
+          if (dump.length() >= 512)
+          {
+            print(dump);
+            if (crashFile)
+            {
+              crashFile.print(dump);
+            }
+            dump = "";
+          }
+        }
+        if (dump.length() > 0)
         {
           print(dump);
           if (crashFile)
           {
             crashFile.print(dump);
           }
-          dump = "";
         }
-      }
-      if (dump.length() > 0)
-      {
-        print(dump);
+
+        print("\n--- END CRASH DUMP ---\n");
+
         if (crashFile)
         {
-          crashFile.print(dump);
+          crashFile.printf("\n=========================================\n");
+          size_t size = crashFile.size();
+          
+          // Check size and rotate if necessary
+          if (size >= MAX_CRASH_LOG_SIZE)
+          {
+            rotateNeeded = true;
+          }
+          crashFile.close();
         }
       }
-
-      print("\n--- END CRASH DUMP ---\n");
-
-      if (crashFile)
+      
+      if (rotateNeeded)
       {
-        crashFile.printf("\n=========================================\n");
-        crashFile.close();
-        
-        // Check size and rotate if necessary
         rotateCrashLogFile();
       }
     }
@@ -531,17 +574,6 @@ void SerialLog::logResetReason()
  */
 void SerialLog::rotateCrashLogFile()
 {
-  // Check size of the crash log file
-  File crashFile = LittleFS.open(CRASH_FILE_PATH, "r");
-  if (!crashFile)
-    return;
-
-  size_t size = crashFile.size();
-  crashFile.close();
-
-  if (size < MAX_CRASH_LOG_SIZE)
-    return;
-
   // Rotation needed
   String oldCrashPath = String(CRASH_FILE_PATH) + ".old";
 
@@ -552,13 +584,18 @@ void SerialLog::rotateCrashLogFile()
   }
 
   // Rename current crash log to .old
-  LittleFS.rename(CRASH_FILE_PATH, oldCrashPath);
-
-  // Immediately create a new empty crash log file
-  File newFile = LittleFS.open(CRASH_FILE_PATH, "w");
-  if (newFile)
+  if (LittleFS.exists(CRASH_FILE_PATH))
   {
-    newFile.close();
+    LittleFS.rename(CRASH_FILE_PATH, oldCrashPath);
+  }
+
+  {
+    // Immediately create a new empty crash log file
+    File newFile = LittleFS.open(CRASH_FILE_PATH, "w");
+    if (newFile)
+    {
+      newFile.close();
+    }
   }
 }
 
@@ -590,8 +627,11 @@ void SerialLog::unlock()
  */
 static void IRAM_ATTR writeToCrashBuffer(const char *msg)
 {
-  if (g_crashLog.magic != CRASH_LOG_MAGIC)
+  portENTER_CRITICAL_ISR(&g_crashLogMux);
+  if (g_crashLog.magic != CRASH_LOG_MAGIC) {
+    portEXIT_CRITICAL_ISR(&g_crashLogMux);
     return;
+  }
   if (g_crashLog.head >= CRASH_LOG_SIZE)
   {
     g_crashLog.head = 0;
@@ -605,6 +645,7 @@ static void IRAM_ATTR writeToCrashBuffer(const char *msg)
     if (g_crashLog.head == 0)
       g_crashLog.wrapped = true;
   }
+  portEXIT_CRITICAL_ISR(&g_crashLogMux);
 }
 
 /**
@@ -647,9 +688,7 @@ extern "C" void vApplicationMallocFailedHook(void)
 
   writeToCrashBuffer(buf);
 
-  Serial.print(buf);
-  Serial.flush();
-  delay(500);
+  ets_printf("%s", buf);
   esp_restart();
 }
 

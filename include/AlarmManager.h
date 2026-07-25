@@ -40,10 +40,12 @@ public:
   void update();
 
   /**
-   * @brief Triggers the alarm to start ringing.
-   * @param alarmId The ID of the alarm that is being triggered.
+   * @brief Triggers a new alarm to start ringing.
+   *
+   * @param alarmId The ID of the alarm to trigger.
+   * @return True if successfully triggered, false if another alarm was already ringing.
    */
-  void trigger(uint8_t alarmId);
+  bool trigger(uint8_t alarmId);
 
   /**
    * @brief Resumes an alarm that was ringing before a reboot.
@@ -62,6 +64,12 @@ public:
    * @return True if an alarm is active, false otherwise.
    */
   bool isRinging() const;
+
+  /**
+   * @brief Checks if a deferred resume is pending.
+   * @return True if a resume is pending, false otherwise.
+   */
+  bool isResumePending() const;
 
   /**
    * @brief Gets the ID of the currently ringing alarm.
@@ -94,6 +102,8 @@ private:
   RampStage _rampStage;
   BuzzerState _buzzerState;
   uint32_t _alarmStartTimestamp; // Unix timestamp
+  unsigned long _alarmStartMillis;
+  uint32_t _resumeElapsedSeconds;
   unsigned long _lastBeepTime;
 
   // --- Deferred Resume Logic ---

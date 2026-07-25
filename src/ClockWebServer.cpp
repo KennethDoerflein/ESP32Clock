@@ -259,45 +259,13 @@ void ClockWebServer::begin()
 
     server.on("/api/alarms/save", HTTP_POST, [](AsyncWebServerRequest *request)
               {
-        if (request->_tempObject) {
-            delete (std::vector<uint8_t>*)request->_tempObject;
-            request->_tempObject = nullptr;
-        } }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
-              {
-        
-        if (index == 0) {
-          // Early-reject if Content-Length is known. If total == 0, client is using
-          // chunked transfer — the cumulative check below is the backstop.
-          if (total > 0 && total > 8192) {
-            request->send(413, "text/plain", "Payload too large");
+        if (!request->_tempObject) {
+            request->send(400, "text/plain", "No payload");
             return;
-          }
-          
-          request->_tempObject = new std::vector<uint8_t>();
-          request->onDisconnect([request]() {
-            if (request->_tempObject) {
-              delete (std::vector<uint8_t>*)request->_tempObject;
-              request->_tempObject = nullptr;
-            }
-          });
         }
-
-        if (!request->_tempObject) return;
-
         std::vector<uint8_t>* buffer = (std::vector<uint8_t>*)request->_tempObject;
         
-        // Safety check for cumulative size
-        if (buffer->size() + len > 8192) {
-             delete buffer;
-             request->_tempObject = nullptr;
-             request->send(413, "text/plain", "Payload too large");
-             return;
-        }
-        
-        buffer->insert(buffer->end(), data, data + len);
-
-        if (index + len == total) {
-          // All data has been received.
+        // All data has been received.
           JsonDocument doc;
           DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
           delete buffer; // Clean up the buffer
@@ -387,7 +355,41 @@ void ClockWebServer::begin()
           TimeManager::getInstance().setNextAlarms();
 
           request->send(200, "text/plain", "Alarms saved successfully!");
-        } });
+    }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+        
+        if (index == 0) {
+          // Early-reject if Content-Length is known. If total == 0, client is using
+          // chunked transfer — the cumulative check below is the backstop.
+          if (total > 0 && total > 8192) {
+            request->client()->close();
+            return;
+          }
+          
+          request->_tempObject = new std::vector<uint8_t>();
+          request->onDisconnect([request]() {
+            if (request->_tempObject) {
+              delete (std::vector<uint8_t>*)request->_tempObject;
+              request->_tempObject = nullptr;
+            }
+          });
+        }
+
+        if (!request->_tempObject) return;
+
+        std::vector<uint8_t>* buffer = (std::vector<uint8_t>*)request->_tempObject;
+        
+        // Safety check for cumulative size
+        if (buffer->size() + len > 8192) {
+             delete buffer;
+             request->_tempObject = nullptr;
+             request->client()->close();
+             return;
+        }
+        
+        buffer->insert(buffer->end(), data, data + len);
+
+         });
 
     // --- API Handlers for Settings ---
     server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -432,47 +434,13 @@ void ClockWebServer::begin()
     server.on(
         "/api/settings/save", HTTP_POST, [](AsyncWebServerRequest *request)
         {
-            if (request->_tempObject) {
-                delete (std::vector<uint8_t>*)request->_tempObject;
-                request->_tempObject = nullptr;
-            } },
-        NULL,
-        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-           size_t index, size_t total)
-        {
-          if (index == 0)
-          {
-            if (total > 0 && total > 4096) {
-              request->send(413, "text/plain", "Payload too large");
-              return;
-            }
-            request->_tempObject = new std::vector<uint8_t>();
-            request->onDisconnect([request]() {
-              if (request->_tempObject) {
-                delete (std::vector<uint8_t>*)request->_tempObject;
-                request->_tempObject = nullptr;
-              }
-            });
-          }
-
-          if (!request->_tempObject)
+        if (!request->_tempObject) {
+            request->send(400, "text/plain", "No payload");
             return;
-
-          std::vector<uint8_t> *buffer =
-              (std::vector<uint8_t> *)request->_tempObject;
-
-          if (buffer->size() + len > 4096) {
-              delete buffer;
-              request->_tempObject = nullptr;
-              request->send(413, "text/plain", "Payload too large");
-              return;
-          }
-
-          buffer->insert(buffer->end(), data, data + len);
-
-          if (index + len == total)
-          {
-            JsonDocument doc;
+        }
+        std::vector<uint8_t>* buffer = (std::vector<uint8_t>*)request->_tempObject;
+        
+        JsonDocument doc;
             DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
 
             delete buffer;
@@ -567,7 +535,42 @@ void ClockWebServer::begin()
 
               request->send(200, "text/plain", "Settings saved!");
             }
+    },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total)
+        {
+          if (index == 0)
+          {
+            if (total > 0 && total > 4096) {
+              request->client()->close();
+              return;
+            }
+            request->_tempObject = new std::vector<uint8_t>();
+            request->onDisconnect([request]() {
+              if (request->_tempObject) {
+                delete (std::vector<uint8_t>*)request->_tempObject;
+                request->_tempObject = nullptr;
+              }
+            });
           }
+
+          if (!request->_tempObject)
+            return;
+
+          std::vector<uint8_t> *buffer =
+              (std::vector<uint8_t> *)request->_tempObject;
+
+          if (buffer->size() + len > 4096) {
+              delete buffer;
+              request->_tempObject = nullptr;
+              request->client()->close();
+              return;
+          }
+
+          buffer->insert(buffer->end(), data, data + len);
+
+          
         });
 
     server.on("/api/settings/reset", HTTP_POST, [](AsyncWebServerRequest *request)
@@ -644,47 +647,13 @@ void ClockWebServer::begin()
     server.on(
         "/api/system/time", HTTP_POST, [](AsyncWebServerRequest *request)
         {
-            if (request->_tempObject) {
-                delete (std::vector<uint8_t>*)request->_tempObject;
-                request->_tempObject = nullptr;
-            } },
-        NULL,
-        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-           size_t index, size_t total)
-        {
-          if (index == 0)
-          {
-            if (total > 0 && total > 256) {
-              request->send(413, "text/plain", "Payload too large");
-              return;
-            }
-            request->_tempObject = new std::vector<uint8_t>();
-            request->onDisconnect([request]() {
-              if (request->_tempObject) {
-                delete (std::vector<uint8_t>*)request->_tempObject;
-                request->_tempObject = nullptr;
-              }
-            });
-          }
-
-          if (!request->_tempObject)
+        if (!request->_tempObject) {
+            request->send(400, "text/plain", "No payload");
             return;
-
-          std::vector<uint8_t> *buffer =
-              (std::vector<uint8_t> *)request->_tempObject;
-
-          if (buffer->size() + len > 256) {
-              delete buffer;
-              request->_tempObject = nullptr;
-              request->send(413, "text/plain", "Payload too large");
-              return;
-          }
-
-          buffer->insert(buffer->end(), data, data + len);
-
-          if (index + len == total)
-          {
-            JsonDocument doc;
+        }
+        std::vector<uint8_t>* buffer = (std::vector<uint8_t>*)request->_tempObject;
+        
+        JsonDocument doc;
             DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
             delete buffer;
             request->_tempObject = nullptr;
@@ -716,7 +685,7 @@ void ClockWebServer::begin()
             auto &logger = SerialLog::getInstance();
 
             // Log the old RTC time for drift diagnostics
-            DateTime oldRtcTime = RTC.now();
+            DateTime oldRtcTime = TimeManager::getInstance().getRTCTime();
             int32_t drift = 0;
             if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
             {
@@ -734,10 +703,10 @@ void ClockWebServer::begin()
                 check_tm.tm_hour,
                 check_tm.tm_min,
                 check_tm.tm_sec);
-            RTC.adjust(time_to_set);
+            TimeManager::getInstance().adjustRTC(time_to_set);
 
             // Verify the write
-            DateTime readback = RTC.now();
+            DateTime readback = TimeManager::getInstance().getRTCTime();
             int32_t writeError = abs((int32_t)readback.unixtime() - (int32_t)epoch);
             if (writeError > 2)
             {
@@ -757,25 +726,15 @@ void ClockWebServer::begin()
                           time_to_set.hour(), time_to_set.minute(), time_to_set.second());
 
             request->send(200, "application/json", "{\"success\":true,\"message\":\"Time synchronized successfully\"}");
-          }
-        });
-
-    server.on(
-        "/api/display/save", HTTP_POST, [](AsyncWebServerRequest *request)
-        {
-            if (request->_tempObject) {
-                delete (std::vector<uint8_t>*)request->_tempObject;
-                request->_tempObject = nullptr;
-            } },
+    },
         NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
            size_t index, size_t total)
         {
           if (index == 0)
           {
-            // Early-reject on known Content-Length; chunked fallback handled cumulatively below.
-            if (total > 0 && total > 4096) {
-              request->send(413, "text/plain", "Payload too large");
+            if (total > 0 && total > 256) {
+              request->client()->close();
               return;
             }
             request->_tempObject = new std::vector<uint8_t>();
@@ -793,18 +752,28 @@ void ClockWebServer::begin()
           std::vector<uint8_t> *buffer =
               (std::vector<uint8_t> *)request->_tempObject;
 
-          if (buffer->size() + len > 4096) {
+          if (buffer->size() + len > 256) {
               delete buffer;
               request->_tempObject = nullptr;
-              request->send(413, "text/plain", "Payload too large");
+              request->client()->close();
               return;
           }
 
           buffer->insert(buffer->end(), data, data + len);
 
-          if (index + len == total)
-          {
-            JsonDocument doc;
+          
+        });
+
+    server.on(
+        "/api/display/save", HTTP_POST, [](AsyncWebServerRequest *request)
+        {
+        if (!request->_tempObject) {
+            request->send(400, "text/plain", "No payload");
+            return;
+        }
+        std::vector<uint8_t>* buffer = (std::vector<uint8_t>*)request->_tempObject;
+        
+        JsonDocument doc;
             DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
             delete buffer;
             request->_tempObject = nullptr;
@@ -841,7 +810,43 @@ void ClockWebServer::begin()
 
               request->send(200, "text/plain", "Display settings saved!");
             }
+    },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total)
+        {
+          if (index == 0)
+          {
+            // Early-reject on known Content-Length; chunked fallback handled cumulatively below.
+            if (total > 0 && total > 4096) {
+              request->client()->close();
+              return;
+            }
+            request->_tempObject = new std::vector<uint8_t>();
+            request->onDisconnect([request]() {
+              if (request->_tempObject) {
+                delete (std::vector<uint8_t>*)request->_tempObject;
+                request->_tempObject = nullptr;
+              }
+            });
           }
+
+          if (!request->_tempObject)
+            return;
+
+          std::vector<uint8_t> *buffer =
+              (std::vector<uint8_t> *)request->_tempObject;
+
+          if (buffer->size() + len > 4096) {
+              delete buffer;
+              request->_tempObject = nullptr;
+              request->client()->close();
+              return;
+          }
+
+          buffer->insert(buffer->end(), data, data + len);
+
+          
         });
 
     server.on("/api/display/reset", HTTP_POST, [](AsyncWebServerRequest *request)
@@ -915,6 +920,14 @@ void ClockWebServer::begin()
         [](AsyncWebServerRequest *request, String filename, size_t index,
            uint8_t *data, size_t len, bool final)
         {
+          if (index == 0) {
+              request->onDisconnect([]() {
+                  if (UpdateManager::getInstance().isUpdateInProgress()) {
+                      UpdateManager::getInstance().abortUpdate();
+                  }
+              });
+          }
+
           if (UpdateManager::getInstance().isUpdateInProgress() && index == 0)
           {
             request->send(409, "text/plain", "An update is already in progress.");
@@ -963,14 +976,16 @@ void ClockWebServer::begin()
         }
         AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
             SerialLog::getInstance().lock();
-            File f = LittleFS.open(SerialLog::getLogFilePath(), "r");
             size_t len = 0;
-            if (f) {
-                if (index < f.size()) {
-                    f.seek(index);
-                    len = f.read(buffer, maxLen);
+            {
+                File f = LittleFS.open(SerialLog::getLogFilePath(), "r");
+                if (f) {
+                    if (index < f.size()) {
+                        f.seek(index);
+                        len = f.read(buffer, maxLen);
+                    }
+                    f.close();
                 }
-                f.close();
             }
             SerialLog::getInstance().unlock();
             return len;
@@ -1001,14 +1016,16 @@ void ClockWebServer::begin()
         }
         AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
             SerialLog::getInstance().lock();
-            File f = LittleFS.open(SerialLog::getCrashLogFilePath(), "r");
             size_t len = 0;
-            if (f) {
-                if (index < f.size()) {
-                    f.seek(index);
-                    len = f.read(buffer, maxLen);
+            {
+                File f = LittleFS.open(SerialLog::getCrashLogFilePath(), "r");
+                if (f) {
+                    if (index < f.size()) {
+                        f.seek(index);
+                        len = f.read(buffer, maxLen);
+                    }
+                    f.close();
                 }
-                f.close();
             }
             SerialLog::getInstance().unlock();
             return len;

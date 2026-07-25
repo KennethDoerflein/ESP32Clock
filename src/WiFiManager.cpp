@@ -134,17 +134,21 @@ void WiFiManager::handleConnection()
 
   // Flush credential save deferred from the event handler (safe to write NVS here)
   bool doCredentialSave = false;
+  String localTestSsid;
+  String localTestPassword;
   {
     LockGuard lock(_mutex);
     if (_pendingCredentialSave) {
       _pendingCredentialSave = false;
       doCredentialSave = true;
+      localTestSsid = _testSsid;
+      localTestPassword = _testPassword;
     }
   }
   if (doCredentialSave) {
     auto &config = ConfigManager::getInstance();
-    config.setWifiSSID(_testSsid);
-    config.setWifiPassword(_testPassword);
+    config.setWifiSSID(localTestSsid);
+    config.setWifiPassword(localTestPassword);
     config.save();
     LockGuard lock(_mutex);
     _pendingReboot = true;
@@ -542,24 +546,26 @@ void WiFiManager::setHostname(const String &hostname)
  */
 void WiFiManager::startConnectionTest(const String &ssid, const String &password, bool saveOnSuccess)
 {
-  LockGuard lock(_mutex);
-  if (_pendingReboot)
   {
-    SerialLog::getInstance().print("Ignoring new connection test, reboot is pending.\n");
-    return;
+    LockGuard lock(_mutex);
+    if (_pendingReboot)
+    {
+      SerialLog::getInstance().print("Ignoring new connection test, reboot is pending.\n");
+      return;
+    }
+
+    auto &logger = SerialLog::getInstance();
+    logger.printf("Starting connection test for SSID: %s\n", ssid.c_str());
+
+    _testSsid = ssid;
+    _testPassword = password;
+    _saveOnSuccess = saveOnSuccess;
+    _testStatus = TEST_IN_PROGRESS;
+
+    // Set a flag to tell the event handler to ignore the next disconnect event,
+    // which we are about to cause intentionally.
+    _ignoreDisconnectEvent = true;
   }
-
-  auto &logger = SerialLog::getInstance();
-  logger.printf("Starting connection test for SSID: %s\n", ssid.c_str());
-
-  _testSsid = ssid;
-  _testPassword = password;
-  _saveOnSuccess = saveOnSuccess;
-  _testStatus = TEST_IN_PROGRESS;
-
-  // Set a flag to tell the event handler to ignore the next disconnect event,
-  // which we are about to cause intentionally.
-  _ignoreDisconnectEvent = true;
 
   WiFi.disconnect(true);
   delay(100);

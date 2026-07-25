@@ -306,8 +306,8 @@ void ClockPage::drawClock(TFT_eSPI &tft)
   bool is24Hour = timeManager.is24HourFormat();
   char timeStr[8];
   char todStr[4];
-  timeManager.getFormattedTime(timeStr, sizeof(timeStr));
-  timeManager.getTOD(todStr, sizeof(todStr));
+  timeManager.getFormattedTime(timeStr, sizeof(timeStr), _renderSnapshot);
+  timeManager.getTOD(todStr, sizeof(todStr), _renderSnapshot);
 
   _sprClock.fillSprite(_bgColor);
   _sprClock.drawString(timeStr, _sprClock.width(), _sprClock.height() / 2);
@@ -334,7 +334,7 @@ void ClockPage::drawClock(TFT_eSPI &tft)
 void ClockPage::drawSeconds(TFT_eSPI &tft)
 {
   char secondsStr[4];
-  TimeManager::getInstance().getFormattedSeconds(secondsStr, sizeof(secondsStr));
+  TimeManager::getInstance().getFormattedSeconds(secondsStr, sizeof(secondsStr), _renderSnapshot);
   _sprSeconds.fillSprite(_bgColor);
   _sprSeconds.drawString(secondsStr, _sprSeconds.width(), 0);
 #ifdef DEBUG_BORDERS
@@ -350,7 +350,7 @@ void ClockPage::drawSeconds(TFT_eSPI &tft)
 void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
 {
   char dayStr[4];
-  TimeManager::getInstance().getDayOfWeek(dayStr, sizeof(dayStr));
+  TimeManager::getInstance().getDayOfWeek(dayStr, sizeof(dayStr), _renderSnapshot);
   _sprDayOfWeek.fillSprite(_bgColor);
   _sprDayOfWeek.drawString(dayStr, 0, _sprDayOfWeek.height() / 2);
 #ifdef DEBUG_BORDERS
@@ -365,8 +365,11 @@ void ClockPage::drawDayOfWeek(TFT_eSPI &tft)
  */
 void ClockPage::drawDate(TFT_eSPI &tft)
 {
+  char dayStr[4];
   char dateStr[12];
-  TimeManager::getInstance().getFormattedDate(dateStr, sizeof(dateStr));
+
+  TimeManager::getInstance().getDayOfWeek(dayStr, sizeof(dayStr), _renderSnapshot);
+  TimeManager::getInstance().getFormattedDate(dateStr, sizeof(dateStr), _renderSnapshot);
   _sprDate.fillSprite(_bgColor);
   _sprDate.drawString(dateStr, _sprDate.width(), _sprDate.height() / 2);
 #ifdef DEBUG_BORDERS
@@ -473,6 +476,7 @@ void ClockPage::drawHumidity(TFT_eSPI &tft)
  */
 void ClockPage::updateDisplayData(DisplayData &data)
 {
+  _renderSnapshot = TimeManager::getInstance().getCachedTime();
   fillClockDisplayBase(data);
   data.temp = getTemperature();
   data.humidity = getHumidity();
@@ -564,11 +568,11 @@ void ClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
 void ClockPage::fillClockDisplayBase(ClockDisplayBase &base) const
 {
   auto &timeManager = TimeManager::getInstance();
-  timeManager.getFormattedTime(base.time, sizeof(base.time));
-  timeManager.getFormattedDate(base.date, sizeof(base.date));
-  timeManager.getDayOfWeek(base.dayOfWeek, sizeof(base.dayOfWeek));
-  timeManager.getTOD(base.tod, sizeof(base.tod));
-  timeManager.getFormattedSeconds(base.seconds, sizeof(base.seconds));
+  timeManager.getFormattedTime(base.time, sizeof(base.time), _renderSnapshot);
+  timeManager.getFormattedDate(base.date, sizeof(base.date), _renderSnapshot);
+  timeManager.getDayOfWeek(base.dayOfWeek, sizeof(base.dayOfWeek), _renderSnapshot);
+  timeManager.getTOD(base.tod, sizeof(base.tod), _renderSnapshot);
+  timeManager.getFormattedSeconds(base.seconds, sizeof(base.seconds), _renderSnapshot);
 }
 
 void ClockPage::renderClockElements(TFT_eSPI &tft, const ClockDisplayBase &current, ClockDisplayBase &last)

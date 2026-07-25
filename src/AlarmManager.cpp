@@ -18,7 +18,7 @@
 /**
  * @brief Private constructor to enforce the singleton pattern.
  */
-AlarmManager::AlarmManager() : _isRinging(false), _activeAlarmId(-1)
+AlarmManager::AlarmManager() : _isRinging(false), _activeAlarmId(-1), _resumeElapsedSeconds(0), _alarmStartMillis(0)
 {
   _mutex = xSemaphoreCreateRecursiveMutex();
 }
@@ -73,14 +73,9 @@ void AlarmManager::update()
   }
 
   // --- Stage Progression Logic ---
-  uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();
-  
-  // Guard against unsigned underflow if RTC loses power and returns epoch 0.
-  // If now < _alarmStartTimestamp the subtraction wraps to ~4B, triggering an
-  // immediate auto-off or infinite ring. Treat any such state as elapsed = 0.
-  uint32_t alarmElapsedSeconds = (now >= _alarmStartTimestamp)
-      ? (now - _alarmStartTimestamp)
-      : 0;
+  // Use millis() for tracking elapsed time while ringing to avoid infinite ring
+  // if the RTC loses power or I2C bus hangs and returns epoch 0.
+  uint32_t alarmElapsedSeconds = _resumeElapsedSeconds + ((millis() - _alarmStartMillis) / 1000);
 
   // --- Auto-off Logic ---
   if (alarmElapsedSeconds >= ALARM_AUTO_OFF_SECONDS)
@@ -143,29 +138,58 @@ void AlarmManager::update()
  */
 void AlarmManager::stop()
 {
-  RecursiveLockGuard lock(_mutex);
-  if (!_isRinging)
-    return;
+  int alarmIdToStop = -1;
+  {
+    RecursiveLockGuard lock(_mutex);
+    if (!_isRinging)
+      return;
 
-  SerialLog::getInstance().printf("Stopping alarm ID %d\n", _activeAlarmId);
+    alarmIdToStop = _activeAlarmId;
+    _isRinging = false;
+    _activeAlarmId = -1;
+    
+    // --- Reset state machine ---
+    _rampStage = STAGE_SLOW_BEEP;
+    _buzzerState = BEEP_OFF;
+  } // Release mutex before calling out to other managers
+
+  SerialLog::getInstance().printf("Stopping alarm ID %d\n", alarmIdToStop);
   digitalWrite(BUZZER_PIN, LOW); // Ensure buzzer is off
-  _isRinging = false;
-  _activeAlarmId = -1;
+
+  auto &config = ConfigManager::getInstance();
+
+  // If this was a one-time alarm, disable it unless it was snoozed
+  // (if snoozed, it will ring again and eventually be fully stopped)
+  Alarm alarm = config.getAlarmById(alarmIdToStop);
+  if (alarm.getId() != 255)
+  {
+    if (alarm.getDays() == 0 && !alarm.isSnoozed())
+    {
+      alarm.setEnabled(false);
+      config.setAlarmById(alarmIdToStop, alarm);
+    }
+    else if (alarm.getDays() != 0 && !alarm.isSnoozed())
+    {
+      // Repeating alarm: dismiss it so it doesn't re-trigger as missed on reboot
+      alarm.dismiss(TimeManager::getInstance().getLocalTime());
+      config.setAlarmById(alarmIdToStop, alarm);
+    }
+  }
 
   // --- Clear the persisted ringing state ---
-  auto &config = ConfigManager::getInstance();
   config.setRingingAlarmId(-1);
   config.setRingingAlarmStartTimestamp(0);
   config.saveRingingAlarmState(); // Persist the change immediately
-
-  // --- Reset state machine ---
-  _rampStage = STAGE_SLOW_BEEP;
-  _buzzerState = BEEP_OFF;
+  // Also save general config in case the alarm was modified (disabled)
+  config.save();
 
   Display::getInstance().setBacklightFlashing(false);
 
   // Refresh display to clear alarm overlay
   DisplayManager::getInstance().requestPartialRefresh();
+  
+  // Check if we missed any alarms while this one was ringing
+  TimeManager::getInstance().checkMissedAlarms();
 }
 
 /**
@@ -176,6 +200,16 @@ bool AlarmManager::isRinging() const
 {
   RecursiveLockGuard lock(_mutex);
   return _isRinging;
+}
+
+/**
+ * @brief Checks if a deferred resume is pending.
+ * @return True if a resume is pending, false otherwise.
+ */
+bool AlarmManager::isResumePending() const
+{
+  RecursiveLockGuard lock(_mutex);
+  return _resumeAlarmOnBoot;
 }
 
 /**
@@ -197,27 +231,33 @@ int AlarmManager::getActiveAlarmId() const
  *
  * @param alarmId The ID of the alarm to trigger.
  */
-void AlarmManager::trigger(uint8_t alarmId)
+bool AlarmManager::trigger(uint8_t alarmId)
 {
-  RecursiveLockGuard lock(_mutex);
-  if (_isRinging)
-    return; // Don't trigger if another is already active
+  uint32_t alarmStartTs = 0;
+  {
+    RecursiveLockGuard lock(_mutex);
+    if (_isRinging)
+      return false; // Don't trigger if another is already active
 
-  SerialLog::getInstance().printf("Triggering alarm ID %d\n", alarmId);
+    SerialLog::getInstance().printf("Triggering alarm ID %d\n", alarmId);
 
-  // --- Initialize the ramping alarm state ---
-  _alarmStartTimestamp = TimeManager::getInstance().getRTCTime().unixtime();
-  _lastBeepTime = millis();
-  _rampStage = STAGE_SLOW_BEEP;
-  _buzzerState = BEEP_ON;
-  digitalWrite(BUZZER_PIN, HIGH); // Start with the buzzer on
-  _isRinging = true;
-  _activeAlarmId = alarmId;
+    // --- Initialize the ramping alarm state ---
+    _alarmStartTimestamp = TimeManager::getInstance().getRTCTime().unixtime();
+    alarmStartTs = _alarmStartTimestamp;
+    _alarmStartMillis = millis();
+    _resumeElapsedSeconds = 0;
+    _lastBeepTime = millis();
+    _rampStage = STAGE_SLOW_BEEP;
+    _buzzerState = BEEP_ON;
+    digitalWrite(BUZZER_PIN, HIGH); // Start with the buzzer on
+    _isRinging = true;
+    _activeAlarmId = alarmId;
+  }
 
   // --- Persist the ringing state ---
   auto &config = ConfigManager::getInstance();
   config.setRingingAlarmId(alarmId);
-  config.setRingingAlarmStartTimestamp(_alarmStartTimestamp);
+  config.setRingingAlarmStartTimestamp(alarmStartTs);
   config.saveRingingAlarmState(); // Persist the change immediately
 
   // Flash backlight
@@ -225,6 +265,8 @@ void AlarmManager::trigger(uint8_t alarmId)
 
   // Update display immediately to show alarm overlay
   DisplayManager::getInstance().requestPartialRefresh();
+  
+  return true;
 }
 
 /**
@@ -249,9 +291,8 @@ void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
   _alarmStartTimestamp = startTimestamp;
 
   // We don't know the buzzer state from before the reboot, so start it
+  _alarmStartMillis = millis();
   _lastBeepTime = millis();
-  _buzzerState = BEEP_ON;
-  digitalWrite(BUZZER_PIN, HIGH);
 
   // Re-evaluate the ramp stage based on how long it's been ringing.
   uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();
@@ -262,8 +303,23 @@ void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
   if (!TimeManager::getInstance().isTimeSet() || now < _alarmStartTimestamp) {
     SerialLog::getInstance().print("AlarmManager: RTC time invalid at resume, starting from STAGE_SLOW_BEEP.\n");
     _rampStage = STAGE_SLOW_BEEP;
+    _resumeElapsedSeconds = 0;
   } else {
     alarmElapsedSeconds = now - _alarmStartTimestamp;
+    
+    // Check if the alarm has already exceeded the auto-off time
+    if (alarmElapsedSeconds >= ALARM_AUTO_OFF_SECONDS) {
+      SerialLog::getInstance().print("AlarmManager: Resumed alarm already exceeded auto-off time. Silently clearing.\n");
+      _isRinging = false;
+      _activeAlarmId = -1;
+      auto &config = ConfigManager::getInstance();
+      config.setRingingAlarmId(-1);
+      config.setRingingAlarmStartTimestamp(0);
+      config.saveRingingAlarmState();
+      return;
+    }
+    
+    _resumeElapsedSeconds = alarmElapsedSeconds;
 
     if (alarmElapsedSeconds >= ((STAGE1_DURATION_MS + STAGE2_DURATION_MS) / 1000))
     {
@@ -278,6 +334,10 @@ void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
       _rampStage = STAGE_SLOW_BEEP;
     }
   }
+  
+  _buzzerState = BEEP_ON;
+  digitalWrite(BUZZER_PIN, HIGH);
+  
   SerialLog::getInstance().printf("Resumed at ramp stage %d\n", _rampStage);
 
   // Flash backlight

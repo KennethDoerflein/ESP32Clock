@@ -2,6 +2,7 @@
 
 #include "Page.h"
 #include <TFT_eSPI.h>
+#include <RTClib.h>
 #include <cstdint>
 #include <cstring>
 
@@ -114,5 +115,7 @@ protected:
 
   // Cached background color
   uint16_t _bgColor;
+
+  DateTime _renderSnapshot;
   TFT_eSPI *_tft;
 };

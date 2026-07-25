@@ -101,11 +101,7 @@ public:
    */
   void showAlarmScreen();
 
-  /**
-   * @brief Draws a progress bar for the alarm dismiss action.
-   * @param progress The progress of the bar (0.0 to 1.0).
-   */
-  void drawDismissProgressBar(float progress);
+
 
   /**
    * @brief Sets the progress of the alarm dismiss action.
@@ -113,10 +109,6 @@ public:
    */
   void setDismissProgress(float progress);
 
-  /**
-   * @brief Clears the alarm text and progress bar from the screen.
-   */
-  void clearAlarmOverlay();
 
   /**
    * @brief Displays a critical error message on the screen.

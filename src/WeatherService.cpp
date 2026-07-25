@@ -327,15 +327,18 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
 
   SerialLog::getInstance().printf("Resolving Location: %s\n", url.c_str());
 
-  http.begin(client, url);
+  if (!http.begin(client, url))
+  {
+    SerialLog::getInstance().print("Geocoding: http.begin failed\n");
+    return false;
+  }
+
   http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
   http.useHTTP10(true);    // Disable chunked transfer encoding for stream safety
   http.setTimeout(5000);   // 5s HTTP timeout
 
-  esp_task_wdt_delete(NULL); // Unenroll before blocking I/O — TLS handshake may exceed WDT timeout
+  esp_task_wdt_delete(NULL); // Unenroll before blocking I/O — TLS handshake + response stream
   int httpCode = http.GET();
-  esp_task_wdt_add(NULL);    // Re-enroll after blocking I/O
-  esp_task_wdt_reset();      // Feed immediately
   bool success = false;
 
   if (httpCode == 200)
@@ -349,103 +352,120 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
     filter["results"][0]["country_code"] = true;
     filter["results"][0]["admin1"] = true;
 
-    String payload = http.getString();
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
+    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+    http.end();
 
     if (!error)
     {
-      JsonArray results = doc["results"];
-      if (results.size() > 0)
+      if (doc["results"].is<JsonArray>())
       {
-        int bestIndex = 0;
-
-        // If we have a context string (e.g. "Paris, Texas"), try to find the best scoring match
-        if (context.length() > 0)
+        JsonArray results = doc["results"].as<JsonArray>();
+        if (results.size() > 0)
         {
-          String contextLower = context;
-          contextLower.toLowerCase();
-          int maxScore = -1;
+          int bestIndex = 0;
 
-          for (size_t i = 0; i < results.size(); i++)
+          // If we have a context string (e.g. "Paris, Texas"), try to find the best scoring match
+          if (context.length() > 0)
           {
-            String country = results[i]["country"].as<String>();
-            String countryCode = results[i]["country_code"].as<String>();
-            String admin1 = results[i]["admin1"].as<String>();
-            country.toLowerCase();
-            admin1.toLowerCase();
+            String contextLower = context;
+            contextLower.toLowerCase();
+            int maxScore = -1;
 
-            int score = 0;
+            for (size_t i = 0; i < results.size(); i++)
+            {
+              String country = results[i]["country"].isNull() ? "" : results[i]["country"].as<String>();
+              String countryCode = results[i]["country_code"].isNull() ? "" : results[i]["country_code"].as<String>();
+              String admin1 = results[i]["admin1"].isNull() ? "" : results[i]["admin1"].as<String>();
+              country.toLowerCase();
+              admin1.toLowerCase();
 
-            // Direct matches
-            if (admin1.length() > 0 && contextLower.indexOf(admin1) != -1)
-            {
-              score += 10;
-            }
-            if (country.length() > 0 && contextLower.indexOf(country) != -1)
-            {
-              score += 1;
-            }
+              int score = 0;
 
-            // Abbreviation match for US
-            if (countryCode == "US" && admin1.length() > 0)
-            {
-              for (const auto &state : US_STATES)
+              // Direct matches
+              if (admin1.length() > 0 && contextLower.indexOf(admin1) != -1)
               {
-                if (admin1 == state.name)
+                score += 10;
+              }
+              if (country.length() > 0 && contextLower.indexOf(country) != -1)
+              {
+                score += 1;
+              }
+
+              // Abbreviation match for US
+              if (countryCode == "US" && admin1.length() > 0)
+              {
+                for (const auto &state : US_STATES)
                 {
-                  if (checkWordPresence(contextLower, state.code))
+                  if (admin1 == state.name)
                   {
-                    score += 10;
+                    if (checkWordPresence(contextLower, state.code))
+                    {
+                      score += 10;
+                    }
+                    break;
                   }
-                  break;
                 }
               }
-            }
 
-            if (score > maxScore)
+              if (score > maxScore)
+              {
+                maxScore = score;
+                bestIndex = i;
+              }
+            }
+            if (maxScore > 0)
             {
-              maxScore = score;
-              bestIndex = i;
+              SerialLog::getInstance().printf("Best context match at index %d (Score: %d)\n", bestIndex, maxScore);
             }
           }
-          if (maxScore > 0)
+
+          if (!results[bestIndex]["latitude"].isNull() && !results[bestIndex]["longitude"].isNull() && !results[bestIndex]["name"].isNull())
           {
-            SerialLog::getInstance().printf("Best context match at index %d (Score: %d)\n", bestIndex, maxScore);
+            lat = results[bestIndex]["latitude"].as<float>();
+            lon = results[bestIndex]["longitude"].as<float>();
+
+            String name = results[bestIndex]["name"].as<String>();
+            String country = results[bestIndex]["country"].isNull() ? "" : results[bestIndex]["country"].as<String>();
+            String admin1 = results[bestIndex]["admin1"].isNull() ? "" : results[bestIndex]["admin1"].as<String>();
+
+            resolvedAddress = name;
+            if (admin1.length() > 0 && admin1 != name)
+              resolvedAddress += ", " + admin1;
+            if (country.length() > 0)
+              resolvedAddress += ", " + country;
+
+            success = true;
+            SerialLog::getInstance().printf("Found: %s (%.4f, %.4f)\n", resolvedAddress.c_str(), lat, lon);
+          }
+          else
+          {
+            SerialLog::getInstance().print("Geocoding result missing required lat/lon/name fields.\n");
           }
         }
-
-        lat = results[bestIndex]["latitude"];
-        lon = results[bestIndex]["longitude"];
-
-        String name = results[bestIndex]["name"].as<String>();
-        String country = results[bestIndex]["country"].as<String>();
-        String admin1 = results[bestIndex]["admin1"].as<String>();
-
-        resolvedAddress = name;
-        if (admin1.length() > 0 && admin1 != name)
-          resolvedAddress += ", " + admin1;
-        if (country.length() > 0)
-          resolvedAddress += ", " + country;
-
-        success = true;
-        SerialLog::getInstance().printf("Found: %s (%.4f, %.4f)\n", resolvedAddress.c_str(), lat, lon);
+        else
+        {
+          SerialLog::getInstance().print("No results in Geocoding response.\n");
+        }
       }
       else
       {
-        SerialLog::getInstance().print("No results in Geocoding response.\n");
+        SerialLog::getInstance().print("Geocoding JSON missing 'results' array.\n");
       }
     }
     else
     {
-      SerialLog::getInstance().printf("JSON Error: %s\n", error.c_str());
+      SerialLog::getInstance().printf("Geocoding JSON Error: %s\n", error.c_str());
     }
   }
   else
   {
     SerialLog::getInstance().printf("Geocoding HTTP Failed: %d\n", httpCode);
+    http.end();
   }
-  http.end();
+
+  esp_task_wdt_add(NULL);    // Re-enroll after blocking network I/O
+  esp_task_wdt_reset();      // Feed immediately
   return success;
 }
 
@@ -512,7 +532,7 @@ void WeatherService::updateLocation()
   SerialLog::getInstance().printf("Updating location for: %s\n", address.c_str());
 
   String resolved;
-  float lat, lon;
+  float lat = 0.0f, lon = 0.0f;
 
   if (resolveLocation(address, resolved, lat, lon))
   {
@@ -525,6 +545,13 @@ void WeatherService::updateLocation()
   else
   {
     SerialLog::getInstance().print("Failed to resolve location.\n");
+    LockGuard lock(_mutex);
+    if (_failureCount < UINT8_MAX) _failureCount++;
+    if (_failureCount >= MAX_CONSECUTIVE_FAILURES && _currentWeather.isValid)
+    {
+      _currentWeather.isValid = false;
+      SerialLog::getInstance().print("Weather: data invalidated (failed location resolution)\n");
+    }
   }
 }
 
@@ -551,7 +578,7 @@ void WeatherService::updateWeather()
   float lat = ConfigManager::getInstance().getLat();
   float lon = ConfigManager::getInstance().getLon();
 
-  if (lat == 0.0 && lon == 0.0)
+  if (lat == 0.0f && lon == 0.0f)
   {
     // Try to get location if we have address
     if (ConfigManager::getInstance().getAddress().length() > 0)
@@ -581,14 +608,25 @@ void WeatherService::updateWeather()
   SerialLog::getInstance().printf("Fetching Weather: %s\n", url.c_str());
   SerialLog::getInstance().printf("Free Heap before Weather Update: %u\n", freeHeap);
 
-  http.begin(client, url);
-  http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS); // Good practice
+  if (!http.begin(client, url))
+  {
+    SerialLog::getInstance().print("Weather: http.begin failed\n");
+    LockGuard lock(_mutex);
+    if (_failureCount < UINT8_MAX) _failureCount++;
+    if (_failureCount >= MAX_CONSECUTIVE_FAILURES && _currentWeather.isValid)
+    {
+      _currentWeather.isValid = false;
+      SerialLog::getInstance().print("Weather: data invalidated (too many consecutive failures)\n");
+    }
+    return;
+  }
+
+  http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
   http.useHTTP10(true);                                  // Disable chunked transfer encoding for stream safety
   http.setTimeout(5000);                                 // 5s HTTP timeout
-  esp_task_wdt_delete(NULL); // Unenroll before blocking I/O — TLS handshake may exceed WDT timeout
+
+  esp_task_wdt_delete(NULL); // Unenroll before blocking I/O — TLS handshake + response stream
   int httpCode = http.GET();
-  esp_task_wdt_add(NULL);    // Re-enroll after blocking I/O
-  esp_task_wdt_reset();      // Feed immediately
 
   if (httpCode == 200)
   {
@@ -614,72 +652,98 @@ void WeatherService::updateWeather()
     filter["daily"]["sunrise"] = true;
     filter["daily"]["sunset"] = true;
 
-    String payload = http.getString();
+    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
     http.end(); // Release connection early so we free network resources immediately
-    esp_task_wdt_reset(); // Feed WDT after reading response body
-    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
+
+    esp_task_wdt_add(NULL);    // Re-enroll after blocking I/O
+    esp_task_wdt_reset();      // Feed immediately
 
     if (!error)
     {
-      float temp = doc["current"]["temperature_2m"];
-      float feelsLike = doc["current"]["apparent_temperature"];
-      float humidity = doc["current"]["relative_humidity_2m"];
-      float windSpeed = doc["current"]["wind_speed_10m"];
-      int code = doc["current"]["weather_code"];
-
-      int cloudCover = doc["current"]["cloud_cover"] | 0;
-      float pressure = doc["current"]["pressure_msl"] | 0.0;
-      int windDirection = doc["current"]["wind_direction_10m"] | 0;
-      float windGusts = doc["current"]["wind_gusts_10m"] | 0.0;
-
-      int rainChance = doc["current"]["precipitation_probability"] | 0;
-      float uvIndex = doc["current"]["uv_index"] | 0.0;
-      float visibility = doc["current"]["visibility"] | 0.0;
-
-      String sunrise = "";
-      String sunset = "";
-      if (!doc["daily"]["sunrise"].isNull() && doc["daily"]["sunrise"].size() > 0)
+      if (doc["current"].is<JsonObject>() &&
+          !doc["current"]["temperature_2m"].isNull() &&
+          !doc["current"]["weather_code"].isNull())
       {
-        String raw = doc["daily"]["sunrise"][0].as<String>();
-        int tIndex = raw.indexOf('T');
-        if (tIndex != -1)
-          sunrise = raw.substring(tIndex + 1);
-        else
-          sunrise = raw;
+        float temp = doc["current"]["temperature_2m"].as<float>();
+        float feelsLike = doc["current"]["apparent_temperature"].isNull() ? temp : doc["current"]["apparent_temperature"].as<float>();
+        float humidity = doc["current"]["relative_humidity_2m"].isNull() ? 0.0f : doc["current"]["relative_humidity_2m"].as<float>();
+        float windSpeed = doc["current"]["wind_speed_10m"].isNull() ? 0.0f : doc["current"]["wind_speed_10m"].as<float>();
+        int code = doc["current"]["weather_code"].as<int>();
+
+        int cloudCover = doc["current"]["cloud_cover"] | 0;
+        float pressure = doc["current"]["pressure_msl"] | 0.0f;
+        int windDirection = doc["current"]["wind_direction_10m"] | 0;
+        float windGusts = doc["current"]["wind_gusts_10m"] | 0.0f;
+
+        int rainChance = doc["current"]["precipitation_probability"] | 0;
+        float uvIndex = doc["current"]["uv_index"] | 0.0f;
+        float visibility = doc["current"]["visibility"] | 0.0f;
+
+        String sunrise = "";
+        String sunset = "";
+        if (doc["daily"].is<JsonObject>())
+        {
+          if (doc["daily"]["sunrise"].is<JsonArray>() && doc["daily"]["sunrise"].size() > 0)
+          {
+            if (!doc["daily"]["sunrise"][0].isNull())
+            {
+              String raw = doc["daily"]["sunrise"][0].as<String>();
+              int tIndex = raw.indexOf('T');
+              if (tIndex != -1)
+                sunrise = raw.substring(tIndex + 1);
+              else
+                sunrise = raw;
+            }
+          }
+          if (doc["daily"]["sunset"].is<JsonArray>() && doc["daily"]["sunset"].size() > 0)
+          {
+            if (!doc["daily"]["sunset"][0].isNull())
+            {
+              String raw = doc["daily"]["sunset"][0].as<String>();
+              int tIndex = raw.indexOf('T');
+              if (tIndex != -1)
+                sunset = raw.substring(tIndex + 1);
+              else
+                sunset = raw;
+            }
+          }
+        }
+
+        {
+          LockGuard lock(_mutex);
+          _currentWeather.temp = temp;
+          _currentWeather.feelsLike = feelsLike;
+          _currentWeather.humidity = humidity;
+          _currentWeather.windSpeed = windSpeed;
+          _currentWeather.rainChance = rainChance;
+          _currentWeather.condition = getConditionFromWMO(code);
+
+          _currentWeather.uvIndex = uvIndex;
+          _currentWeather.cloudCover = cloudCover;
+          _currentWeather.pressure = pressure;
+          _currentWeather.visibility = visibility;
+          _currentWeather.windDirection = windDirection;
+          _currentWeather.windGusts = windGusts;
+          _currentWeather.sunrise = sunrise;
+          _currentWeather.sunset = sunset;
+
+          _currentWeather.isValid = true;
+          _failureCount = 0; // Success! Reset failures
+        }
+
+        SerialLog::getInstance().printf("Weather Updated: %.1fF, %s\n", temp, getConditionFromWMO(code));
       }
-      if (!doc["daily"]["sunset"].isNull() && doc["daily"]["sunset"].size() > 0)
+      else
       {
-        String raw = doc["daily"]["sunset"][0].as<String>();
-        int tIndex = raw.indexOf('T');
-        if (tIndex != -1)
-          sunset = raw.substring(tIndex + 1);
-        else
-          sunset = raw;
-      }
-
-      {
+        SerialLog::getInstance().print("Weather JSON Error: missing 'current' object or required fields\n");
         LockGuard lock(_mutex);
-        _currentWeather.temp = temp;
-        _currentWeather.feelsLike = feelsLike;
-        _currentWeather.humidity = humidity;
-        _currentWeather.windSpeed = windSpeed;
-        _currentWeather.rainChance = rainChance;
-        _currentWeather.condition = getConditionFromWMO(code);
-
-        _currentWeather.uvIndex = uvIndex;
-        _currentWeather.cloudCover = cloudCover;
-        _currentWeather.pressure = pressure;
-        _currentWeather.visibility = visibility;
-        _currentWeather.windDirection = windDirection;
-        _currentWeather.windGusts = windGusts;
-        _currentWeather.sunrise = sunrise;
-        _currentWeather.sunset = sunset;
-
-        _currentWeather.isValid = true;
-        _failureCount = 0; // Success! Reset failures
+        if (_failureCount < UINT8_MAX) _failureCount++;
+        if (_failureCount >= MAX_CONSECUTIVE_FAILURES && _currentWeather.isValid)
+        {
+          _currentWeather.isValid = false;
+          SerialLog::getInstance().print("Weather: data invalidated (too many consecutive failures)\n");
+        }
       }
-
-      SerialLog::getInstance().printf("Weather Updated: %.1fF, %s\n", temp, getConditionFromWMO(code));
     }
     else
     {
@@ -697,6 +761,9 @@ void WeatherService::updateWeather()
   {
     String errorMsg = http.errorToString(httpCode);
     SerialLog::getInstance().printf("Weather HTTP Failed: %d (%s)\n", httpCode, errorMsg.c_str());
+    http.end();
+    esp_task_wdt_add(NULL);    // Re-enroll after blocking I/O
+    esp_task_wdt_reset();      // Feed immediately
     LockGuard lock(_mutex);
     if (_failureCount < UINT8_MAX) _failureCount++;
     if (_failureCount >= MAX_CONSECUTIVE_FAILURES && _currentWeather.isValid)
@@ -704,6 +771,6 @@ void WeatherService::updateWeather()
       _currentWeather.isValid = false;
       SerialLog::getInstance().print("Weather: data invalidated (too many consecutive failures)\n");
     }
-    http.end();
   }
 }
+

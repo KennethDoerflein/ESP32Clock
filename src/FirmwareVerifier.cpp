@@ -34,7 +34,10 @@ bool FirmwareVerifier::computeSHA256(const uint8_t *data, size_t len, uint8_t *h
 FirmwareVerifier::SHA256Context::SHA256Context() : _ctx(nullptr)
 {
     _ctx = new mbedtls_sha256_context;
-    mbedtls_sha256_init((mbedtls_sha256_context *)_ctx);
+    if (_ctx)
+    {
+        mbedtls_sha256_init((mbedtls_sha256_context *)_ctx);
+    }
 }
 
 FirmwareVerifier::SHA256Context::~SHA256Context()

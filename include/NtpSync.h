@@ -14,8 +14,6 @@ extern const char *NTP_SERVER;
 extern const char *BACKUP_NTP_SERVER;
 /// @brief Tertiary (backup) NTP server address.
 extern const char *BACKUP2_NTP_SERVER;
-/// @brief Timezone information string for POSIX `setenv`.
-extern const char *TZ_INFO;
 
 /**
  * @brief One-time initialization of the SNTP client.
@@ -36,15 +34,6 @@ void initNtp();
  * @return false if the time could not be obtained.
  */
 bool getNTPData(struct tm &timeinfo);
-
-/**
- * @brief Synchronizes the device's RTC with the time from an NTP server.
- *
- * This function attempts to get the time using `getNTPData` and, if successful,
- * updates the RTC with this time.
- * @return True if the RTC was synchronized successfully, false otherwise.
- */
-bool syncTime();
 
 /**
  * @brief Represents the state of the non-blocking NTP synchronization process.
@@ -96,15 +85,3 @@ void resetNtpSync();
  * @return true if an NTP sync is in progress, false otherwise.
  */
 bool isNtpSyncInProgress();
-
-/**
- * @brief Fetches the current time from an NTP server without setting the RTC.
- *
- * This function retrieves the time from an NTP server and returns it as a
- * DateTime object. It is useful for checking the current time without
- * modifying the system's RTC.
- *
- * @return A DateTime object representing the current NTP time. If the sync
- *         fails, the returned object will be invalid (`!isValid()`).
- */
-DateTime getNtpTime();

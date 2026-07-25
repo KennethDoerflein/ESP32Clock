@@ -69,11 +69,13 @@ void WeatherClockPage::render(TFT_eSPI &tft)
 
   // Weather-specific elements
   if (fabs(currentData.outdoorTemp - _lastWeatherData.outdoorTemp) > 0.1 ||
-      currentData.outdoorCondition != _lastWeatherData.outdoorCondition)
+      currentData.outdoorCondition != _lastWeatherData.outdoorCondition ||
+      currentData.outdoorValid != _lastWeatherData.outdoorValid)
   {
     drawWeather(tft);
     _lastWeatherData.outdoorTemp = currentData.outdoorTemp;
     _lastWeatherData.outdoorCondition = currentData.outdoorCondition;
+    _lastWeatherData.outdoorValid = currentData.outdoorValid;
   }
 
   if (fabs(currentData.indoorTemp - _lastWeatherData.indoorTemp) > 0.1)
@@ -315,6 +317,7 @@ void WeatherClockPage::drawIndoorHumidity(TFT_eSPI &tft)
 
 void WeatherClockPage::updateDisplayData(WeatherClockDisplayData &data)
 {
+  _renderSnapshot = TimeManager::getInstance().getCachedTime();
   fillClockDisplayBase(data);
 
   data.indoorTemp = getTemperature();
@@ -323,6 +326,7 @@ void WeatherClockPage::updateDisplayData(WeatherClockDisplayData &data)
   WeatherData wd = WeatherService::getInstance().getCurrentWeather();
   data.outdoorTemp = wd.temp;
   data.outdoorCondition = wd.condition;
+  data.outdoorValid = wd.isValid;
 
   auto &timeManager = TimeManager::getInstance();
   std::vector<NextAlarmTime> alarms = timeManager.getNextAlarms(1);
@@ -373,5 +377,6 @@ void WeatherClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   _lastWeatherData.indoorHumidity = -999.0;
   _lastWeatherData.outdoorTemp = -999.0;
   _lastWeatherData.outdoorCondition = " ";
+  _lastWeatherData.outdoorValid = false;
   strncpy(_lastWeatherData.nextAlarm, "REFRESH", sizeof(_lastWeatherData.nextAlarm));
 }

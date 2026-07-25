@@ -121,6 +121,21 @@ cleanup:
 }
 
 /**
+ * @brief Aborts an in-progress update.
+ */
+void UpdateManager::abortUpdate()
+{
+    if (_updateInProgress)
+    {
+        SerialLog::getInstance().print("Update aborted by client disconnect.\n");
+        Update.abort();
+        _updateInProgress = false;
+        _updateFailed = false;
+        _lastError = "Aborted by disconnect";
+    }
+}
+
+/**
  * @brief Checks if an update is currently in progress.
  * @return True if an update is in progress, false otherwise.
  */
@@ -155,14 +170,12 @@ String UpdateManager::checkForUpdate()
     time_t now = time(nullptr);
     if (now < 1000000000)
     {
-        SerialLog::getInstance().print("Time not set. Attempting NTP sync...\n");
-        if (!syncTime())
-        {
-            result["error"] = "Failed to synchronize time. Cannot verify certificates.";
-            String out;
-            serializeJson(result, out);
-            return out;
-        }
+        SerialLog::getInstance().print("Time not set. Requesting NTP sync...\n");
+        startNtpSync();
+        result["error"] = "Time not set. Please wait a few seconds for synchronization and try again.";
+        String out;
+        serializeJson(result, out);
+        return out;
     }
 
     WiFiClientSecure client;
@@ -234,13 +247,9 @@ String UpdateManager::handleGithubUpdate()
     time_t now = time(nullptr);
     if (now < 1000000000) // Approx year 2001
     {
-        SerialLog::getInstance().print("Time not set. Attempting NTP sync...\n");
-        // Use a local ntp sync helper to avoid recursion if syncTime calls getNTPData which calls configTime
-        if (!syncTime())
-        {
-            return "Failed to synchronize time. Cannot verify certificates.";
-        }
-        now = time(nullptr);
+        SerialLog::getInstance().print("Time not set. Requesting NTP sync...\n");
+        startNtpSync();
+        return "Time not set. Please wait a few seconds for synchronization and try again.";
     }
     
     char timeStr[64];
@@ -358,6 +367,15 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
     // Enroll in Task Watchdog
     esp_task_wdt_add(NULL);
     
+    // Call the helper method to ensure C++ destructors run when it returns
+    doRunGithubUpdateTask(pvParameters);
+    
+    esp_task_wdt_delete(NULL); // Remove from watchdog before deleting task
+    vTaskDelete(NULL);
+}
+
+void UpdateManager::doRunGithubUpdateTask(void *pvParameters)
+{
     GithubUpdateInfo *updateInfo = (GithubUpdateInfo *)pvParameters;
     getInstance()._updateInProgress = true;
     getInstance()._lastError = "";
@@ -407,8 +425,6 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
             getInstance()._lastError = "Failed to download or parse signature file";
             delete updateInfo;
             getInstance()._updateInProgress = false;
-            esp_task_wdt_delete(NULL);
-            vTaskDelete(NULL);
             return;
         }
     }
@@ -451,8 +467,6 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
-                esp_task_wdt_delete(NULL);
-                vTaskDelete(NULL);
                 return;
             }
 
@@ -487,8 +501,6 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
-                esp_task_wdt_delete(NULL);
-                vTaskDelete(NULL);
                 return;
             }
 
@@ -505,8 +517,6 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
-                esp_task_wdt_delete(NULL);
-                vTaskDelete(NULL);
                 return;
             }
 
@@ -521,8 +531,6 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
-                esp_task_wdt_delete(NULL);
-                vTaskDelete(NULL);
                 return;
             }
 
@@ -537,8 +545,6 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
-                esp_task_wdt_delete(NULL);
-                vTaskDelete(NULL);
                 return;
             }
         }
@@ -554,13 +560,40 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 firmwareClient.stop();
                 delete updateInfo;
                 getInstance()._updateInProgress = false;
-                esp_task_wdt_delete(NULL);
-                vTaskDelete(NULL);
                 return;
             }
 
-            size_t written = Update.writeStream(*stream);
-            if (written != (size_t)contentLength)
+            size_t written = 0;
+            uint8_t chunkBuffer[4096];
+            while (firmwareHttp.connected() && (contentLength <= 0 || written < (size_t)contentLength))
+            {
+                esp_task_wdt_reset();
+                int available = stream->available();
+                if (available > 0)
+                {
+                    size_t toRead = min((size_t)available, sizeof(chunkBuffer));
+                    if (contentLength > 0)
+                    {
+                        toRead = min(toRead, (size_t)contentLength - written);
+                    }
+                    size_t read = stream->readBytes(chunkBuffer, toRead);
+                    if (read > 0)
+                    {
+                        if (Update.write(chunkBuffer, read) != read)
+                        {
+                            SerialLog::getInstance().print("Update write failed during stream\n");
+                            break;
+                        }
+                        written += read;
+                    }
+                }
+                else
+                {
+                    delay(10);
+                }
+            }
+
+            if (contentLength > 0 && written != (size_t)contentLength)
             {
                 SerialLog::getInstance().printf("Write failed: wrote %d of %d\n", written, contentLength);
             }
@@ -577,9 +610,7 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
                 delay(1000); // Give system time to flush logs before restart
                 SerialLog::getInstance().clearCrashLogMagic();
                 ESP.restart();
-                // Never reached, but include for safety
-                esp_task_wdt_delete(NULL);
-                vTaskDelete(NULL);
+                return;
             }
             else
             {
@@ -602,7 +633,4 @@ void UpdateManager::runGithubUpdateTask(void *pvParameters)
     firmwareHttp.end();
     firmwareClient.stop();
     delete updateInfo;
-    
-    esp_task_wdt_delete(NULL); // Remove from watchdog before deleting task
-    vTaskDelete(NULL);
 }

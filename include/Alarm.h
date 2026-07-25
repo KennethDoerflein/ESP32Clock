@@ -36,28 +36,14 @@ public:
    */
   static bool isOddWeek(const DateTime &dt)
   {
-    // Convert to time_t for reliable day-of-year calculation via struct tm.
-    time_t epoch = (time_t)dt.unixtime();
-    struct tm t;
-    gmtime_r(&epoch, &t);
-
-    // ISO 8601 week number approximation:
-    // Compute the ordinal day of the year (1-based), then derive the week.
-    // ISO weeks start on Monday (tm_wday: 0=Sun, so Mon=1).
-    int dayOfYear = t.tm_yday + 1; // tm_yday is 0-based
-    // Adjust so Monday=0 .. Sunday=6
-    int weekday = (t.tm_wday + 6) % 7;
-    int isoWeek = (dayOfYear - weekday + 10) / 7;
-
-    // Handle edge cases: week 0 belongs to previous year's last week.
-    // We allow isoWeek 53 to exist for years which have it, as parity (isoWeek % 2)
-    // still holds correctly. Only clamp if it somehow exceeds 53.
-    if (isoWeek < 1)
-      isoWeek = 52;
-    else if (isoWeek > 53)
-      isoWeek = 1;
-
-    return (isoWeek % 2) == 1;
+    // A robust, continuous week parity calculation that never flips mid-week
+    // or repeats at year boundaries (unlike ISO week numbers).
+    // Epoch (1970-01-01) was a Thursday.
+    // Monday, Jan 5, 1970 is 4 days after epoch.
+    // By subtracting 4 from days since epoch, we align week 0 to start on a Monday.
+    uint32_t daysSinceEpoch = dt.unixtime() / 86400;
+    int32_t absoluteWeek = ((int32_t)daysSinceEpoch - 4) / 7;
+    return (absoluteWeek % 2) == 1;
   }
 
   /**
@@ -115,10 +101,10 @@ public:
   uint32_t getSnoozeUntil() const { return _snoozeUntil; }
 
   /**
-   * @brief Gets the last day of the week the alarm was dismissed.
-   * @return The day of the week (0=Sun, 6=Sat), or an invalid value if not dismissed.
+   * @brief Gets the epoch day the alarm was last dismissed.
+   * @return The days since Unix epoch, or 0 if not dismissed.
    */
-  uint8_t getLastDismissedDay() const { return _lastDismissedDay; }
+  uint32_t getLastDismissedDayEpoch() const { return _lastDismissedDayEpoch; }
 
   /**
    * @brief Sets the unique identifier of the alarm.
@@ -182,10 +168,10 @@ public:
   }
 
   /**
-   * @brief Sets the last day the alarm was dismissed.
-   * @param day The day of the week (0=Sun, 6=Sat).
+   * @brief Sets the last day the alarm was dismissed as an epoch day.
+   * @param dayEpoch The days since Unix epoch.
    */
-  void setLastDismissedDay(uint8_t day) { _lastDismissedDay = day; }
+  void setLastDismissedDayEpoch(uint32_t dayEpoch) { _lastDismissedDayEpoch = dayEpoch; }
 
   /**
    * @brief Snoozes the alarm for a user-defined duration.
@@ -213,8 +199,8 @@ public:
     }
     else
     {
-      // For repeating alarms, record the day it was dismissed
-      _lastDismissedDay = now.dayOfTheWeek();
+      // For repeating alarms, record the absolute day it was dismissed
+      _lastDismissedDayEpoch = now.unixtime() / 86400;
     }
   }
 
@@ -247,7 +233,7 @@ public:
     }
 
     // For repeating alarms, check if it has already been dismissed today.
-    if (_days != 0 && _lastDismissedDay == now.dayOfTheWeek())
+    if (_days != 0 && _lastDismissedDayEpoch == now.unixtime() / 86400)
     {
       return false;
     }
@@ -288,5 +274,5 @@ private:
   bool _biweeklyOddWeek = false; // Which week parity to fire on (true=odd, false=even)
   bool _snoozed = false;
   uint32_t _snoozeUntil = 0;     // Unix timestamp for reboot resilience
-  uint8_t _lastDismissedDay = 8; // 8 is an invalid day to ensure it can ring on first boot
+  uint32_t _lastDismissedDayEpoch = 0; // Days since epoch it was last dismissed
 };

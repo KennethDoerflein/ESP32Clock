@@ -179,6 +179,7 @@ void enterSafeMode()
     {
       delay(250);
       logger.print(".");
+      esp_task_wdt_reset();
     }
 
     if (WiFi.status() == WL_CONNECTED)
@@ -482,6 +483,7 @@ void setup()
         triggerFactoryReset("snooze button", true);
       }
       delay(DEBOUNCE_DELAY); // Small delay to prevent busy-waiting.
+      esp_task_wdt_reset();
     }
 
     // If the button was released before the 10-second mark, cancel and proceed.
@@ -756,7 +758,7 @@ void loop()
           {
             alarm.dismiss(timeManager.getCachedTime());
             config.setAlarmById(alarmId, alarm);
-            config.save();
+            config.scheduleSave();
           }
           alarmManager.stop();
 
@@ -783,7 +785,7 @@ void loop()
           {
             alarm.snooze(config.getSnoozeDuration());
             config.setAlarmById(alarmId, alarm);
-            config.save();
+            config.scheduleSave();
           }
           alarmManager.stop();
 
@@ -833,7 +835,7 @@ void loop()
             config.setAlarmById(alarm.getId(), alarm);
           }
         }
-        config.save();
+        config.scheduleSave();
 
         // Force the alarm sprite to re-render, which will now be empty
         displayManager.update();

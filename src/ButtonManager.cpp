@@ -65,13 +65,17 @@ void IRAM_ATTR ButtonManager::handleInterrupt(void *arg)
   ButtonManager *instance = static_cast<ButtonManager *>(arg);
   portENTER_CRITICAL_ISR(&instance->_mux);
   unsigned long interruptTime = millis();
+  unsigned long elapsed = interruptTime - instance->_lastInterruptTime;
+  
+  // Always update last interrupt time to extend the debounce window
+  // as long as the mechanical switch is bouncing.
+  instance->_lastInterruptTime = interruptTime;
 
-  if (interruptTime - instance->_lastInterruptTime < DEBOUNCE_DELAY)
+  if (elapsed < DEBOUNCE_DELAY)
   {
     portEXIT_CRITICAL_ISR(&instance->_mux);
     return;
   }
-  instance->_lastInterruptTime = interruptTime;
 
   if (digitalRead(instance->_pin) == LOW)
   {
