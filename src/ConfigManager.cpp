@@ -416,9 +416,6 @@ bool ConfigManager::save()
     oldNumAlarms = LEGACY_ALARMS_COUNT;
   }
 
-  _preferences.putInt("numAlarms", _alarms.size());
-  _preferences.putInt("nextAlarmId", _nextAlarmId);
-
   // Clean up orphaned alarms if the number of alarms has decreased
   if ((int)_alarms.size() < oldNumAlarms)
   {
@@ -472,6 +469,9 @@ bool ConfigManager::save()
     snprintf(key, sizeof(key), "a_%zu_lastDis", i);
     _preferences.putUInt(key, _alarms[i].getLastDismissedDayEpoch());
   }
+
+  _preferences.putInt("numAlarms", _alarms.size());
+  _preferences.putInt("nextAlarmId", _nextAlarmId);
 
   SerialLog::getInstance().print("Configuration saved.");
   return true;

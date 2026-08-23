@@ -130,13 +130,13 @@ public:
    * @brief Sets the hour at which the alarm should ring.
    * @param hour The new hour for the alarm (0-23).
    */
-  void setHour(uint8_t hour) { _hour = hour; }
+  void setHour(uint8_t hour) { _hour = (hour > 23) ? 23 : hour; }
 
   /**
    * @brief Sets the minute at which the alarm should ring.
    * @param minute The new minute for the alarm (0-59).
    */
-  void setMinute(uint8_t minute) { _minute = minute; }
+  void setMinute(uint8_t minute) { _minute = (minute > 59) ? 59 : minute; }
 
   /**
    * @brief Sets the days of the week for the alarm to repeat.

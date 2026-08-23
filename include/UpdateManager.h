@@ -92,7 +92,7 @@ private:
 
     bool _updateFailed = false;
     std::atomic<bool> _updateInProgress{false};
-    String _lastError;
+    const char* _lastError = "";
 
 
     // GitHub update data structure

@@ -20,6 +20,7 @@
 #include <sys/time.h>
 #include <esp_task_wdt.h>
 #include <WiFi.h>
+#include <esp_sntp.h>
 
 #include <vector>
 #include <algorithm>
@@ -34,7 +35,11 @@ DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
   // If the alarm is snoozed, the next ring time is the snooze end time.
   if (alarm.isSnoozed())
   {
-    return DateTime(alarm.getSnoozeUntil());
+    time_t snoozeEpoch = alarm.getSnoozeUntil();
+    struct tm t_local;
+    localtime_r(&snoozeEpoch, &t_local);
+    return DateTime(t_local.tm_year + 1900, t_local.tm_mon + 1, t_local.tm_mday,
+                    t_local.tm_hour, t_local.tm_min, t_local.tm_sec);
   }
 
   // Check today
@@ -129,7 +134,14 @@ void TimeManager::syncSystemClockFromRTC()
   // Don't fight with an active NTP sync — the SNTP daemon is updating
   // the system clock in the background.
   // Don't fight with an active NTP sync or the background SNTP daemon
-  if (isNtpSyncInProgress() || WiFi.status() == WL_CONNECTED)
+  if (isNtpSyncInProgress())
+  {
+    return;
+  }
+
+  // If WiFi is connected, only defer to the SNTP daemon if it's currently in a successful state.
+  // If the internet is down, SNTP will fail, and we MUST fall back to the RTC.
+  if (WiFi.status() == WL_CONNECTED && sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED)
   {
     return;
   }

@@ -64,8 +64,8 @@ private:
   int _pin;
   volatile unsigned long _pressDuration;
   volatile bool _newPress;
-  unsigned long _lastInterruptTime;
-  unsigned long _buttonPressTime;
+  volatile unsigned long _lastInterruptTime;
+  volatile unsigned long _buttonPressTime;
   portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
 };
 

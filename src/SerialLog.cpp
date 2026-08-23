@@ -159,10 +159,7 @@ static void getTimestamp(char* buf, size_t maxLen)
 {
   time_t now = time(nullptr);
   struct tm t;
-  {
-    RecursiveLockGuard lock(TimeManager::getInstance().getI2CMutex());
-    localtime_r(&now, &t);
-  }
+  localtime_r(&now, &t);
 
   // Retrieve current task name safely
   const char *taskName = "unknown";
@@ -311,7 +308,13 @@ void SerialLog::logToFile(const char *message)
     _logBuffer += '\n';
   }
 
-  if (_logBuffer.length() >= BUFFER_THRESHOLD)
+  // Don't flush inline at the normal BUFFER_THRESHOLD (256B). The periodic
+  // loop() on LogicTask handles that every FLUSH_INTERVAL ms. Flushing here
+  // would allow any calling thread (e.g. WeatherUpdate) to perform LittleFS
+  // file I/O, which corrupts LittleFS internal state when another task is
+  // also mid-operation (see lfs_file_close assert crash).
+  // Only flush as a safety valve at 4KB to prevent OOM in degenerate bursts.
+  if (_logBuffer.length() >= 4096)
   {
     flush();
   }
@@ -324,6 +327,9 @@ void SerialLog::logToFile(const char *message)
 void SerialLog::flush()
 {
   if (_logBuffer.length() == 0)
+    return;
+
+  if (UpdateManager::getInstance().isUpdateInProgress())
     return;
 
   bool needsRotation = false;

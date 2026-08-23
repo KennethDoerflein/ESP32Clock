@@ -15,6 +15,7 @@
 #include "LockGuard.h"
 #include "driver/temp_sensor.h"
 #include <math.h>
+#include <Wire.h>
 #include "Display.h"
 
 // Instantiate the global sensor objects declared in the header.
@@ -115,6 +116,9 @@ static unsigned long prevSensorMillis = 0;
  */
 void setupSensors()
 {
+  Wire.begin();
+  Wire.setTimeOut(1000); // 1-second timeout to prevent indefinite bus hangs
+
   for (int i = 0; i < SENSOR_RETRY_COUNT; ++i)
   {
     bme280_found = BME.begin(BME280_I2C_ADDRESS);

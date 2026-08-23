@@ -705,9 +705,9 @@ void loop()
   // Check if settings have changed and need a reload.
   if (config.isDirty())
   {
+    config.clearDirtyFlag();
     displayManager.refresh();
     timeManager.setNextAlarms();
-    config.clearDirtyFlag();
     SerialLog::getInstance().print("Settings changed, refreshing display.\n");
     // Re-evaluate snooze state and update display
     timeManager.updateSnoozeStates();

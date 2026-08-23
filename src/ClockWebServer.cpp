@@ -268,7 +268,10 @@ void ClockWebServer::begin()
         // All data has been received.
           JsonDocument doc;
           DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
-          delete buffer; // Clean up the buffer
+          
+          // Use a std::unique_ptr to ensure the buffer is deleted when the function returns,
+          // safely keeping it alive while `doc` is processed (since ArduinoJson 7 uses zero-copy).
+          std::unique_ptr<std::vector<uint8_t>> autoBuffer(buffer);
           request->_tempObject = nullptr;
 
           if (error) {
@@ -443,7 +446,7 @@ void ClockWebServer::begin()
         JsonDocument doc;
             DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
 
-            delete buffer;
+            std::unique_ptr<std::vector<uint8_t>> autoBuffer(buffer);
             request->_tempObject = nullptr;
 
             if (error)
@@ -655,7 +658,7 @@ void ClockWebServer::begin()
         
         JsonDocument doc;
             DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
-            delete buffer;
+            std::unique_ptr<std::vector<uint8_t>> autoBuffer(buffer);
             request->_tempObject = nullptr;
 
             if (error)
@@ -775,7 +778,7 @@ void ClockWebServer::begin()
         
         JsonDocument doc;
             DeserializationError error = deserializeJson(doc, buffer->data(), buffer->size());
-            delete buffer;
+            std::unique_ptr<std::vector<uint8_t>> autoBuffer(buffer);
             request->_tempObject = nullptr;
 
             if (error)
