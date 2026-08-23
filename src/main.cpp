@@ -38,6 +38,8 @@
 #include <ESPAsyncWebServer.h>
 #include <DNSServer.h>
 #include <esp_task_wdt.h>
+#include <esp_ota_ops.h>
+#include <Update.h>
 #if __has_include("version.h")
 // This file exists, so we'll include it.
 #include "version.h"
@@ -449,7 +451,16 @@ void setup()
 
     if (bootCount >= SAFE_MODE_BOOT_THRESHOLD)
     {
-      // Boot loop detected — enter safe mode (never returns)
+      // If we got stuck in a boot loop and we have a previous OTA partition,
+      // force a software rollback before falling back to Safe Mode.
+      if (Update.canRollBack())
+      {
+        logger.print("Boot loop detected. Software rollback available. Rolling back...\n");
+        Update.rollBack();
+        ESP.restart();
+      }
+
+      // Boot loop detected and no rollback available — enter safe mode (never returns)
       enterSafeMode();
     }
   }
@@ -663,7 +674,8 @@ void loop()
   if (!bootCounterResetDone && currentMillis > 30000)
   {
     resetBootCounter();
-    SerialLog::getInstance().print("Uptime reached 30s. Boot counter reset. Firmware is stable.\n");
+    esp_ota_mark_app_valid_cancel_rollback(); // Confirm OTA update success to prevent rollback
+    SerialLog::getInstance().print("Uptime reached 30s. Boot counter reset and OTA marked valid. Firmware is stable.\n");
     bootCounterResetDone = true;
   }
 
