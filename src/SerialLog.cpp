@@ -74,9 +74,9 @@ void SerialLog::begin(AsyncWebServer *server)
  */
 void SerialLog::loop()
 {
-  if (xSemaphoreTakeRecursive(_mutex, 0) == pdTRUE)
-  { // Non-blocking check
-    if (_logBuffer.length() > 0 && (millis() - _lastFlushTime >= FLUSH_INTERVAL))
+  if (xSemaphoreTakeRecursive(_mutex, pdMS_TO_TICKS(50)) == pdTRUE)
+  {
+    if (_logBuffer.length() > 0 && ((millis() - _lastFlushTime >= FLUSH_INTERVAL) || _logBuffer.length() >= BUFFER_THRESHOLD))
     {
       flush();
     }
@@ -308,15 +308,15 @@ void SerialLog::logToFile(const char *message)
     _logBuffer += '\n';
   }
 
-  // Don't flush inline at the normal BUFFER_THRESHOLD (256B). The periodic
-  // loop() on LogicTask handles that every FLUSH_INTERVAL ms. Flushing here
-  // would allow any calling thread (e.g. WeatherUpdate) to perform LittleFS
-  // file I/O, which corrupts LittleFS internal state when another task is
-  // also mid-operation (see lfs_file_close assert crash).
-  // Only flush as a safety valve at 4KB to prevent OOM in degenerate bursts.
-  if (_logBuffer.length() >= 4096)
+  // Cap the in-memory buffer to prevent unbounded heap growth if flush is delayed.
+  // NEVER perform LittleFS file I/O from arbitrary calling tasks (e.g. WeatherUpdate, loopTask)
+  // because concurrent LittleFS operations across tasks/cores cause LittleFS internal corruption
+  // and assertion crashes (lfs_file_close). All LittleFS disk writes must only occur in loop() on LogicTask.
+  static const size_t MAX_LOG_BUFFER_CAP = 4096;
+  if (_logBuffer.length() > MAX_LOG_BUFFER_CAP)
   {
-    flush();
+    // Discard oldest bytes to keep within cap
+    _logBuffer = _logBuffer.substring(_logBuffer.length() - (MAX_LOG_BUFFER_CAP / 2));
   }
 }
 
@@ -411,14 +411,6 @@ void SerialLog::rotateLogFile()
   if (LittleFS.exists(LOG_FILE_PATH))
   {
     LittleFS.rename(LOG_FILE_PATH, oldLogPath);
-  }
-
-  {
-    File logFile = LittleFS.open(LOG_FILE_PATH, "w");
-    if (logFile)
-    {
-      logFile.close();
-    }
   }
 }
 
@@ -593,15 +585,6 @@ void SerialLog::rotateCrashLogFile()
   if (LittleFS.exists(CRASH_FILE_PATH))
   {
     LittleFS.rename(CRASH_FILE_PATH, oldCrashPath);
-  }
-
-  {
-    // Immediately create a new empty crash log file
-    File newFile = LittleFS.open(CRASH_FILE_PATH, "w");
-    if (newFile)
-    {
-      newFile.close();
-    }
   }
 }
 
