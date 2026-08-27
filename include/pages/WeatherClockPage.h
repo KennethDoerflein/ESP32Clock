@@ -14,7 +14,7 @@ struct WeatherClockDisplayData : public ClockDisplayBase
   float indoorTemp;
   float indoorHumidity;
   float outdoorTemp;
-  String outdoorCondition;
+  char outdoorCondition[32] = "";
   bool outdoorValid = false;
   char nextAlarm[16];
 };

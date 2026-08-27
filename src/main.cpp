@@ -641,8 +641,12 @@ void setup()
   else
   {
     logger.print("WiFi connection failed and RTC not set. Displaying setup instructions.\n");
-    display.drawMultiLineStatusMessage("Connect to Clock-Setup", "Go to http://192.168.4.1");
   }
+
+  // Bump the priority of the main Arduino loop task (Core 1) from 1 to 2.
+  // This guarantees that when the display needs to render (every 100ms),
+  // it fully preempts the WeatherUpdate task (Priority 1), preventing any UI stuttering.
+  vTaskPrioritySet(NULL, 2);
 
   // Create the Logic Task on Core 0
   xTaskCreatePinnedToCore(
@@ -679,13 +683,15 @@ void loop()
     bootCounterResetDone = true;
   }
 
-  // Implement a non-blocking delay to prevent watchdog timeouts.
-  if (currentMillis - g_lastLoopTime < LOOP_INTERVAL)
+  // Implement a non-blocking delay to prevent watchdog timeouts and save CPU.
+  // By delaying for the exact remaining time, we allow Core 1 to be fully utilized
+  // by other tasks (like WeatherUpdate) without waking up this task every 1ms.
+  unsigned long elapsed = currentMillis - g_lastLoopTime;
+  if (elapsed < LOOP_INTERVAL)
   {
-    delay(1); // Yield to other tasks.
-    return;
+    vTaskDelay(pdMS_TO_TICKS(LOOP_INTERVAL - elapsed));
   }
-  g_lastLoopTime = currentMillis;
+  g_lastLoopTime = millis();
 
   // --- Core Clock Logic (Runs regardless of WiFi connection) ---
   auto &timeManager = TimeManager::getInstance();

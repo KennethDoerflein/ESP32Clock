@@ -716,7 +716,8 @@ void WeatherService::updateWeather()
           _currentWeather.humidity = humidity;
           _currentWeather.windSpeed = windSpeed;
           _currentWeather.rainChance = rainChance;
-          _currentWeather.condition = getConditionFromWMO(code);
+          strncpy(_currentWeather.condition, getConditionFromWMO(code), sizeof(_currentWeather.condition) - 1);
+          _currentWeather.condition[sizeof(_currentWeather.condition) - 1] = '\0';
 
           _currentWeather.uvIndex = uvIndex;
           _currentWeather.cloudCover = cloudCover;
@@ -724,8 +725,10 @@ void WeatherService::updateWeather()
           _currentWeather.visibility = visibility;
           _currentWeather.windDirection = windDirection;
           _currentWeather.windGusts = windGusts;
-          _currentWeather.sunrise = sunrise;
-          _currentWeather.sunset = sunset;
+          strncpy(_currentWeather.sunrise, sunrise.c_str(), sizeof(_currentWeather.sunrise) - 1);
+          _currentWeather.sunrise[sizeof(_currentWeather.sunrise) - 1] = '\0';
+          strncpy(_currentWeather.sunset, sunset.c_str(), sizeof(_currentWeather.sunset) - 1);
+          _currentWeather.sunset[sizeof(_currentWeather.sunset) - 1] = '\0';
 
           _currentWeather.isValid = true;
           _failureCount = 0; // Success! Reset failures

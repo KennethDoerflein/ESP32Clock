@@ -11,7 +11,7 @@ struct WeatherData
   float humidity = 0.0;
   float windSpeed = 0.0;
   int rainChance = 0;
-  String condition = "";
+  char condition[32] = "";
 
   float uvIndex = 0.0;
   int cloudCover = 0;
@@ -19,8 +19,8 @@ struct WeatherData
   float visibility = 0.0;
   int windDirection = 0;
   float windGusts = 0.0;
-  String sunrise = "";
-  String sunset = "";
+  char sunrise[16] = "";
+  char sunset[16] = "";
 
   bool isValid = false;
 };

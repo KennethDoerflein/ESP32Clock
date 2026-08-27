@@ -43,7 +43,7 @@ void WeatherClockPage::onEnter(TFT_eSPI &tft)
   setupLayout(tft); // Calculate layout after sprites are created
 
   // Force a redraw of all elements
-  _lastWeatherData = {};
+  _lastWeatherData = WeatherClockDisplayData();
   _lastWeatherData.indoorTemp = -999.0;
   _lastWeatherData.indoorHumidity = -999.0;
   _lastWeatherData.outdoorTemp = -999.0;
@@ -69,12 +69,13 @@ void WeatherClockPage::render(TFT_eSPI &tft)
 
   // Weather-specific elements
   if (fabs(currentData.outdoorTemp - _lastWeatherData.outdoorTemp) > 0.1 ||
-      currentData.outdoorCondition != _lastWeatherData.outdoorCondition ||
+      strcmp(currentData.outdoorCondition, _lastWeatherData.outdoorCondition) != 0 ||
       currentData.outdoorValid != _lastWeatherData.outdoorValid)
   {
     drawWeather(tft);
     _lastWeatherData.outdoorTemp = currentData.outdoorTemp;
-    _lastWeatherData.outdoorCondition = currentData.outdoorCondition;
+    strncpy(_lastWeatherData.outdoorCondition, currentData.outdoorCondition, sizeof(_lastWeatherData.outdoorCondition) - 1);
+    _lastWeatherData.outdoorCondition[sizeof(_lastWeatherData.outdoorCondition) - 1] = '\0';
     _lastWeatherData.outdoorValid = currentData.outdoorValid;
   }
 
@@ -241,7 +242,7 @@ void WeatherClockPage::drawWeather(TFT_eSPI &tft)
     _sprWeather.loadFont(CenturyGothicBold48);
     _sprWeather.setTextColor(forecastColor, _bgColor);
     _sprWeather.setTextDatum(ML_DATUM);
-    _sprWeather.drawString(" " + wd.condition, currentX, centerY);
+    _sprWeather.drawString(String(" ") + wd.condition, currentX, centerY);
   }
   else
   {
@@ -325,7 +326,8 @@ void WeatherClockPage::updateDisplayData(WeatherClockDisplayData &data)
 
   WeatherData wd = WeatherService::getInstance().getCurrentWeather();
   data.outdoorTemp = wd.temp;
-  data.outdoorCondition = wd.condition;
+  strncpy(data.outdoorCondition, wd.condition, sizeof(data.outdoorCondition) - 1);
+  data.outdoorCondition[sizeof(data.outdoorCondition) - 1] = '\0';
   data.outdoorValid = wd.isValid;
 
   auto &timeManager = TimeManager::getInstance();
@@ -376,7 +378,7 @@ void WeatherClockPage::refresh(TFT_eSPI &tft, bool fullRefresh)
   _lastWeatherData.indoorTemp = -999.0;
   _lastWeatherData.indoorHumidity = -999.0;
   _lastWeatherData.outdoorTemp = -999.0;
-  _lastWeatherData.outdoorCondition = " ";
+  strcpy(_lastWeatherData.outdoorCondition, " ");
   _lastWeatherData.outdoorValid = false;
   strncpy(_lastWeatherData.nextAlarm, "REFRESH", sizeof(_lastWeatherData.nextAlarm));
 }
