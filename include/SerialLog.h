@@ -141,6 +141,13 @@ private:
   String _logBuffer;
   unsigned long _lastFlushTime;
   SemaphoreHandle_t _mutex;
+  size_t _currentLogSize = 0;
+  bool _logSizeInitialized = false;
+
+  /**
+   * @brief Initializes the tracked file size of the active log file.
+   */
+  void initLogSize();
 
   /**
    * @brief Writes a message to the log buffer.

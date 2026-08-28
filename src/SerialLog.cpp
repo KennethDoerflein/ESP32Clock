@@ -36,8 +36,8 @@ const char *SerialLog::LOG_FILE_PATH = "/system.log";
 const size_t SerialLog::MAX_LOG_SIZE = 256 * 1024;    // 256KB
 const char *SerialLog::CRASH_FILE_PATH = "/crash.log";
 const size_t SerialLog::MAX_CRASH_LOG_SIZE = 64 * 1024; // 64KB
-const size_t SerialLog::BUFFER_THRESHOLD = 256;       // 256 Bytes
-const unsigned long SerialLog::FLUSH_INTERVAL = 2000; // 2 Seconds
+const size_t SerialLog::BUFFER_THRESHOLD = 512;       // 512 Bytes
+const unsigned long SerialLog::FLUSH_INTERVAL = 5000; // 5 Seconds
 
 /**
  * @brief Constructs a new SerialLog instance.
@@ -321,6 +321,22 @@ void SerialLog::logToFile(const char *message)
 }
 
 /**
+ * @brief Initializes the tracked file size of the active log file.
+ * Assumes the mutex is already held by the caller.
+ */
+void SerialLog::initLogSize()
+{
+  _logSizeInitialized = true;
+  _currentLogSize = 0;
+  File f = LittleFS.open(LOG_FILE_PATH, "r");
+  if (f)
+  {
+    _currentLogSize = f.size();
+    f.close();
+  }
+}
+
+/**
  * @brief Flushes the log buffer to the file in LittleFS.
  * Assumes the mutex is already held by the caller.
  */
@@ -332,53 +348,34 @@ void SerialLog::flush()
   if (UpdateManager::getInstance().isUpdateInProgress())
     return;
 
-  bool needsRotation = false;
-
+  if (!_logSizeInitialized)
   {
-    File logFile = LittleFS.open(LOG_FILE_PATH, "a");
-    if (logFile)
-    {
-      if (logFile.size() >= MAX_LOG_SIZE)
-      {
-        needsRotation = true;
-      }
-      else
-      {
-        logFile.print(_logBuffer);
-        _logBuffer = "";
-        _lastFlushTime = millis();
-      }
-      logFile.close();
-    }
-    else
-    {
-      // If file open fails, clear the buffer early to prevent OOM.
-      // 1024 bytes is enough to hold recent context without risking heap exhaustion.
-      if (_logBuffer.length() > 1024)
-      {
-        _logBuffer = "";
-      }
-      return;
-    }
+    initLogSize();
   }
 
-  if (needsRotation)
+  // If appending the current buffer will exceed MAX_LOG_SIZE (or if file is already at max),
+  // rotate first so we start a clean new log file without opening the full file in append mode.
+  if (_currentLogSize + _logBuffer.length() >= MAX_LOG_SIZE)
   {
-    rotateLogFile(); // This assumes rotating doesn't need the mutex or is fast
-    File logFile = LittleFS.open(LOG_FILE_PATH, "a");
-    if (logFile)
+    rotateLogFile();
+  }
+
+  File logFile = LittleFS.open(LOG_FILE_PATH, "a");
+  if (logFile)
+  {
+    size_t written = logFile.print(_logBuffer);
+    logFile.close();
+    _currentLogSize += written;
+    _logBuffer = "";
+    _lastFlushTime = millis();
+  }
+  else
+  {
+    // If file open fails, clear the buffer early to prevent OOM.
+    // 1024 bytes is enough to hold recent context without risking heap exhaustion.
+    if (_logBuffer.length() > 1024)
     {
-      logFile.print(_logBuffer);
       _logBuffer = "";
-      _lastFlushTime = millis();
-      logFile.close();
-    }
-    else
-    {
-      if (_logBuffer.length() > 1024)
-      {
-        _logBuffer = "";
-      }
     }
   }
 }
@@ -401,17 +398,11 @@ void SerialLog::rotateLogFile()
   // Mutex should be held by caller
   String oldLogPath = String(LOG_FILE_PATH) + ".old";
 
-  // Remove the old backup if it exists
-  if (LittleFS.exists(oldLogPath))
-  {
-    LittleFS.remove(oldLogPath);
-  }
-
-  // Rename current log to .old
-  if (LittleFS.exists(LOG_FILE_PATH))
-  {
-    LittleFS.rename(LOG_FILE_PATH, oldLogPath);
-  }
+  // Directly remove old backup and rename current log without calling exists(),
+  // which causes unnecessary open/close cycles in LittleFS.
+  LittleFS.remove(oldLogPath);
+  LittleFS.rename(LOG_FILE_PATH, oldLogPath);
+  _currentLogSize = 0;
 }
 
 /**
@@ -575,17 +566,9 @@ void SerialLog::rotateCrashLogFile()
   // Rotation needed
   String oldCrashPath = String(CRASH_FILE_PATH) + ".old";
 
-  // Remove the old backup if it exists
-  if (LittleFS.exists(oldCrashPath))
-  {
-    LittleFS.remove(oldCrashPath);
-  }
-
-  // Rename current crash log to .old
-  if (LittleFS.exists(CRASH_FILE_PATH))
-  {
-    LittleFS.rename(CRASH_FILE_PATH, oldCrashPath);
-  }
+  // Directly remove old crash log and rename current without exists() overhead
+  LittleFS.remove(oldCrashPath);
+  LittleFS.rename(CRASH_FILE_PATH, oldCrashPath);
 }
 
 void SerialLog::cleanupClients()

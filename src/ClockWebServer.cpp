@@ -1046,15 +1046,9 @@ void ClockWebServer::begin()
     server.on("/api/crash/clear", HTTP_POST, [](AsyncWebServerRequest *request)
               {
         SerialLog::getInstance().lock();
-        if (LittleFS.exists(SerialLog::getCrashLogFilePath()))
-        {
-          LittleFS.remove(SerialLog::getCrashLogFilePath());
-        }
+        LittleFS.remove(SerialLog::getCrashLogFilePath());
         String oldCrashPath = String(SerialLog::getCrashLogFilePath()) + ".old";
-        if (LittleFS.exists(oldCrashPath))
-        {
-          LittleFS.remove(oldCrashPath);
-        }
+        LittleFS.remove(oldCrashPath);
         SerialLog::getInstance().unlock();
         request->send(200, "text/plain", "Crash log cleared successfully."); });
 
