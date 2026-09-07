@@ -270,13 +270,17 @@ void SerialLog::logToFile(const char *message)
   // We do this here to capture the formatted message.
   if (g_crashLog.magic == CRASH_LOG_MAGIC)
   {
+    // Compute length outside the critical section to keep it as short as possible.
+    // portENTER_CRITICAL on ESP32-S3 disables interrupts and spin-locks the other
+    // core; we must not do any non-trivial work (like strlen over a long string)
+    // while holding it.
+    size_t len = strlen(message);
     portENTER_CRITICAL(&g_crashLogMux);
     if (g_crashLog.head >= CRASH_LOG_SIZE)
     {
       g_crashLog.head = 0;
       g_crashLog.wrapped = false;
     }
-    size_t len = strlen(message);
     for (size_t i = 0; i < len; i++)
     {
       g_crashLog.buffer[g_crashLog.head] = message[i];
@@ -360,7 +364,34 @@ void SerialLog::flush()
     rotateLogFile();
   }
 
-  File logFile = LittleFS.open(LOG_FILE_PATH, "a");
+  // Open in "r+" (read/write without truncation) and seek to end ourselves, rather than
+  // using "a" mode. fopen("a") internally calls fseek(SEEK_END) as a separate VFS operation
+  // after open(), and in esp_littlefs this second call can assert (lfs_mlist_isopen) if the
+  // file handle was not fully registered in lfs->mlist — particularly after a rename().
+  // Using "r+"→seek-to-end bypasses newlib's append-mode fseek entirely.
+  // If the file doesn't exist yet (after rotation or first boot), use "w" to create it.
+  File logFile;
+  if (LittleFS.exists(LOG_FILE_PATH))
+  {
+    logFile = LittleFS.open(LOG_FILE_PATH, "r+");
+    if (logFile)
+    {
+      if (!logFile.seek(0, SeekEnd))
+      {
+        // seek() failed — the lfs_file handle is in a bad state (e.g. opened
+        // immediately after a rename() before LittleFS committed superblock).
+        // Reset the File so the close() below is skipped and we avoid the
+        // lfs_file_close assert on a null lfs_file pointer.
+        logFile.close();
+        logFile = File();
+      }
+    }
+  }
+  else
+  {
+    logFile = LittleFS.open(LOG_FILE_PATH, "w");
+  }
+
   if (logFile)
   {
     size_t written = logFile.print(_logBuffer);
@@ -371,8 +402,11 @@ void SerialLog::flush()
   }
   else
   {
-    // If file open fails, clear the buffer early to prevent OOM.
-    // 1024 bytes is enough to hold recent context without risking heap exhaustion.
+    // File open failed (or seek failed above) — reinitialize size tracking on
+    // next flush so we re-read actual size rather than relying on a stale estimate.
+    _logSizeInitialized = false;
+
+    // Clear the buffer to prevent OOM if writes keep failing.
     if (_logBuffer.length() > 1024)
     {
       _logBuffer = "";
@@ -401,8 +435,22 @@ void SerialLog::rotateLogFile()
   // Directly remove old backup and rename current log without calling exists(),
   // which causes unnecessary open/close cycles in LittleFS.
   LittleFS.remove(oldLogPath);
-  LittleFS.rename(LOG_FILE_PATH, oldLogPath);
-  _currentLogSize = 0;
+  bool renamed = LittleFS.rename(LOG_FILE_PATH, oldLogPath);
+
+  if (renamed)
+  {
+    _currentLogSize = 0;
+    // Yield briefly after rename so LittleFS can fully commit directory metadata
+    // before the next open(). Without this, lfs_file_open can race the superblock
+    // commit and produce a null lfs_file_t, triggering the lfs_mlist_isopen assert.
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+  else
+  {
+    // Rename failed — force size re-read on next flush so we don't permanently
+    // mistrack the file size and loop on rotation attempts.
+    _logSizeInitialized = false;
+  }
 }
 
 /**
@@ -474,8 +522,31 @@ void SerialLog::logResetReason()
     {
       bool rotateNeeded = false;
       {
-        // Open the crash log file in LittleFS for appending the crash details
-        File crashFile = LittleFS.open(CRASH_FILE_PATH, "a");
+        // Open the crash log file in LittleFS for appending the crash details.
+        // Do NOT use "a" mode: fopen("a") in esp_littlefs performs a second
+        // fseek(SEEK_END) VFS call after open, which can hit lfs_mlist_isopen
+        // assert if the lfs_file handle is null (same bug fixed in flush()).
+        // Use "r+"→seek-to-end when the file already exists, or "w" to create it.
+        File crashFile;
+        if (LittleFS.exists(CRASH_FILE_PATH))
+        {
+          crashFile = LittleFS.open(CRASH_FILE_PATH, "r+");
+          if (crashFile)
+          {
+            if (!crashFile.seek(0, SeekEnd))
+            {
+              // Seek failed — handle is in a bad state; close and fall through
+              // without writing so we don't trigger lfs_file_close assert.
+              crashFile.close();
+              crashFile = File();
+            }
+          }
+        }
+        else
+        {
+          crashFile = LittleFS.open(CRASH_FILE_PATH, "w");
+        }
+
         if (crashFile)
         {
           char bootTime[64];
@@ -644,7 +715,9 @@ extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskNa
 {
   // This hook may be called from ISR context on ESP32.
   // Avoid ALL FreeRTOS API, heap allocations, and mutex operations.
-  char buf[128];
+  // Use a static buffer — the task stack has overflowed, so a stack-allocated
+  // local of any meaningful size risks clobbering adjacent memory before restart.
+  static char buf[128];
   snprintf(buf, sizeof(buf), "\n[STACK OVERFLOW] Task: '%s' overflowed its stack!\n", pcTaskName ? pcTaskName : "?");
 
   writeToCrashBuffer(buf);
