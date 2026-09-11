@@ -14,31 +14,75 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
   - [First-Time Setup](#first-time-setup)
   - [Web Interface](#web-interface)
   - [Physical Button Functions](#physical-button-functions)
+  - [Safe Mode & Boot Loop Protection](#safe-mode--boot-loop-protection)
   - [Factory Reset](#factory-reset)
 - [Features and Settings in Detail](#features-and-settings-in-detail)
+  - [WiFi Page](#wifi-page)
+  - [Alarms Page](#alarms-page)
+  - [Weather Page](#weather-page)
+  - [Settings Page](#settings-page)
+  - [Logs Page](#logs-page)
+  - [System Page](#system-page)
+  - [Temperature & Environmental Sensor Architecture](#temperature--environmental-sensor-architecture)
 - [Project Roadmap](#project-roadmap)
 
 ## Features
 
-- **Large Color Display**: A 4" 480x320 color IPS display provides a clear and vibrant user interface.
-- **Weather Forecast**: Accurate local weather data powered by Open-Meteo, including temperature, humidity, wind speed, rain chance, and current conditions.
-- **Offline Mode**: Operate the clock completely disconnected from Wi-Fi, disabling online services like NTP and weather.
-- **Web-Based Configuration**: A mobile-friendly web UI allows for easy setup and configuration without needing to re-flash the firmware.
-- **Dynamic Alarms**: Configure up to 20 alarms. Add, delete, and modify alarms directly from the web interface.
-- **Customizable UI**: Change display colors, flip the screen orientation, invert colors, and toggle between 12/24-hour format and Celsius/Fahrenheit.
-- **Page Management**: Enable, disable, and reorder display pages (Clock, Weather, Weather+Clock, Info) to suit your preference.
-- **WiFi & AP Mode**: Connects to your local WiFi network or starts its own Access Point (`Clock-Setup`) if credentials are not set.
-- **Automatic Time Sync**: An onboard Real-Time Clock (DS3231) with battery backup keeps accurate time, synchronized daily with NTP internet servers.
-- **Timezone Support**: Select your local timezone from a dropdown list.
-- **Temperature Sensors & Calibration**: A BME280 sensor for ambient temperature and humidity, and a sensor within the DS3231 for time-drift compensation. Includes auto-calibration and manual compensation factors for enclosure heat.
-- **Smart Brightness Control**: The display backlight can be controlled manually via the web UI or set to an automatic day/night schedule.
-- **System Logging**: Integrated logging system with file rotation (`system.log`) and a live WebSocket-based log viewer in the web UI.
-- **Over-the-Air (OTA) Updates**: Update the clock's firmware directly from the web interface.
-- **Persistent Storage**: All settings (WiFi credentials, display preferences, alarms) are saved to the ESP32's internal flash storage.
-- **mDNS Support**: Access the clock's web interface using a human-readable name (e.g., `ESP32Clock-XXXXXX.local`).
-- **Physical Factory Reset**: Hardware-based methods to reset the device to its default settings.
-
----
+- **Large Color Display**: A 4" 480x320 color IPS display provides a clear and vibrant user interface with smooth anti-aliased font rendering and sprite-based double buffering.
+- **Rich Weather Forecasts**: Local weather powered by the Open-Meteo API, including current temperature, apparent "feels like" temperature, relative humidity, wind speed, wind direction, wind gusts, rain probability, cloud cover, UV index, atmospheric pressure, visibility, weather conditions, and daily sunrise/sunset times.
+- **Asynchronous Geocoding**: Enter any city or address (e.g., "New York, NY" or "Paris, France") and coordinates are automatically resolved asynchronously via the Open-Meteo Geocoding API with state-code awareness.
+- **Multi-Layer Timekeeping & Synchronization**:
+  - Hardware DS3231 Real-Time Clock with battery backup ensures uninterrupted timekeeping across power outages.
+  - Multi-tier NTP synchronization (primary: `time.nist.gov`, backup: `time.cloudflare.com`, fallback: `us.pool.ntp.org`) with exponential backoff and jitter.
+  - Daily automatic synchronization, periodic drift detection and resyncing.
+  - Initial boot seeding from RTC to guarantee accurate timestamps prior to network connection.
+  - Browser-to-device one-click manual time sync via web interface for air-gapped or offline setups.
+  - Automatic Daylight Saving Time (DST) detection and full POSIX timezone support.
+- **Advanced Dynamic Alarms**:
+  - Configure up to 20 alarms via the web interface.
+  - Set custom hour and minute, individual days of the week, or one-time alarms.
+  - **Biweekly Scheduling**: Configure alarms to repeat every other week (even or odd week cycles).
+  - **3-Stage Progressive Ramping Buzzer**: Transitions from slow beeping (10s) to rapid beeping (20s) to continuous tone.
+  - Visual alarm indicators: flashing display backlight and on-screen active alarm / snooze countdown overlay.
+  - **Reboot Persistence & Auto-Shutoff**: Automatically resumes ringing if a power cycle occurs while active, and automatically silences after 30 minutes.
+  - **Missed Alarm Catch-Up**: Detects and triggers alarms that were missed during unexpected power outages or clock adjustments (capped at 90 minutes).
+  - Customizable snooze duration and hold-to-dismiss timer.
+- **Environmental Sensing & Thermal Compensation**:
+  - BME280 sensor reads ambient room temperature, relative humidity, and pressure with fallback to DS3231 internal sensor.
+  - Exponential moving average (EMA) noise filtering.
+  - Cold-boot automatic temperature calibration.
+  - Configurable enclosure heat compensation factor and manual offset correction.
+  - Relative humidity compensation based on the August-Roche-Magnus approximation.
+- **Multi-Page Display Management**:
+  - 4 built-in display pages: **Clock**, **Weather**, **Weather+Clock** (combined), and **Info**.
+  - Enable, disable, and custom-order pages via Move Up / Move Down buttons in the web interface.
+  - Configurable startup/default page.
+  - Physical button single-press page cycling with display preemption on Core 1 for stutter-free rendering.
+- **Customizable Appearance**:
+  - Full hex color picker support for individual UI elements: Background, Time, AM/PM, Seconds, Day of Week, Date, Temperature, Humidity, Alarm/Snooze icons, Weather Temp, and Forecast conditions.
+  - Screen flip (180° rotation) and color inversion toggles.
+  - 12-hour (with AM/PM) or 24-hour format; Fahrenheit or Celsius temperature units.
+- **Smart Backlight Control**:
+  - Scheduled Auto Brightness with custom day/night transition hours and brightness levels.
+  - Manual brightness slider (0–255 PWM).
+- **Offline Mode**: Complete disconnected operation with WiFi and online polling turned off.
+- **WiFi Connectivity & Captive Portal**:
+  - Connects to 2.4 GHz 802.11 b/g/n networks.
+  - Automatic Access Point (`Clock-Setup`) and Captive Portal with OS connectivity detection if unconfigured or connection fails.
+  - In-browser network scanning and non-blocking credential testing.
+  - Custom hostname and mDNS address (e.g., `http://ESP32Clock-XXXXXX.local`).
+- **Secure OTA Updates**:
+  - Over-the-Air firmware updates directly from the web interface.
+  - GitHub Releases integration: one-click check and update directly from GitHub repository releases. This method uses Ed25519 signature verification to prevent unauthorized firmware installations.
+  - Manual web uploads are unverified and intended for sideloading/development.
+  - Dual-OTA partition layout (`app0` / `app1`) with automatic rollback on boot failure.
+- **Diagnostics, Crash Recovery & Safe Mode**:
+  - Boot loop detection: enters a minimal recovery environment (`Clock-SafeMode`) after repeated crash-boots.
+  - Hardware Task Watchdog Timer (TWDT) monitoring critical FreeRTOS tasks.
+  - RTC-backed crash log capturing panic and exception traces across unexpected reboots.
+  - Core dump support stored in a dedicated flash partition (`coredump.bin`) with web download and erase tools.
+  - Real-time WebSocket live logging and persistent rotating log files (`system.log`).
+- **Hardware & Web Factory Reset**: Multiple reset mechanisms (Web UI, runtime BOOT button 10s hold, or power-on Snooze button hold) with options to keep or clear WiFi credentials. System and crash logs persist across factory resets.
 
 ## Hardware Requirements
 
@@ -178,23 +222,27 @@ The following libraries are required and are automatically managed by PlatformIO
 
 ## Software Architecture
 
-The firmware is organized into a collection of singleton manager classes, each responsible for a specific aspect of the clock's functionality.
+The firmware is organized into a collection of singleton manager classes and modular components running across the ESP32-S3's dual cores (Core 0 for network/logic/logging; Core 1 for display rendering and timekeeping):
 
-- **`AlarmManager`**: Manages the physical ringing of an alarm (buzzer and display).
-- **`ClockWebServer`**: Manages the ESP32's web server for configuration and updates.
-- **`ConfigManager`**: Manages the application's configuration settings.
-- **`DisplayManager`**: Manages the active display page, alarm overlays, and orchestrates rendering.
-- **`SerialLog`**: A singleton logger that mirrors Serial output to a WebSocket and a rotating log file.
-- **`TimeManager`**: Manages timekeeping, NTP synchronization, and time formatting.
-- **`UpdateManager`**: Handles OTA (Over-the-Air) firmware updates.
-- **`WeatherService`**: Handles fetching weather data and resolving locations via Open-Meteo.
-- **`WiFiManager`**: Manages WiFi connectivity for the ESP32.
-- **`Display`**: Manages the low-level TFT display and backlight.
-- **`Page`**: An abstract base class for a single display page.
-  - **`ClockPage`**: A page that displays the main clock face.
-  - **`WeatherPage`**: A page that displays detailed weather conditions.
-  - **`WeatherClockPage`**: A combined page showing both time and weather.
-  - **`InfoPage`**: A simple page that displays static system information.
+- **`AlarmManager`**: Manages physical alarm ringing, buzzer frequency ramping across 3 progressive stages (slow beep -> fast beep -> continuous), display backlight flashing, reboot resume, and auto-shutoff timer.
+- **`ButtonManager`**: Provides debounced interrupt-based input handling for the multi-function physical button (press durations, page switching, snooze, and hold-to-dismiss).
+- **`ClockWebServer`**: Asynchronous web server hosting the configuration UI, REST API endpoints, live log WebSocket server, captive portal, and firmware upload receiver.
+- **`ConfigManager`**: Thread-safe configuration manager utilizing ESP32 NVS Preferences for persistent storage with write debouncing to protect flash memory.
+- **`DisplayManager`**: Orchestrates active display page lifecycle, page transitions, alarm overlay banners, dismiss progress bars, and status icons with display preemption on Core 1 for zero jitter.
+- **`Display`**: Low-level TFT display abstraction (ILI9488 SPI driver), screen rotation, color inversion, and LEDC PWM backlight control.
+- **`FirmwareVerifier`**: Provides cryptographic verification using Ed25519 signatures and SHA-256 streaming hashing before applying firmware updates.
+- **`NtpSync`**: Multi-tiered NTP client featuring exponential backoff, jitter, and automatic fallback across NIST, Cloudflare, and NTP Pool servers.
+- **`SensorModule`**: Interfaces with the BME280 (I2C) and DS3231 sensors, implementing I2C bus recovery, exponential moving average (EMA) noise filtering, enclosure thermal compensation, and August-Roche-Magnus humidity correction.
+- **`SerialLog`**: Centralized thread-safe logger mirroring serial output to a live WebSocket feed, persistent rotating LittleFS file (`system.log`), and RTC memory crash dump buffer.
+- **`TimeManager`**: High-accuracy timekeeping coordinator bridging the DS3231 hardware RTC and ESP32 system clock, tracking Daylight Saving Time, drift compensation, missed alarm detection, and biweekly parity calculations.
+- **`UpdateManager`**: Handles OTA firmware updates via file upload and automated GitHub Releases checks with cryptographic signature verification and dual-OTA partition rollback safety.
+- **`WeatherService`**: Handles asynchronous geocoding and fetches comprehensive weather metrics from Open-Meteo via HTTPS with PSRAM-backed JSON filtering; network loops execute in the background Logic Task (Core 0) with HTTPS requests offloaded to a persistent FreeRTOS worker (`WeatherUpdate` on Core 1 at priority 1, preempted by Core 1 display rendering).
+- **`WiFiManager`**: Manages WiFi STA connection, automatic reconnection, non-blocking connection tests, DNS captive portal, network scanning, and mDNS responder.
+- **`Page`**: An abstract base class for display pages:
+  - **`ClockPage`**: Large retro-styled digital clock face with time, AM/PM, seconds, day of week, date, indoor temperature, indoor humidity, and next alarm indicators.
+  - **`WeatherPage`**: Dedicated weather display showing current outdoor temperature, condition description, humidity, wind, and rain chance.
+  - **`WeatherClockPage`**: Split-layout screen combining clock display with live outdoor conditions and indoor environmental data.
+  - **`InfoPage`**: Static information screen showing device hostname, IP address, and firmware version.
 
 ---
 
@@ -221,26 +269,41 @@ The web interface is organized into several sections:
 
 ### Physical Button Functions
 
-The physical button (connected to GPIO 5) serves multiple purposes depending on the context:
+The physical button (connected to GPIO 5) is debounced via interrupts and serves multiple functions depending on the system state:
 
-- **Normal Operation**: A short press cycles through the available display pages (e.g., Clock, Weather, Weather+Clock).
+- **Normal Operation (Idle)**:
+  - A **short press** cycles through the configured enabled display pages in sequence (e.g., Clock -> Weather -> Info -> Weather+Clock).
 - **Alarm Ringing**:
-  - A **short press** will **snooze** the alarm for the duration specified in the web interface.
-  - **Pressing and holding** the button will **dismiss** the alarm. The required hold time can be configured in the web interface.
+  - A **short press** will **snooze** the ringing alarm for the configured snooze duration (default 9 minutes).
+  - **Pressing and holding** the button will **dismiss** the alarm. A graphical progress bar fills at the bottom of the screen while held; once the configured dismiss duration (default 3 seconds) is reached, the alarm is dismissed.
 - **Alarm Snoozed**:
-  - **Pressing and holding** the button for 3 seconds will end the snooze and dismiss the alarm.
+  - **Pressing and holding** the button for the dismiss duration will cancel snooze for all snoozed alarms, with real-time visual progress feedback on the display.
+
+### Safe Mode & Boot Loop Protection
+
+The firmware includes multi-stage boot protection to prevent bricking if an error or crash occurs during startup:
+
+- **Boot Counter**: A persistent counter in NVS is incremented immediately upon boot. It is only reset to zero after 30 seconds of stable, uninterrupted uptime.
+- **Automatic Firmware Rollback**: If repeated crashes occur and a previous working firmware partition is available in dual-OTA layout (`app0` / `app1`), the device automatically rolls back to the prior firmware version.
+- **Safe Mode Environment**: If 10 consecutive crash-boots occur without rollback, the clock halts normal initialization and enters **Safe Mode**:
+  - Starts minimal recovery peripherals only (screen, WiFi, and a lightweight web recovery server).
+  - Attempts to connect to saved WiFi or launches fallback AP **`Clock-SafeMode`** (`http://192.168.4.1`).
+  - Displays recovery instructions and IP on the screen.
+  - Allows uploading a fixed firmware binary via browser to recover the device without physical disassembly or serial flashing.
 
 ### Factory Reset
 
 There are three ways to perform a factory reset:
 
-1.  **Via the Web Interface**: Navigate to the "System" page and click the "Factory Reset" button.
-2.  **Boot-Time Reset**:
+1.  **Via the Web Interface**: Navigate to the "System" page and click either:
+    - **Factory Reset**: Erases all stored settings (including WiFi credentials, alarms, and display preferences) and reboots the device into setup mode. System and crash logs persist across factory resets.
+    - **Factory Reset (Keep WiFi)**: Erases all alarms, colors, and display settings, but preserves saved WiFi credentials. System and crash logs persist across factory resets.
+2.  **Boot-Time Reset (Physical)**:
     - Disconnect the clock from power.
     - Press and hold the **Snooze button** (GPIO 5).
-    - Reconnect the power while still holding the button.
-    - Continue holding for **30 seconds**. The screen will display a confirmation message.
-3.  **Runtime Reset**:
+    - Reconnect power while continuing to hold the button.
+    - Hold for **10 seconds**. The screen will display `"Hold for factory reset"` and then trigger the reset.
+3.  **Runtime Reset (Physical)**:
     - While the clock is running normally, press and hold the **Boot button** (GPIO 0) on the ESP32 board for **10 seconds**.
 
 ---
@@ -251,127 +314,129 @@ There are three ways to perform a factory reset:
 
 This page allows you to connect the clock to your local WiFi network.
 
-- **Scan for Networks**: Click the "Scan" button to see a list of available WiFi networks. Clicking on a network name will automatically fill in the SSID field.
-- **SSID & Password**: Manually enter your network's name and password.
-- **Save & Reboot**: Click to save the credentials to the device's persistent memory. The clock will then automatically reboot and connect to the configured network.
-- **Hostname**: You can set a custom hostname for the device on your network. This also serves as the mDNS address (e.g., `http://your-hostname.local`).
+- **Scan for Networks**: Click the "Scan" button to see a list of available 2.4 GHz WiFi networks with signal strength. Clicking on a network name automatically populates the SSID field.
+- **SSID & Password**: Manually enter or adjust your network's credentials.
+- **Test Connection**: Test credentials non-blockingly without saving or rebooting to confirm valid authentication.
+- **Save & Reboot**: Save credentials to persistent NVS storage and automatically reboot into station mode.
+- **Hostname**: Set a custom network hostname (1–63 alphanumeric characters or hyphens). This configures the DHCP client name and the mDNS local domain (e.g., `http://your-hostname.local`).
 
 ### Alarms Page
 
-- **Dynamic Alarms**: You can add up to 20 alarms. Click "Add Alarm" to create a new one.
-- **Alarm Management**: For each alarm, you can:
-  - **Enable/Disable**: Toggle the alarm on or off.
-  - **Set Time**: Configure the hour and minute.
-  - **Set Repeat Days**: Choose which days of the week the alarm should be active.
-  - **Delete**: Remove an alarm permanently.
-- **Snooze Duration**: Set the number of minutes the alarm will wait before ringing again after the snooze button is pressed.
-- **Dismiss Duration**: Configure how many seconds the physical button must be held down to dismiss a ringing alarm completely.
+- **Dynamic Alarms**: Add and configure up to 20 alarms simultaneously. Click "Add Alarm" to create a new one.
+- **Alarm Configuration**:
+  - **Enable/Disable**: Toggle any alarm on or off individually.
+  - **Time**: Select hour and minute in 12-hour or 24-hour format.
+  - **Repeat Days**: Choose specific days of the week (Sunday through Saturday), or leave days unselected for a one-time alarm that auto-disables after ringing.
+  - **Biweekly Mode**: Enable alternating two-week alarm schedules (even vs. odd ISO week parity cycles), ideal for shift work or rotating schedules.
+  - **Delete**: Permanently remove alarms.
+- **Progressive Ramping Buzzer**:
+  - **Stage 1 (0–10s)**: Gentle slow beeps (200ms on, 800ms off).
+  - **Stage 2 (10–30s)**: Urgent fast beeps (150ms on, 150ms off).
+  - **Stage 3 (30s–30m)**: Continuous high tone.
+  - **Auto-Shutoff**: Silences automatically after 30 minutes to prevent unattended ringing.
+- **Visual Feedback**:
+  - Flashing screen backlight while ringing.
+  - Large on-screen ringing banner displaying "ALARM" (or remaining countdown MM:SS when snoozed).
+  - When snoozed, an icon and countdown show the remaining snooze time.
+  - Animated dismiss progress bar at the bottom of the screen during button holds.
+- **Snooze & Dismiss Controls**:
+  - **Snooze Duration**: Configurable snooze time in minutes (default 9 minutes).
+  - **Dismiss Hold Duration**: Configurable hold time in seconds required to dismiss an active alarm or cancel snooze (default 3 seconds).
+- **Power Failure & Clock Jump Resiliency**:
+  - **Ringing State Persistence**: If power is cut while an alarm is ringing, the clock detects the active state upon boot, resumes ringing with the appropriate elapsed stage offset, and flashes the display.
+  - **Missed Alarm Window Catch-Up**: Checks for alarms that should have fired during unexpected power outages, reboots, or manual/NTP clock jumps and triggers them immediately (capped at 90 minutes).
 
 ### Weather Page
 
-This page allows you to configure the location for weather forecasts.
+This page allows you to configure location and inspect comprehensive weather metrics.
 
-- **Location Setup**: Enter your city or address in the input field (e.g., "New York, NY" or "Paris, France") and click "Save Location".
-- **Auto-Resolve**: The system will automatically resolve the address to coordinates using the Open-Meteo Geocoding API.
-- **Units**: Weather units (Celsius/Fahrenheit) follow the global system setting defined in the Settings page.
+- **Location Input**: Enter a city or address (e.g., "Seattle, WA", "Berlin, Germany", or zip code) and click "Save Location".
+- **Asynchronous Geocoding**: Resolves addresses in the background without blocking web requests or clock rendering, supporting international locations and US state abbreviations.
+- **Automatic Coordinates**: Stores resolved latitude and longitude in NVS; clearing the field disables weather polling.
+- **Comprehensive Live Metrics**:
+  - Current Temperature and Apparent ("Feels Like") Temperature.
+  - Relative Humidity (%) and Precipitation Chance (%).
+  - Wind Speed, Wind Direction (compass bearing, e.g., "NW"), and Wind Gusts.
+  - Atmospheric Pressure (hPa) and Visibility (meters).
+  - Cloud Cover (%) and UV Index.
+  - WMO Condition Description (e.g., "Clear", "Partly Cloudy", "Rain Showers", "Thunderstorm").
+  - Sunrise and Sunset times (formatted according to 12h/24h preference).
+- **Force Sync**: Trigger an immediate weather data refresh on demand.
+- **Background FreeRTOS Worker**: Dedicated persistent task on Core 1 with 10-minute update interval, exponential failure backoff, and PSRAM JSON parsing to avoid heap fragmentation.
 
 ### Settings Page
 
-This page is divided into two tabs: "General" and "Display".
+Divided into "General" and "Display" tabs.
 
 #### General Tab
 
 - **Page Configuration**:
-  - **Default Page**: Select which page the clock should show on startup.
-  - **Enabled Pages**: Drag and drop pages to reorder them or uncheck them to hide them from the rotation.
-- **Offline Mode**: Disables Wi-Fi connectivity and all online features (Weather, NTP sync) for a completely offline operation.
+  - **Default Page**: Choose which page the clock defaults to on startup (Clock, Weather, Info, or Weather+Clock).
+  - **Enabled Pages**: Reorder pages via Move Up / Move Down buttons or uncheck to remove them from physical button cycling.
+- **Offline Mode**: Completely turns off WiFi and all network operations (NTP, weather). Timekeeping and sensor monitoring continue uninterrupted.
 - **Brightness Settings**:
-  - **Auto Brightness**: Enables a schedule-based brightness adjustment, with configurable start/end times and day/night brightness levels.
-  - **Manual Brightness**: When Auto Brightness is disabled, a single slider allows you to set a fixed brightness level.
+  - **Auto Brightness**: Schedule-based backlight dimming. Configure daytime start hour, night start hour, daytime brightness level (0–255), and night brightness level (0–255).
+  - **Manual Brightness**: Fixed brightness slider active when Auto Brightness is disabled.
 - **Time and Display Format**:
-  - **24-Hour Format**: Toggles the time display between 12-hour (e.g., 3:45 PM) and 24-hour (e.g., 15:45) formats.
-  - **Use Celsius (°C)**: Switches the temperature display between Celsius and Fahrenheit.
-  - **Flip Display Orientation**: Rotates the display by 180 degrees.
-  - **Invert Colors**: Inverts the color palette of the screen.
-- **Timezone**: Select your local timezone from a dropdown list.
-- **Temperature Calibration**:
-  - **Auto Temperature Calibration**: Attempts to automatically calibrate the ambient temperature sensor upon a cold boot.
-  - **Manual Temperature Correction**: Allows you to set a fixed offset to the temperature reading.
-  - **Temperature Compensation Factor**: Adjusts how much the internal RTC temperature influences the ambient temperature reading to compensate for heat generated inside the enclosure.
+  - **24-Hour Format**: Toggle between 12-hour (with AM/PM) and 24-hour formats.
+  - **Temperature Units**: Toggle globally between Celsius (°C) and Fahrenheit (°F).
+  - **Flip Display Orientation**: Rotates the display 180 degrees.
+  - **Invert Colors**: Hardware IPS color inversion toggle.
+- **Timezone**: Select from standard POSIX timezone definitions with automated Daylight Saving Time transitions.
+- **Temperature Sensors & Calibration**:
+  - **Auto Temperature Calibration**: Performs automatic cold-boot calibration of the ambient sensor.
+  - **Manual Temperature Correction**: Set a fixed temperature offset (±°C) to adjust readings.
+  - **Temperature Compensation Factor**: Adjusts the ratio (0.00 to 1.00) of internal RTC temperature used to dynamically subtract enclosure heat from the ambient sensor.
+  - **August-Roche-Magnus Humidity Correction**: Automatically recalculates accurate relative humidity from the dew point whenever temperature offsets are applied.
+- **Reset General Settings**: Reverts general configuration options to factory defaults.
 
 #### Display Tab
 
-This tab provides a set of color pickers to customize the appearance of nearly every element on the clock face.
+Customizes the color palette of every element rendered on the screen:
 
-- **Customizable Elements**: Background, Time, AM/PM, Seconds, Day of the Week, Date, Temperature, Humidity, and Weather elements.
-- **Reset to Defaults**: A button is provided to revert all color settings to their original values.
+- **Color Pickers**: 10 distinct hex color pickers in the web UI for Background, Time, AM/PM Indicator (TOD), Seconds, Day of Week, Date, Indoor Temperature, Indoor Humidity, Weather Temperature, and Forecast Condition text (with system defaults for alarm and snooze icons).
+- **Reset to Defaults**: Restores all display colors to their default retro-cyan/green palette.
 
 ### Logs Page
 
-This page provides tools for monitoring and debugging the system.
+Diagnostic tools for live monitoring and crash analysis:
 
-- **Live Log**: A real-time WebSocket view of the serial log output.
-- **System Log File**:
-  - **Download**: Download the persistent `system.log` file.
-  - **Rollover**: Manually force a log file rotation (renames current to `.old` and starts fresh).
+- **Live Log Viewer**: Real-time streaming console output delivered via WebSockets with automatic reconnection and client cleanup.
+- **System Log File (`system.log`)**:
+  - Persistent log stored in LittleFS with automatic rotation at 256 KB (`system.log.old`).
+  - Web download button and manual "Rotate Log" trigger.
+  - Thread-safe write buffering to prevent filesystem corruption.
+- **Crash Log File (`crash.log`)**:
+  - Diagnostic crash log recording boot reset reasons, panic backtraces, and pre-crash log buffer contents captured in non-volatile RTC memory across watchdog resets and brownouts.
+  - Download and clear crash log endpoints.
+- **ESP32 Core Dump (`coredump.bin`)**:
+  - Downloads raw ELF/binary core dumps saved to the dedicated `coredump` partition (`0xE10000`) for post-mortem GDB debugging.
+  - Web button to clear/erase core dump flash partition.
 
 ### System Page
 
-This page contains tools for firmware updates and system-level commands.
+System diagnostics, updates, and maintenance:
 
-#### Firmware Update
+- **Cryptographic Firmware Update**:
+  - **Manual Upload**: Upload a compiled `firmware.bin` directly from your browser.
+  - **GitHub Update**: Queries GitHub Releases API for the latest release tag. Downloads `firmware.bin`, `firmware.sig`, and `firmware.sha256`, verifying the Ed25519 cryptographic signature against the onboard public key before flashing.
+  - **Dual-OTA Partitions & Rollback**: Uses `app0` / `app1` partitions. If newly flashed firmware fails to run stably for 30 seconds, the device automatically cancels the update and rolls back to the previous operational firmware.
+- **System Actions**:
+  - **Reboot Device**: Cleanly flushes settings and performs a software restart.
+  - **Factory Reset**: Erases all configuration in NVS flash and restarts.
+  - **Factory Reset (Keep WiFi)**: Clears alarms, display settings, and preferences while preserving WiFi credentials.
+  - **NTP Time Sync**: Manually triggers an immediate NTP synchronization cycle.
+  - **Manual Browser Time Sync**: One-click button (`/api/system/time`) that writes the client browser's exact Unix epoch to the DS3231 hardware RTC and system clock, calculating drift diagnostics and catching missed alarms.
+- **Live System Statistics**:
+  - **Free Heap**: Real-time available heap memory and minimum lifetime heap.
+  - **Uptime**: Continuous device run time since last boot.
+  - **WiFi RSSI**: Signal strength in dBm.
+  - **ESP32 Core Temperature**: Internal silicon temperature measured by on-chip thermal sensor.
+  - **Sensor Status**: Detection indicators and raw readings for BME280, DS3231 RTC, and enclosure compensation offsets.
 
-- **Manual Upload**: Update the firmware by selecting a compiled `.bin` file from your computer and clicking "Upload."
-- **GitHub Update**: The clock can automatically check for the latest release on this GitHub repository and perform an update if a newer version is available.
+### Temperature & Environmental Sensor Architecture
 
-#### System Actions
-
-- **Reboot Device**: Safely restarts the clock.
-- **Factory Reset**: Erases all stored settings (including WiFi credentials, alarms, and display preferences) and reboots the device.
-- **Factory Reset (Keep WiFi)**: Erases all settings _except_ for the saved WiFi credentials.
-
-#### System Information
-
-The System page also displays a live feed of the clock's internal statistics, which can be useful for diagnostics:
-
-- **Free Heap**: The amount of available memory.
-- **Uptime**: How long the device has been running since its last reboot.
-- **WiFi RSSI**: The signal strength of the WiFi connection.
-- **ESP32 Core Temperature**: The internal temperature of the main processor.
-
-### A Note on Temperature Sensors
-
-This project utilizes two temperature sensors:
-
-1.  **BME280**: This is the primary sensor for ambient room temperature and humidity, and its readings are what's shown on the main display.
-2.  **DS3231**: The Real-Time Clock module contains its own internal temperature sensor. This is used by the RTC to compensate for temperature variations and maintain accurate timekeeping. It is not displayed on the clock face.
-
----
-
-## Project Roadmap
-
-This project is broken down into phases to prioritize a functional base clock before implementing more complex features.
-
-### V1.1.0 (Completed - moved to V2.0.0)
-
-- [x] **Alarm Management**
-  - [x] Add/Delete alarms (Dynamic alarms).
-  - [x] Increased limit (up to 20 alarms).
-- [x] **Logging**
-  - [x] Create a log file that is stored in LittleFS.
-  - [x] The log file should be appended to and automatically roll over.
-  - [x] Live Log Viewer in Web UI.
-
-### V2.0.0 (Completed)
-
-- [x] **Add Weather Page**
-  - [x] Get longitude and latitude from a zip code/address and store it in the filesystem.
-  - [x] Use location data to get weather from Open-Meteo.
-  - [x] Update weather information periodically.
-  - [x] Add a "Weather" page and a combined "Weather+Clock" page.
-- [x] **UI/UX Enhancements**
-  - [x] Allow users to set a default display page.
-  - [x] Enable/Disable and reorder pages.
-
----
-
+1.  **BME280 Environmental Sensor**: Connected via shared I2C bus (GPIO 8/9). Measures ambient temperature, relative humidity, and barometric pressure. Features 9-clock I2C bus recovery on startup, exponential moving average (EMA) noise smoothing, and thermal inertia modeling.
+2.  **DS3231 High-Precision RTC**: Battery-backed I2C timekeeper with an internal temperature-compensated crystal oscillator (TCXO). Its internal temperature reading is used as an enclosure reference to subtract circuit heat from the ambient sensor.
+3.  **ESP32-S3 Internal Sensor**: Built-in silicon temperature sensor monitored for system health diagnostics and CPU load tracking.
+4.  **Brightness-Scaled Thermal Compensation**: Blends internal core and RTC temperatures (`0.25 * core + 0.75 * RTC`) to model enclosure heating, dynamically scaled by backlight PWM duty cycle (`0.80 + 0.20 * brightness_ratio`) and smoothed by an exponential moving average (EMA, alpha=0.02) to track enclosure thermal inertia without sudden jumps.

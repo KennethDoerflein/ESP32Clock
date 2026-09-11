@@ -46,6 +46,7 @@ const unsigned long SerialLog::FLUSH_INTERVAL = 5000; // 5 Seconds
 SerialLog::SerialLog() : _ws("/ws/log"), _lastFlushTime(0)
 {
   _mutex = xSemaphoreCreateRecursiveMutex();
+  _wsLogQueue = xQueueCreate(24, sizeof(char *));
   _logBuffer.reserve(BUFFER_THRESHOLD + 64); // Pre-allocate to reduce fragmentation
 }
 
@@ -65,6 +66,7 @@ SerialLog &SerialLog::getInstance()
  */
 void SerialLog::begin(AsyncWebServer *server)
 {
+  _connectedClients.store(0, std::memory_order_relaxed);
   _ws.onEvent(onEvent);
   server->addHandler(&_ws);
 }
@@ -82,6 +84,38 @@ void SerialLog::loop()
     }
     xSemaphoreGiveRecursive(_mutex);
   }
+
+  // Drain WebSocket log queue safely from this task context
+  if (_wsLogQueue != nullptr)
+  {
+    char *queuedMsg = nullptr;
+    size_t clientCount = _connectedClients.load(std::memory_order_relaxed);
+    if (clientCount == 0 || !_consoleLoggingEnabled)
+    {
+      // No clients connected or console logging disabled: discard queued messages to prevent backlog
+      while (xQueueReceive(_wsLogQueue, &queuedMsg, 0) == pdTRUE)
+      {
+        if (queuedMsg != nullptr)
+        {
+          free(queuedMsg);
+        }
+      }
+    }
+    else
+    {
+      // Clients connected: send queued messages as long as buffers have space.
+      // If availableForWriteAll() becomes false, stop draining so un-sent messages
+      // remain in the queue to be sent once buffers drain.
+      while (_ws.availableForWriteAll() && xQueueReceive(_wsLogQueue, &queuedMsg, 0) == pdTRUE)
+      {
+        if (queuedMsg != nullptr)
+        {
+          _ws.textAll(queuedMsg);
+          free(queuedMsg);
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -97,11 +131,17 @@ void SerialLog::onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, Aw
 {
   if (type == WS_EVT_CONNECT)
   {
+    SerialLog::getInstance()._connectedClients.fetch_add(1, std::memory_order_relaxed);
     // client connected
     Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
   }
   else if (type == WS_EVT_DISCONNECT)
   {
+    uint32_t count = SerialLog::getInstance()._connectedClients.load(std::memory_order_relaxed);
+    if (count > 0)
+    {
+      SerialLog::getInstance()._connectedClients.fetch_sub(1, std::memory_order_relaxed);
+    }
     // client disconnected
     Serial.printf("ws[%s][%u] disconnect\n", server->url(), client->id());
   }
@@ -205,7 +245,17 @@ void SerialLog::print(const String &message)
   if (_consoleLoggingEnabled)
   {
     Serial.print(prefixed);
-    if (_ws.count() > 0) _ws.textAll(prefixed);
+    if (_connectedClients.load(std::memory_order_relaxed) > 0 && _wsLogQueue != nullptr)
+    {
+      char *heapStr = strdup(prefixed.c_str());
+      if (heapStr != nullptr)
+      {
+        if (xQueueSend(_wsLogQueue, &heapStr, 0) != pdTRUE)
+        {
+          free(heapStr); // Queue full, drop to prevent leak
+        }
+      }
+    }
   }
   if (_fileLoggingEnabled)
   {
@@ -249,7 +299,17 @@ void SerialLog::printf(const char *format, ...)
   if (_consoleLoggingEnabled)
   {
     Serial.print(prefixed);
-    if (_ws.count() > 0) _ws.textAll(prefixed);
+    if (_connectedClients.load(std::memory_order_relaxed) > 0 && _wsLogQueue != nullptr)
+    {
+      char *heapStr = strdup(prefixed.c_str());
+      if (heapStr != nullptr)
+      {
+        if (xQueueSend(_wsLogQueue, &heapStr, 0) != pdTRUE)
+        {
+          free(heapStr); // Queue full, drop to prevent leak
+        }
+      }
+    }
   }
   if (_fileLoggingEnabled)
   {
@@ -646,6 +706,7 @@ void SerialLog::cleanupClients()
 {
   RecursiveLockGuard lock(_mutex);
   _ws.cleanupClients();
+  _connectedClients.store(_ws.count(), std::memory_order_relaxed);
 }
 
 void SerialLog::lock()

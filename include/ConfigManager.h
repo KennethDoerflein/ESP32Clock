@@ -88,9 +88,9 @@ public:
   /**
    * @brief Initializes the configuration manager.
    *
-   * This method mounts the LittleFS filesystem for general configuration
-   * and initializes the NVS Preferences for alarm persistence. If the file doesn't exist, it creates one with
-   * default values. This should be called once at startup.
+   * Initializes NVS Preferences for persistent configuration storage.
+   * Populates default values if settings have not yet been stored.
+   * This should be called once at startup.
    */
   void begin();
 
@@ -103,7 +103,7 @@ public:
   void loop();
 
   /**
-   * @brief Saves the current configuration to the JSON file.
+   * @brief Saves the current configuration to NVS Preferences.
    * @return True if the save was successful, false otherwise.
    */
   bool save();
@@ -112,7 +112,7 @@ public:
    * @brief Schedules a save operation.
    *
    * This method sets a flag to save the configuration after a short delay.
-   * This is used to prevent rapid, successive writes to the filesystem when
+   * This is used to prevent rapid, successive writes to NVS when
    * multiple settings are changed in quick succession.
    */
   void scheduleSave();

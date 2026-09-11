@@ -6,6 +6,8 @@
 #include <LittleFS.h>
 #include <FS.h>
 #include <freertos/semphr.h>
+#include <freertos/queue.h>
+#include <atomic>
 
 /**
  * @class SerialLog
@@ -143,6 +145,8 @@ private:
   SemaphoreHandle_t _mutex;
   size_t _currentLogSize = 0;
   bool _logSizeInitialized = false;
+  QueueHandle_t _wsLogQueue = nullptr;
+  std::atomic<uint32_t> _connectedClients{0};
 
   /**
    * @brief Initializes the tracked file size of the active log file.

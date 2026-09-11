@@ -37,6 +37,11 @@ void ButtonManager::begin()
  */
 void ButtonManager::attach()
 {
+  portENTER_CRITICAL(&_mux);
+  _newPress = false;
+  _buttonPressTime = 0;
+  _lastInterruptTime = millis();
+  portEXIT_CRITICAL(&_mux);
   attachInterruptArg(digitalPinToInterrupt(_pin), handleInterrupt, this, CHANGE);
 }
 
@@ -49,6 +54,10 @@ void ButtonManager::attach()
 void ButtonManager::detach()
 {
   detachInterrupt(digitalPinToInterrupt(_pin));
+  portENTER_CRITICAL(&_mux);
+  _newPress = false;
+  _buttonPressTime = 0;
+  portEXIT_CRITICAL(&_mux);
 }
 
 /**
@@ -66,16 +75,15 @@ void IRAM_ATTR ButtonManager::handleInterrupt(void *arg)
   portENTER_CRITICAL_ISR(&instance->_mux);
   unsigned long interruptTime = millis();
   unsigned long elapsed = interruptTime - instance->_lastInterruptTime;
-  
-  // Always update last interrupt time to extend the debounce window
-  // as long as the mechanical switch is bouncing.
-  instance->_lastInterruptTime = interruptTime;
-
   if (elapsed < DEBOUNCE_DELAY)
   {
     portEXIT_CRITICAL_ISR(&instance->_mux);
     return;
   }
+
+  // Update last interrupt time only on accepted transitions to avoid
+  // trailing-edge contact chatter discarding valid button releases.
+  instance->_lastInterruptTime = interruptTime;
 
   if (digitalRead(instance->_pin) == LOW)
   {
@@ -134,5 +142,6 @@ void ButtonManager::clearNewPress()
 {
   portENTER_CRITICAL(&_mux);
   _newPress = false;
+  _buttonPressTime = 0;
   portEXIT_CRITICAL(&_mux);
 }

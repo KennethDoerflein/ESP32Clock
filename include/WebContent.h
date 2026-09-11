@@ -191,22 +191,11 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
             .then(response => response.json())
             .then(data => {
                  if (data.success) {
-                     saveLocationBtn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Saved';
-                     saveLocationBtn.classList.remove('btn-outline-primary');
-                     saveLocationBtn.classList.add('btn-success');
-                     
-                     if (data.resolvedAddress) {
-                        locationInput.value = data.resolvedAddress;
+                     if (data.pending) {
+                         pollGeocodingStatus();
+                     } else {
+                         finishSaveLocation(data.resolvedAddress);
                      }
-                     
-                     
-                     setTimeout(() => {
-                        saveLocationBtn.disabled = false;
-                        saveLocationBtn.textContent = 'Save Location';
-                        saveLocationBtn.classList.remove('btn-success');
-                        saveLocationBtn.classList.add('btn-outline-primary');
-                        syncBtn.click(); // Trigger sync
-                     }, 1500);
                  } else {
                      alert(data.message || 'Failed to save location');
                      saveLocationBtn.disabled = false;
@@ -219,6 +208,45 @@ const char WEATHER_PAGE_HTML[] PROGMEM = R"rawliteral(
                 saveLocationBtn.textContent = 'Save Location';
             });
     });
+
+    function pollGeocodingStatus() {
+        fetch('/api/weather/geocoding-status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.pending) {
+                    setTimeout(pollGeocodingStatus, 1000);
+                } else if (data.success) {
+                    finishSaveLocation(data.resolvedAddress);
+                } else {
+                    alert('Failed to resolve location.');
+                    saveLocationBtn.disabled = false;
+                    saveLocationBtn.textContent = 'Save Location';
+                }
+            })
+            .catch(e => {
+                alert('Error polling status: ' + e);
+                saveLocationBtn.disabled = false;
+                saveLocationBtn.textContent = 'Save Location';
+            });
+    }
+
+    function finishSaveLocation(resolvedAddress) {
+        saveLocationBtn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Saved';
+        saveLocationBtn.classList.remove('btn-outline-primary');
+        saveLocationBtn.classList.add('btn-success');
+        
+        if (resolvedAddress) {
+           locationInput.value = resolvedAddress;
+        }
+        
+        setTimeout(() => {
+           saveLocationBtn.disabled = false;
+           saveLocationBtn.textContent = 'Save Location';
+           saveLocationBtn.classList.remove('btn-success');
+           saveLocationBtn.classList.add('btn-outline-primary');
+           syncBtn.click(); // Trigger sync
+        }, 1500);
+    }
 
     function fetchWeather() {
         fetch('/api/weather')
@@ -1935,6 +1963,16 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
                 <input class="form-check-input biweekly-toggle" type="checkbox" ${biweeklyChecked} title="Enable to repeat every other week instead of every week.">
                 <label class="form-check-label">Every other week</label>
               </div>
+              <div class="biweekly-parity ${alarm.biweekly ? '' : 'd-none'} mt-2">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input biweekly-even" type="radio" name="parity-${domId}" id="parity-even-${domId}" value="even" ${alarm.biweekly && !alarm.biweeklyOddWeek ? 'checked' : ''}>
+                  <label class="form-check-label" for="parity-even-${domId}">Even Weeks</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input biweekly-odd" type="radio" name="parity-${domId}" id="parity-odd-${domId}" value="odd" ${alarm.biweekly && alarm.biweeklyOddWeek ? 'checked' : ''}>
+                  <label class="form-check-label" for="parity-odd-${domId}">Odd Weeks</label>
+                </div>
+              </div>
               <small class="text-muted biweekly-hint ${alarm.biweekly ? '' : 'd-none'}">This alarm will ring every 2 weeks on the selected days.</small>
             </div>
           </div>
@@ -1992,16 +2030,23 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
         if (biweeklyToggle) {
           biweeklyToggle.addEventListener("change", () => {
             const hint = card.querySelector(".biweekly-hint");
+            const parity = card.querySelector(".biweekly-parity");
             if (hint) {
               if (biweeklyToggle.checked) {
                 hint.classList.remove("d-none");
+                if (parity) parity.classList.remove("d-none");
               } else {
                 hint.classList.add("d-none");
+                if (parity) parity.classList.add("d-none");
               }
             }
             handleInputChange();
           });
         }
+
+        card.querySelectorAll('.biweekly-even, .biweekly-odd').forEach(radio => {
+            radio.addEventListener("change", () => handleInputChange());
+        });
 
         card
           .querySelector('input[type="time"]')
@@ -2087,9 +2132,13 @@ const char ALARMS_PAGE_HTML[] PROGMEM = R"rawliteral(
               card.querySelector('input[type="time"]').value.split(":")[1]
             ),
             days: 0,
-            biweekly: false,
-            biweeklyOddWeek: card.dataset.biweeklyOddWeek === "true"
+            biweekly: false
           };
+          const oddRadio = card.querySelector(".biweekly-odd");
+          const evenRadio = card.querySelector(".biweekly-even");
+          if (oddRadio && evenRadio && (oddRadio.checked || evenRadio.checked)) {
+            alarmData.biweeklyOddWeek = oddRadio.checked;
+          }
           card.querySelectorAll(".day-btn.btn-primary").forEach((btn) => {
             alarmData.days |= parseInt(btn.dataset.value);
           });

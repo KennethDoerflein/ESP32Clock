@@ -1449,7 +1449,7 @@ void ConfigManager::setTimezone(const String &tz)
     {
       timezone = tz;
       {
-        RecursiveLockGuard timeLock(TimeManager::getInstance().getI2CMutex());
+        RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
         setenv("TZ", timezone.c_str(), 1);
         tzset();
       }

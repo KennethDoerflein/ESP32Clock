@@ -3,6 +3,7 @@
 #include "Page.h"
 #include <vector>
 #include <memory> // For std::unique_ptr
+#include <atomic>
 #include <TFT_eSPI.h>
 
 /**
@@ -132,8 +133,8 @@ private:
   int _currentPageIndex = -1;                ///< Index of the current page.
   bool _alarmIconVisible = false;            ///< Tracks the current state of the alarm icon.
   bool _isSnoozing = false;                  ///< Tracks the snooze state of the icon.
-  bool _partialRefresh = false;
-  bool _fullRefresh = false;
+  volatile std::atomic<bool> _partialRefresh{false};
+  volatile std::atomic<bool> _fullRefresh{false};
 
   // Alarm Overlay
   TFT_eSprite *_alarmSprite;

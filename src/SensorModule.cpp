@@ -9,6 +9,7 @@
  */
 
 #include "SensorModule.h"
+#include "HardwareBus.h"
 #include "ConfigManager.h"
 #include "SerialLog.h"
 #include "TimeManager.h"
@@ -116,8 +117,42 @@ static unsigned long prevSensorMillis = 0;
  */
 void setupSensors()
 {
-  Wire.begin();
-  Wire.setTimeOut(1000); // 1-second timeout to prevent indefinite bus hangs
+  // 9-clock SCL pulse recovery in GPIO mode before Wire.begin
+  // If an unexpected reset occurred while a slave held SDA low,
+  // clocking SCL up to 9 times frees the slave and recovers the bus.
+  pinMode(I2C_SDA, INPUT_PULLUP);
+  pinMode(I2C_SCL, OUTPUT_OPEN_DRAIN);
+  digitalWrite(I2C_SCL, HIGH);
+  delayMicroseconds(10);
+
+  for (int i = 0; i < 9; ++i)
+  {
+    if (digitalRead(I2C_SDA) == HIGH)
+    {
+      break; // Slave released SDA
+    }
+    digitalWrite(I2C_SCL, LOW);
+    delayMicroseconds(5);
+    digitalWrite(I2C_SCL, HIGH);
+    delayMicroseconds(5);
+  }
+
+  // Generate STOP condition: pull SCL LOW, set SDA LOW, release SCL HIGH, then release SDA HIGH
+  digitalWrite(I2C_SCL, LOW);
+  delayMicroseconds(5);
+  pinMode(I2C_SDA, OUTPUT_OPEN_DRAIN);
+  digitalWrite(I2C_SDA, LOW);
+  delayMicroseconds(5);
+  digitalWrite(I2C_SCL, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(I2C_SDA, HIGH);
+  delayMicroseconds(5);
+
+  pinMode(I2C_SDA, INPUT);
+  pinMode(I2C_SCL, INPUT);
+
+  Wire.begin(I2C_SDA, I2C_SCL, 100000);
+  Wire.setTimeOut(50); // 50ms timeout to prevent indefinite bus hangs
 
   for (int i = 0; i < SENSOR_RETRY_COUNT; ++i)
   {
@@ -316,11 +351,8 @@ void handleSensorUpdates(bool force)
     prevSensorMillis = now;
 
     // All I2C operations (BME280 and RTC temperature reads) must be
-    // serialized with the same mutex that TimeManager uses for RTC.now()
-    // and RTC.adjust(). Without this, loopTask (Core 1) and logicTask
-    // (Core 0) can access the Wire bus simultaneously, corrupting the
-    // I2C transaction state and triggering a FreeRTOS mutex assertion.
-    RecursiveLockGuard i2cLock(TimeManager::getInstance().getI2CMutex());
+    // serialized with the dedicated hardware I2CBus recursive mutex.
+    RecursiveLockGuard i2cLock(I2CBus::getMutex());
 
     // Read the core temp sensor FIRST so it's available for compensation.
     if (core_temp_started)

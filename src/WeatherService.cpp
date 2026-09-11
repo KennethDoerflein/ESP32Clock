@@ -8,9 +8,40 @@
 #include <ArduinoJson.h>
 #include "LockGuard.h"
 #include <esp_task_wdt.h>
+#include <esp_heap_caps.h>
+
+struct SpiRamAllocator : ArduinoJson::Allocator
+{
+  void* allocate(size_t size) override
+  {
+    void* p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p)
+    {
+      p = malloc(size);
+    }
+    return p;
+  }
+
+  void deallocate(void* ptr) override
+  {
+    free(ptr);
+  }
+
+  void* reallocate(void* ptr, size_t new_size) override
+  {
+    void* p = heap_caps_realloc(ptr, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p)
+    {
+      p = realloc(ptr, new_size);
+    }
+    return p;
+  }
+};
+
+static SpiRamAllocator g_spiRamAllocator;
 
 static const unsigned long WEATHER_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
-static const uint32_t MIN_HEAP_FOR_NETWORK = 40000; // Minimum free heap (bytes) to attempt TLS
+static const uint32_t MIN_CONTIGUOUS_HEAP_FOR_TLS = 38000; // Minimum contiguous heap (bytes) to attempt TLS
 static const uint8_t MAX_CONSECUTIVE_FAILURES = 6; // Invalidate stale data after this many failures
 
 // Helper to convert WMO Weather Codes to String Condition
@@ -126,7 +157,7 @@ void WeatherService::begin()
   xTaskCreatePinnedToCore(
       weatherTaskEntry,    // Persistent task entry point
       "WeatherUpdate",     // Name of the task
-      32768,               // Stack size (32KB for HTTPS + JSON)
+      20480,               // Stack size (20KB for HTTPS + JSON in PSRAM)
       this,                // Task input parameter
       1,                   // Priority
       &_weatherTaskHandle, // Task handle
@@ -314,9 +345,10 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
     return false;
   }
 
-  if (ESP.getFreeHeap() < MIN_HEAP_FOR_NETWORK)
+  uint32_t maxAllocHeap = ESP.getMaxAllocHeap();
+  if (maxAllocHeap < MIN_CONTIGUOUS_HEAP_FOR_TLS)
   {
-    SerialLog::getInstance().printf("Geocoding: heap too low (%u), aborting\n", ESP.getFreeHeap());
+    SerialLog::getInstance().printf("Geocoding: max alloc heap too low (%u), aborting\n", maxAllocHeap);
     return false;
   }
 
@@ -352,7 +384,7 @@ bool performGeocodingSearch(String url, String context, String &resolvedAddress,
     filter["results"][0]["country_code"] = true;
     filter["results"][0]["admin1"] = true;
 
-    JsonDocument doc;
+    JsonDocument doc(&g_spiRamAllocator);
     DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
     http.end();
 
@@ -560,11 +592,11 @@ void WeatherService::updateWeather()
   if (WiFi.status() != WL_CONNECTED)
     return;
 
-  // Guard: ensure sufficient heap for TLS (~40KB needed for mbedTLS buffers)
-  uint32_t freeHeap = ESP.getFreeHeap();
-  if (freeHeap < MIN_HEAP_FOR_NETWORK)
+  // Guard: ensure sufficient contiguous heap for TLS (~38KB needed for mbedTLS buffers)
+  uint32_t maxAllocHeap = ESP.getMaxAllocHeap();
+  if (maxAllocHeap < MIN_CONTIGUOUS_HEAP_FOR_TLS)
   {
-    SerialLog::getInstance().printf("Weather: heap too low (%u), skipping update\n", freeHeap);
+    SerialLog::getInstance().printf("Weather: max alloc heap too low (%u), skipping update\n", maxAllocHeap);
     LockGuard lock(_mutex);
     if (_failureCount < UINT8_MAX) _failureCount++;
     if (_failureCount >= MAX_CONSECUTIVE_FAILURES && _currentWeather.isValid)
@@ -606,7 +638,7 @@ void WeatherService::updateWeather()
   url += "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,cloud_cover,pressure_msl,wind_direction_10m,wind_gusts_10m,uv_index,visibility,precipitation_probability&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&forecast_days=1&timezone=auto";
 
   SerialLog::getInstance().printf("Fetching Weather: %s\n", url.c_str());
-  SerialLog::getInstance().printf("Free Heap before Weather Update: %u\n", freeHeap);
+  SerialLog::getInstance().printf("Max Alloc Heap before Weather Update: %u\n", maxAllocHeap);
 
   if (!http.begin(client, url))
   {
@@ -630,7 +662,7 @@ void WeatherService::updateWeather()
 
   if (httpCode == 200)
   {
-    JsonDocument doc;
+    JsonDocument doc(&g_spiRamAllocator);
 
     // Filter to reduce memory usage
     JsonDocument filter;

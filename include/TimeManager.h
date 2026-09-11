@@ -7,6 +7,7 @@
 #include <vector>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include "HardwareBus.h"
 
 // Structure to hold an alarm's next occurrence time and its ID
 struct NextAlarmTime
@@ -201,20 +202,19 @@ public:
   void adjustRTC(const DateTime &newTime);
 
   /**
-   * @brief Returns the I2C mutex handle for external I2C bus serialization.
-   * @details All I2C peripherals sharing the same bus (RTC, BME280, etc.)
-   *          must acquire this mutex before any Wire transaction to prevent
-   *          concurrent access from different FreeRTOS tasks.
-   * @return The recursive mutex handle guarding I2C operations.
+   * @brief Returns the internal state mutex for TimeManager state protection.
+   * @return The recursive mutex handle guarding internal TimeManager state.
    */
-  SemaphoreHandle_t getI2CMutex() const { return _mutex; }
+  SemaphoreHandle_t getStateMutex() const { return _mutex; }
 
   /**
    * @brief Gets the current UTC time converted to local time.
-   * @details Uses the system timezone to convert the UTC RTC time.
+   * @details Uses the system timezone to convert UTC time. If preReadUtc is provided,
+   *          avoids redundant I2C bus queries.
+   * @param preReadUtc Optional pointer to an already-read UTC DateTime.
    * @return A DateTime object representing the current local time.
    */
-  DateTime getLocalTime() const;
+  DateTime getLocalTime(const DateTime *preReadUtc = nullptr) const;
 
   /**
    * @brief Checks if the RTC has been set to a valid time.
@@ -240,9 +240,10 @@ public:
   void checkDriftAndResync();
 
   /**
-   * @brief Checks for DST transitions and updates the RTC if needed.
+   * @brief Checks for DST transitions, updates ConfigManager, handles missed alarms, and reschedules alarms.
+   * @param preReadUtc Optional pointer to an already-read UTC DateTime to avoid redundant I2C reads.
    */
-  void checkDST();
+  void checkDST(const DateTime *preReadUtc = nullptr);
 
   /**
    * @brief Processes the alarm event outside of the ISR.
@@ -289,12 +290,6 @@ public:
   void updateNextAlarmsCache();
 
 private:
-  // Timestamp of the last DST evaluation (millis()).
-  unsigned long _lastDstCheck = 0;
-  // How often to evaluate DST transitions (once per hour).
-  static const unsigned long DST_CHECK_INTERVAL = 60UL * 60UL * 1000UL;
-
-private:
   /**
    * @brief Private constructor to enforce the singleton pattern.
    */
@@ -307,7 +302,7 @@ private:
   unsigned long lastUpdate = 0;
 
   /// @brief The interval at which the `update` method runs its checks, in milliseconds.
-  static constexpr unsigned long UPDATE_INTERVAL = 50; // 50 milliseconds
+  static constexpr unsigned long UPDATE_INTERVAL = 250; // 250 milliseconds
 
   uint8_t _lastDecodedSecond = 61;
 

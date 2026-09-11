@@ -207,11 +207,29 @@ public:
   /**
    * @brief Updates the snooze state of the alarm.
    * This should be called periodically.
+   * @param currentEpoch Optional epoch to compare against; if 0, uses time(nullptr) or cached time.
    * @return true if the snooze period has just ended, false otherwise.
    */
-  bool updateSnooze()
+  bool updateSnooze(uint32_t currentEpoch = 0)
   {
-    if (_snoozed && TimeManager::getInstance().getRTCTime().unixtime() > _snoozeUntil)
+    if (!_snoozed)
+    {
+      return false;
+    }
+    if (currentEpoch == 0)
+    {
+      time_t nowT = time(nullptr);
+      if (nowT > 100000)
+      {
+        currentEpoch = (uint32_t)nowT;
+      }
+      else
+      {
+        DateTime rtcNow = TimeManager::getInstance().getRTCTime();
+        currentEpoch = rtcNow.isValid() ? (uint32_t)rtcNow.unixtime() : 0;
+      }
+    }
+    if (currentEpoch > _snoozeUntil)
     {
       _snoozed = false;
       _snoozeUntil = 0;

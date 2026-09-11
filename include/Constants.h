@@ -18,7 +18,7 @@
 #define LOOP_INTERVAL 100                  ///< The target interval for the main application loop.
 #define DEBOUNCE_DELAY 50                  ///< Debounce delay for button interrupts.
 #define FACTORY_RESET_HOLD_TIME 10000      ///< Time to hold the BOOT button for a runtime factory reset.
-#define BOOT_FACTORY_RESET_HOLD_TIME 30000 ///< Time to hold the SNOOZE button at boot for a factory reset.
+#define BOOT_FACTORY_RESET_HOLD_TIME 10000 ///< Time to hold the SNOOZE button at boot for a factory reset.
 #define SETUP_CANCEL_DELAY 2000            ///< Duration to display the "Reset cancelled" message.
 #define WEB_SERVER_STABILIZATION_DELAY 100 ///< Brief delay to allow the web server to stabilize after starting.
 #define OFFLINE_MODE_MESSAGE_DELAY 5000    ///< Duration to display the "Offline Mode" message.

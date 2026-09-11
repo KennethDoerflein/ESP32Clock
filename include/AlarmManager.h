@@ -43,16 +43,18 @@ public:
    * @brief Triggers a new alarm to start ringing.
    *
    * @param alarmId The ID of the alarm to trigger.
+   * @param currentEpoch The current UTC epoch timestamp (if 0, fetched outside mutex).
    * @return True if successfully triggered, false if another alarm was already ringing.
    */
-  bool trigger(uint8_t alarmId);
+  bool trigger(uint8_t alarmId, uint32_t currentEpoch = 0);
 
   /**
    * @brief Resumes an alarm that was ringing before a reboot.
    * @param alarmId The ID of the alarm to resume.
    * @param startTimestamp The Unix timestamp when the alarm originally started.
+   * @param currentEpoch The current UTC epoch timestamp (if 0, fetched outside mutex).
    */
-  void resume(uint8_t alarmId, uint32_t startTimestamp);
+  void resume(uint8_t alarmId, uint32_t startTimestamp, uint32_t currentEpoch = 0);
 
   /**
    * @brief Stops the alarm from ringing.

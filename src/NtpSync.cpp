@@ -26,8 +26,11 @@
 void initNtp()
 {
   configTime(0, 0, NTP_SERVER, BACKUP_NTP_SERVER, BACKUP2_NTP_SERVER);
-  setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
-  tzset();
+  {
+    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+    setenv("TZ", ConfigManager::getInstance().getTimezone().c_str(), 1);
+    tzset();
+  }
   SerialLog::getInstance().print("NTP: SNTP client initialized.\n");
 }
 
@@ -84,12 +87,10 @@ bool isNtpSyncInProgress()
 
 /**
  * @brief Processes the time data received from an NTP server.
- * @details Converts the tm struct to a DateTime and sets the hardware RTC.
- *          The ESP-IDF SNTP daemon already handles RTT compensation internally,
- *          so the time in `timeinfo` (from `getLocalTime`) is already accurate.
- * @param timeinfo The tm struct populated by a successful getLocalTime() call.
+ * @details Converts the system clock (already updated by SNTP) to UTC, writes it
+ *          to the hardware RTC, runs a DST check, and reschedules hardware alarms.
  */
-static void _processSuccessfulNtpSync(const struct tm &timeinfo)
+static void _processSuccessfulNtpSync()
 {
   auto &logger = SerialLog::getInstance();
 
@@ -123,8 +124,9 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
   {
     unsigned long elapsedMs = millis() - millisAtSyncStart;
     time_t ntpTimeAtStart = (time_t)time_to_set.unixtime() - (time_t)(elapsedMs / 1000);
-    int32_t sysDrift = (int32_t)sysTimeAtSyncStart - (int32_t)ntpTimeAtStart;
-    int32_t rtcDrift = (int32_t)rtcTimeAtSyncStart - (int32_t)ntpTimeAtStart;
+    int64_t sysDrift = (int64_t)sysTimeAtSyncStart - (int64_t)ntpTimeAtStart;
+    int64_t rtcDrift = (int64_t)rtcTimeAtSyncStart - (int64_t)ntpTimeAtStart;
+    logger.printf("Pre-sync drift -> System: %llds, RTC: %llds\n", (long long)sysDrift, (long long)rtcDrift);
 
     // Format the NTP reference time at sync start for logging
     struct tm ntpStartTm;
@@ -157,10 +159,10 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
     // Fallback: no pre-sync snapshot (e.g., blocking sync at boot)
     if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
     {
-      int32_t driftSeconds = (int32_t)oldRtcTime.unixtime() - (int32_t)time_to_set.unixtime();
-      logger.printf("NTP correction: RTC was %s by %ld seconds\n",
+      int64_t driftSeconds = (int64_t)oldRtcTime.unixtime() - (int64_t)time_to_set.unixtime();
+      logger.printf("NTP correction: RTC was %s by %lld seconds\n",
                     driftSeconds > 0 ? "ahead" : "behind",
-                    (long)abs(driftSeconds));
+                    (long long)abs(driftSeconds));
     }
   }
 
@@ -170,25 +172,33 @@ static void _processSuccessfulNtpSync(const struct tm &timeinfo)
   TimeManager::getInstance().adjustRTC(time_to_set);
 
   DateTime readback = TimeManager::getInstance().getRTCTime();
-  int32_t writeError = abs((int32_t)readback.unixtime() - (int32_t)time_to_set.unixtime());
+  int64_t writeError = abs((int64_t)readback.unixtime() - (int64_t)time_to_set.unixtime());
   if (writeError > 2)
   {
-    logger.printf("WARNING: RTC write verification failed! Expected %lu, got %lu (delta=%ld)\n",
-                  (unsigned long)time_to_set.unixtime(), (unsigned long)readback.unixtime(), (long)writeError);
+    logger.printf("WARNING: RTC write verification failed! Expected %lu, got %lu (delta=%lld)\n",
+                  (unsigned long)time_to_set.unixtime(), (unsigned long)readback.unixtime(), (long long)writeError);
   }
 
-  // Update DST status in configuration (for UI/logging purposes only)
-  ConfigManager::getInstance().setDST(timeinfo.tm_isdst > 0);
+  // Run a full DST check now that the system clock and RTC have been
+  // updated. This is the same code path as the per-second tick in
+  // TimeManager::update(), and ensures that if the sync happens to land
+  // exactly on a DST spring-forward moment the skipped-hour alarm window
+  // is checked and hardware alarms are rescheduled.
+  TimeManager::getInstance().checkDST();
 
   logger.printf("RTC synchronized with NTP time (UTC): %04d-%02d-%02d %02d:%02d:%02d\n",
                 time_to_set.year(), time_to_set.month(), time_to_set.day(),
                 time_to_set.hour(), time_to_set.minute(), time_to_set.second());
 
-  // Check for missed alarms if the time jumped forward significantly (>60s)
-  int32_t jumpSeconds = (int32_t)time_to_set.unixtime() - (int32_t)oldRtcTime.unixtime();
-  if (jumpSeconds > 60)
+  // Check for missed alarms if the time jumped forward
+  if (oldRtcTime.isValid())
   {
-    TimeManager::getInstance().checkMissedAlarmsWindow(oldRtcTime.unixtime(), time_to_set.unixtime());
+    int64_t jumpSeconds = (int64_t)time_to_set.unixtime() - (int64_t)oldRtcTime.unixtime();
+    if (jumpSeconds > 60)
+    {
+      time_t oldEpoch = (time_t)oldRtcTime.unixtime();
+      TimeManager::getInstance().checkMissedAlarmsWindow(oldEpoch, oldEpoch + jumpSeconds);
+    }
   }
 
   // Update hardware alarms since the system time was just corrected
@@ -280,7 +290,7 @@ NtpSyncState updateNtpSync()
   struct tm timeinfo;
   if (getNTPData(timeinfo))
   {
-    _processSuccessfulNtpSync(timeinfo);
+    _processSuccessfulNtpSync();
     ntpState = NTP_SYNC_SUCCESS; // Update state to success
     return ntpState;
   }

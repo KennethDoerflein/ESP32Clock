@@ -75,6 +75,59 @@ void test_alarm_biweekly_parity(void) {
     }
 }
 
+void test_alarm_dst_spring_forward_skipped_hour(void) {
+    Alarm alarm;
+    alarm.setHour(2);
+    alarm.setMinute(30);
+    alarm.setDays(DAY_SUN);
+    alarm.setEnabled(true);
+
+    // Simulated checkSkipped created during spring forward skipped hour (2:30 AM on Sun Mar 8, 2026)
+    DateTime checkSkipped(2026, 3, 8, 2, 30, 0);
+    TEST_ASSERT_EQUAL(2, checkSkipped.hour());
+    TEST_ASSERT_EQUAL(30, checkSkipped.minute());
+    TEST_ASSERT_TRUE(alarm.shouldRing(checkSkipped));
+
+    // A minute that doesn't match should not ring
+    DateTime checkSkippedOther(2026, 3, 8, 2, 15, 0);
+    TEST_ASSERT_FALSE(alarm.shouldRing(checkSkippedOther));
+}
+
+void test_alarm_dst_fall_back_dismiss_no_duplicate(void) {
+    Alarm alarm;
+    alarm.setHour(1);
+    alarm.setMinute(30);
+    alarm.setDays(DAY_SUN | DAY_MON);
+    alarm.setEnabled(true);
+
+    // Ring at first 1:30 AM on fall back day (Sun Nov 1, 2026)
+    DateTime firstRing(2026, 11, 1, 1, 30, 0);
+    TEST_ASSERT_TRUE(alarm.shouldRing(firstRing));
+
+    // User dismisses the alarm
+    alarm.dismiss(firstRing);
+    TEST_ASSERT_TRUE(alarm.isEnabled()); // Still enabled since repeating
+
+    // At the second 1:30 AM on the same day after fall back, should not ring again
+    DateTime secondRing(2026, 11, 1, 1, 30, 0);
+    TEST_ASSERT_FALSE(alarm.shouldRing(secondRing));
+
+    // Next day (Mon Nov 2, 2026) at 1:30 AM, should ring normally
+    DateTime nextDayRing(2026, 11, 2, 1, 30, 0);
+    TEST_ASSERT_TRUE(alarm.shouldRing(nextDayRing));
+}
+
+void test_alarm_biweekly_parity_across_dst(void) {
+    // 2026 US Spring Forward: Sunday March 8, 2026
+    DateTime sat(2026, 3, 7, 23, 0, 0);
+    DateTime sunDst(2026, 3, 8, 3, 30, 0);
+    DateTime mon(2026, 3, 9, 8, 0, 0);
+
+    // Sat and Sun belong to the same week; Mon begins the next week
+    TEST_ASSERT_EQUAL(Alarm::isOddWeek(sat), Alarm::isOddWeek(sunDst));
+    TEST_ASSERT_NOT_EQUAL(Alarm::isOddWeek(sunDst), Alarm::isOddWeek(mon));
+}
+
 int main(int argc, char **argv) {
     // This is required for Arduino/PlatformIO on-target testing
 }
@@ -86,6 +139,9 @@ void setup() {
     RUN_TEST(test_alarm_one_time_dismiss);
     RUN_TEST(test_alarm_repeating_dismiss);
     RUN_TEST(test_alarm_biweekly_parity);
+    RUN_TEST(test_alarm_dst_spring_forward_skipped_hour);
+    RUN_TEST(test_alarm_dst_fall_back_dismiss_no_duplicate);
+    RUN_TEST(test_alarm_biweekly_parity_across_dst);
     UNITY_END();
 }
 

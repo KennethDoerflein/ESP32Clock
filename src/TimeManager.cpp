@@ -10,6 +10,7 @@
 // #define LOG_TICKS
 
 #include "TimeManager.h"
+#include "HardwareBus.h"
 #include "NtpSync.h"
 #include "SensorModule.h"
 #include "ConfigManager.h"
@@ -37,7 +38,13 @@ DateTime calculateNextRingTime(const Alarm &alarm, const DateTime &now)
   {
     time_t snoozeEpoch = alarm.getSnoozeUntil();
     struct tm t_local;
-    localtime_r(&snoozeEpoch, &t_local);
+    {
+      RecursiveLockGuard lock(TimeManager::getInstance().getStateMutex());
+      if (localtime_r(&snoozeEpoch, &t_local) == nullptr)
+      {
+        return DateTime();
+      }
+    }
     return DateTime(t_local.tm_year + 1900, t_local.tm_mon + 1, t_local.tm_mday,
                     t_local.tm_hour, t_local.tm_min, t_local.tm_sec);
   }
@@ -102,7 +109,7 @@ void TimeManager::seedSystemClockFromRTC()
   auto &logger = SerialLog::getInstance();
 
   DateTime rtcTime = getRTCTime();
-  if (!rtcTime.isValid() || rtcTime.year() < 2024 || rtcTime.year() > 2040)
+  if (!rtcTime.isValid() || rtcTime.year() < 2024 || rtcTime.year() > 2099)
   {
     logger.printf("WARNING: RTC time is invalid or out of range (year=%d). Cannot seed system clock.\n",
                   rtcTime.isValid() ? rtcTime.year() : 0);
@@ -147,7 +154,7 @@ void TimeManager::syncSystemClockFromRTC()
   }
 
   DateTime rtcTime = getRTCTime();
-  if (!rtcTime.isValid() || rtcTime.year() < 2024 || rtcTime.year() > 2040)
+  if (!rtcTime.isValid() || rtcTime.year() < 2024 || rtcTime.year() > 2099)
   {
     return; // RTC time is invalid, cannot use as reference
   }
@@ -155,7 +162,7 @@ void TimeManager::syncSystemClockFromRTC()
   // Compare RTC (UTC) against the system clock (UTC)
   time_t sysEpoch = time(nullptr);
   time_t rtcEpoch = (time_t)rtcTime.unixtime();
-  int32_t drift = (int32_t)sysEpoch - (int32_t)rtcEpoch;
+  int64_t drift = (int64_t)sysEpoch - (int64_t)rtcEpoch;
 
   if (abs(drift) >= 2)
   {
@@ -203,9 +210,6 @@ void TimeManager::begin()
   // added assurance that the internal DST flag is correct before the
   // main loop starts calling update().
   checkDST();
-  // Prevent the periodic timer from firing immediately in the first
-  // update() call by pretending that we just ran.
-  _lastDstCheck = millis();
 }
 
 /**
@@ -243,18 +247,14 @@ bool TimeManager::update()
   // second when queried again during the render phase.
   {
     RecursiveLockGuard lock(_mutex);
-    _cachedTime = getLocalTime();
+    _cachedTime = getLocalTime(&now);
   }
 
 #ifdef LOG_TICKS
   SerialLog::getInstance().print("TimeManager: Tick\n");
 #endif
-  // Perform routine checks, like the daily time sync and DST change.
-  if (currentMillis - _lastDstCheck >= DST_CHECK_INTERVAL)
-  {
-    checkDST();
-    _lastDstCheck = currentMillis;
-  }
+  // Check for DST transitions on every second tick using the pre-read RTC time (zero I2C overhead).
+  checkDST(&now);
 
   // --- Layer 1: Periodic system clock realignment from RTC ---
   if (currentMillis - _lastSystemClockSync >= SYSTEM_CLOCK_SYNC_INTERVAL)
@@ -545,13 +545,11 @@ void TimeManager::checkDriftAndResync()
   startNtpSync();
 }
 
-void TimeManager::checkDST()
+void TimeManager::checkDST(const DateTime *preReadUtc)
 {
-  // This method is invoked periodically from update(), once during begin(),
+  // This method is invoked on every second transition in update(), once during begin(),
   // and immediately when timezone is modified.
-  bool currentDstState = ConfigManager::getInstance().isDST();
-
-  DateTime utc = getRTCTime();
+  DateTime utc = (preReadUtc != nullptr) ? *preReadUtc : getRTCTime();
   if (!utc.isValid())
   {
     return;
@@ -568,18 +566,34 @@ void TimeManager::checkDST()
     }
   }
 
+  if (resolved.tm_isdst < 0)
+  {
+    return; // DST information unavailable
+  }
+
+  bool currentDstState = ConfigManager::getInstance().isDST();
   bool newDstState = resolved.tm_isdst > 0;
 
   if (newDstState != currentDstState)
   {
     ConfigManager::getInstance().setDST(newDstState);
     SerialLog::getInstance().printf("DST State updated: %d -> %d\n", currentDstState, newDstState);
+
+    // If transitioning into DST (Spring Forward), local time jumped forward by 1 hour.
+    // Check for any alarms that were scheduled in the skipped hour window.
+    if (newDstState && !currentDstState)
+    {
+      checkMissedAlarmsWindow(epoch - 3600, epoch);
+    }
+
+    // Reschedule hardware RTC alarms immediately to reflect the new UTC offset
+    setNextAlarms();
   }
 }
 
-DateTime TimeManager::getLocalTime() const
+DateTime TimeManager::getLocalTime(const DateTime *preReadUtc) const
 {
-  DateTime utc = getRTCTime();
+  DateTime utc = (preReadUtc != nullptr) ? *preReadUtc : getRTCTime();
   if (!utc.isValid())
   {
     return utc;
@@ -645,15 +659,21 @@ DateTime TimeManager::getRTCTime() const
   {
     return DateTime(); // Returns an invalid DateTime (year < 2000)
   }
-  RecursiveLockGuard lock(_mutex);
 
   // --- Layer 2: Double-read I2C validation ---
   // Read the RTC twice in quick succession. If the I2C bus is corrupted,
   // the two readings will differ wildly. Valid readings should agree
   // within 1 second (the read takes ~1ms, so at most one second boundary
   // can be crossed between reads).
-  DateTime read1 = RTC.now();
-  DateTime read2 = RTC.now();
+  DateTime read1;
+  DateTime read2;
+  {
+    RecursiveLockGuard i2cLock(I2CBus::getMutex());
+    read1 = RTC.now();
+    read2 = RTC.now();
+  }
+
+  RecursiveLockGuard lock(_mutex);
 
   if (!read1.isValid() || !read2.isValid())
   {
@@ -666,12 +686,12 @@ DateTime TimeManager::getRTCTime() const
     return DateTime(); // No fallback available
   }
 
-  int32_t readDelta = abs((int32_t)read1.unixtime() - (int32_t)read2.unixtime());
+  int64_t readDelta = abs((int64_t)read1.unixtime() - (int64_t)read2.unixtime());
   if (readDelta > 1)
   {
     SerialLog::getInstance().printf(
-        "WARNING: RTC double-read mismatch! read1=%lu, read2=%lu (delta=%ld). Using last known-good.\n",
-        (unsigned long)read1.unixtime(), (unsigned long)read2.unixtime(), (long)readDelta);
+        "WARNING: RTC double-read mismatch! read1=%lu, read2=%lu (delta=%lld). Using last known-good.\n",
+        (unsigned long)read1.unixtime(), (unsigned long)read2.unixtime(), (long long)readDelta);
     if (_lastValidRtcTime.isValid() && _lastValidRtcTime.year() >= 2024)
     {
       return _lastValidRtcTime;
@@ -680,7 +700,7 @@ DateTime TimeManager::getRTCTime() const
   }
 
   // Sanity check: year must be in valid range
-  if (read2.year() < 2024 || read2.year() > 2040)
+  if (read2.year() < 2024 || read2.year() > 2099)
   {
     SerialLog::getInstance().printf(
         "WARNING: RTC time out of range (year=%d). Using last known-good.\n", read2.year());
@@ -695,19 +715,19 @@ DateTime TimeManager::getRTCTime() const
   // A small backward jump (1-2s) can happen legitimately due to NTP corrections.
   if (_lastValidRtcTime.isValid() && _lastValidRtcTime.year() >= 2024)
   {
-    int32_t timeDelta = (int32_t)read2.unixtime() - (int32_t)_lastValidRtcTime.unixtime();
+    int64_t timeDelta = (int64_t)read2.unixtime() - (int64_t)_lastValidRtcTime.unixtime();
     static int consecutiveJumps = 0;
-    if (abs((int)timeDelta) > 5)
+    if (abs((long long)timeDelta) > 5)
     {
       consecutiveJumps++;
       if (consecutiveJumps < 3)
       {
         SerialLog::getInstance().printf(
-            "WARNING: RTC time jumped by %ld seconds. Rejecting.\n",
-            (long)timeDelta);
+            "WARNING: RTC time jumped by %lld seconds. Rejecting.\n",
+            (long long)timeDelta);
         return _lastValidRtcTime;
       }
-      SerialLog::getInstance().printf("WARNING: RTC time jumped by %ld seconds. Accepting after consecutive reads.\n", (long)timeDelta);
+      SerialLog::getInstance().printf("WARNING: RTC time jumped by %lld seconds. Accepting after consecutive reads.\n", (long long)timeDelta);
       consecutiveJumps = 0;
     }
     else
@@ -735,8 +755,11 @@ DateTime TimeManager::getCachedTime() const
 
 void TimeManager::adjustRTC(const DateTime &newTime)
 {
+  {
+    RecursiveLockGuard i2cLock(I2CBus::getMutex());
+    RTC.adjust(newTime);
+  }
   RecursiveLockGuard lock(_mutex);
-  RTC.adjust(newTime);
   // Update the last valid time to prevent the monotonicity check in
   // getRTCTime() from rejecting the new (potentially backward-adjusted) time.
   _lastValidRtcTime = newTime;
@@ -750,8 +773,12 @@ bool TimeManager::isTimeSet() const
   {
     return false;
   }
-  RecursiveLockGuard lock(_mutex);
-  return !RTC.lostPower();
+  bool lostPower = true;
+  {
+    RecursiveLockGuard i2cLock(I2CBus::getMutex());
+    lostPower = RTC.lostPower();
+  }
+  return !lostPower;
 }
 
 void TimeManager::checkMissedAlarms()
@@ -801,28 +828,31 @@ void TimeManager::checkMissedAlarmsWindow(time_t startEpoch, time_t endEpoch)
       int expected_hour = (prev_t_local.tm_hour + 1) % 24;
       if (t_local.tm_hour != expected_hour)
       {
-          int day_offset = (expected_hour == 0) ? 1 : 0;
-          for (int m = 0; m < 60; m++)
+          int skipped_hour = expected_hour;
+          while (skipped_hour != t_local.tm_hour)
           {
-            struct tm target_tm = prev_t_local;
-            target_tm.tm_mday += day_offset;
-            target_tm.tm_hour = expected_hour;
-            target_tm.tm_min = m;
-            target_tm.tm_sec = 0;
-            target_tm.tm_isdst = -1;
-            mktime(&target_tm);
-
-            DateTime checkSkipped(
-              target_tm.tm_year + 1900, target_tm.tm_mon + 1, target_tm.tm_mday,
-              target_tm.tm_hour, target_tm.tm_min, target_tm.tm_sec);
-
-            for (const auto &alarm : alarms)
+            int day_offset = (skipped_hour == 0) ? 1 : 0;
+            DateTime baseDate(prev_t_local.tm_year + 1900, prev_t_local.tm_mon + 1, prev_t_local.tm_mday, 0, 0, 0);
+            if (day_offset != 0)
             {
-              if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkSkipped))
+              baseDate = baseDate + TimeSpan(1, 0, 0, 0);
+            }
+
+            for (int m = 0; m < 60; m++)
+            {
+              DateTime checkSkipped(
+                baseDate.year(), baseDate.month(), baseDate.day(),
+                skipped_hour, m, 0);
+
+              for (const auto &alarm : alarms)
               {
-                if (earliestMissedAlarmId == -1) earliestMissedAlarmId = alarm.getId();
+                if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkSkipped))
+                {
+                  if (earliestMissedAlarmId == -1) earliestMissedAlarmId = alarm.getId();
+                }
               }
             }
+            skipped_hour = (skipped_hour + 1) % 24;
           }
       }
     }
@@ -885,7 +915,7 @@ void TimeManager::handleAlarm()
 
 void TimeManager::clearRtcAlarms()
 {
-  // Assumes Mutex is held by caller if called internally
+  RecursiveLockGuard i2cLock(I2CBus::getMutex());
   RTC.clearAlarm(1);
   RTC.clearAlarm(2);
   RTC.disableAlarm(1);
@@ -940,25 +970,42 @@ std::vector<NextAlarmTime> TimeManager::getNextAlarms(int count) const
 
 void TimeManager::setNextAlarms()
 {
-  RecursiveLockGuard lock(_mutex);
-  if (RTC.alarmFired(1))
+  int8_t firedAlarm1 = -1;
+  int8_t firedAlarm2 = -1;
+
   {
-    RTC.clearAlarm(1);
-    SerialLog::getInstance().printf("RTC alarm 1 fired for alarm ID %d\n", _rtcAlarm1Id);
-    if (_rtcAlarm1Id != -1)
+    RecursiveLockGuard i2cLock(I2CBus::getMutex());
+    if (RTC.alarmFired(1))
     {
-      AlarmManager::getInstance().trigger(_rtcAlarm1Id);
+      RTC.clearAlarm(1);
+      RecursiveLockGuard lock(_mutex);
+      firedAlarm1 = _rtcAlarm1Id;
+    }
+    if (RTC.alarmFired(2))
+    {
+      RTC.clearAlarm(2);
+      RecursiveLockGuard lock(_mutex);
+      firedAlarm2 = _rtcAlarm2Id;
     }
   }
-  if (RTC.alarmFired(2))
+
+  uint32_t currentEpoch = time(nullptr);
+  if (currentEpoch < 100000)
   {
-    RTC.clearAlarm(2);
-    SerialLog::getInstance().printf("RTC alarm 2 fired for alarm ID %d\n", _rtcAlarm2Id);
-    if (_rtcAlarm2Id != -1)
-    {
-      AlarmManager::getInstance().trigger(_rtcAlarm2Id);
-    }
+    currentEpoch = getRTCTime().unixtime();
   }
+
+  if (firedAlarm1 != -1)
+  {
+    SerialLog::getInstance().printf("RTC alarm 1 fired for alarm ID %d\n", firedAlarm1);
+    AlarmManager::getInstance().trigger(firedAlarm1, currentEpoch);
+  }
+  if (firedAlarm2 != -1)
+  {
+    SerialLog::getInstance().printf("RTC alarm 2 fired for alarm ID %d\n", firedAlarm2);
+    AlarmManager::getInstance().trigger(firedAlarm2, currentEpoch);
+  }
+
   clearRtcAlarms();
 
   // Update cache first to ensure we have latest (local times)
@@ -967,32 +1014,48 @@ void TimeManager::setNextAlarms()
   // We need at least 2 alarms for RTC setting
   std::vector<NextAlarmTime> nextAlarms = getNextAlarms(2);
 
+  {
+    RecursiveLockGuard lock(_mutex);
+    _rtcAlarm1Id = !nextAlarms.empty() ? nextAlarms[0].id : -1;
+    _rtcAlarm2Id = (nextAlarms.size() > 1) ? nextAlarms[1].id : -1;
+  }
+
   if (!nextAlarms.empty())
   {
-    _rtcAlarm1Id = nextAlarms[0].id;
     // Store local ring time converted back to UTC for the hardware alarm
     DateTime utcTime = localToUtc(nextAlarms[0].time);
-    RTC.setAlarm1(utcTime, DS3231_A1_Date);
-    
-    char buf[60];
-    snprintf(buf, sizeof(buf), "Set RTC alarm 1 for %04d-%02d-%02d %02d:%02d:%02d (LOCAL)\n",
-             nextAlarms[0].time.year(), nextAlarms[0].time.month(), nextAlarms[0].time.day(),
-             nextAlarms[0].time.hour(), nextAlarms[0].time.minute(), nextAlarms[0].time.second());
-    SerialLog::getInstance().print(buf);
+    if (utcTime.isValid())
+    {
+      {
+        RecursiveLockGuard i2cLock(I2CBus::getMutex());
+        RTC.setAlarm1(utcTime, DS3231_A1_Date);
+      }
+      
+      char buf[60];
+      snprintf(buf, sizeof(buf), "Set RTC alarm 1 for %04d-%02d-%02d %02d:%02d:%02d (LOCAL)\n",
+               nextAlarms[0].time.year(), nextAlarms[0].time.month(), nextAlarms[0].time.day(),
+               nextAlarms[0].time.hour(), nextAlarms[0].time.minute(), nextAlarms[0].time.second());
+      SerialLog::getInstance().print(buf);
+    }
   }
 
   if (nextAlarms.size() > 1)
   {
-    _rtcAlarm2Id = nextAlarms[1].id;
     // Store local ring time converted back to UTC for the hardware alarm
     DateTime utcTime = localToUtc(nextAlarms[1].time);
-    RTC.setAlarm2(utcTime, DS3231_A2_Date);
-    
-    char buf[60];
-    snprintf(buf, sizeof(buf), "Set RTC alarm 2 for %04d-%02d-%02d %02d:%02d (LOCAL)\n",
-             nextAlarms[1].time.year(), nextAlarms[1].time.month(), nextAlarms[1].time.day(),
-             nextAlarms[1].time.hour(), nextAlarms[1].time.minute());
-    SerialLog::getInstance().print(buf);
+    if (utcTime.isValid())
+    {
+      {
+        RecursiveLockGuard i2cLock(I2CBus::getMutex());
+        RTC.setAlarm2(utcTime, DS3231_A2_Date);
+      }
+      
+      char buf[60];
+      snprintf(buf, sizeof(buf), "Set RTC alarm 2 for %04d-%02d-%02d %02d:%02d (LOCAL)\n",
+               nextAlarms[1].time.year(), nextAlarms[1].time.month(), nextAlarms[1].time.day(),
+               nextAlarms[1].time.hour(), nextAlarms[1].time.minute());
+      SerialLog::getInstance().print(buf);
+    }
   }
 }
 
@@ -1009,8 +1072,16 @@ DateTime TimeManager::localToUtc(const DateTime &local) const
   t_local.tm_sec = local.second();
   t_local.tm_isdst = -1; // Let system determine
 
-  // mktime converts local tm to time_t (UTC epoch)
-  time_t now_utc = mktime(&t_local);
+  time_t now_utc;
+  {
+    RecursiveLockGuard lock(_mutex);
+    now_utc = mktime(&t_local);
+  }
+
+  if (now_utc == (time_t)(-1))
+  {
+    return DateTime(); // Conversion failed
+  }
 
   struct tm t_utc;
   gmtime_r(&now_utc, &t_utc);

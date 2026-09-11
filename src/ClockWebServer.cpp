@@ -83,12 +83,12 @@ void ClockWebServer::begin()
     // First, we handle the specific URLs that operating systems use for their
     // connectivity checks. Responding correctly to these prevents the OS from
     // disconnecting or opening its own browser window.
-    server.on("/connecttest.txt", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(200, "text/plain", "Microsoft Connect Test"); });
-    server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(204); });
-    server.on("/hotspot-detect.html", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(200, "text/html", "<!DOCTYPE html><HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"); });
+    server.on("/connecttest.txt", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onCaptivePortalRedirect(request); });
+    server.on("/generate_204", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onCaptivePortalRedirect(request); });
+    server.on("/hotspot-detect.html", HTTP_GET, [this](AsyncWebServerRequest *request)
+              { onCaptivePortalRedirect(request); });
 
     // Next, we define the actual setup page that the user should see.
     // This is served from the root URL of the ESP32's IP address.
@@ -99,11 +99,8 @@ void ClockWebServer::begin()
     // requests any other page (e.g., google.com, msn.com), we don't serve content.
     // Instead, we issue an HTTP 302 Redirect, which tells the browser to go to
     // our root setup page. This is the key to reliably forcing the setup page to appear.
-    server.onNotFound([](AsyncWebServerRequest *request)
-                      {
-      // Create the full URL for redirection (e.g., "http://192.168.4.1")
-      String redirectUrl = "http://" + request->host();
-      request->redirect(redirectUrl); });
+    server.onNotFound([this](AsyncWebServerRequest *request)
+                      { onCaptivePortalRedirect(request); });
   }
   else
   {
@@ -324,11 +321,12 @@ void ClockWebServer::begin()
             alarm.setMinute(alarmObj["minute"] | 0);
             alarm.setDays(alarmObj["days"] | 0);
 
+            bool wasBiweekly = alarm.isBiweekly();
             bool newBiweekly = alarmObj["biweekly"] | false;
             alarm.setBiweekly(newBiweekly);
-            if (newBiweekly && alarmObj["biweeklyOddWeek"].is<bool>()) {
+            if (newBiweekly && !alarmObj["biweeklyOddWeek"].isNull()) {
               alarm.setBiweeklyOddWeek(alarmObj["biweeklyOddWeek"] | false);
-            } else if (newBiweekly) {
+            } else if (newBiweekly && !wasBiweekly) {
               // Auto-compute parity from current week when first enabling biweekly
               DateTime now = TimeManager::getInstance().getLocalTime();
               alarm.setBiweeklyOddWeek(Alarm::isOddWeek(now));
@@ -529,10 +527,8 @@ void ClockWebServer::begin()
 
               if (!oldOfflineMode && config.isOfflineMode())
               {
+                request->onDisconnect([](){ SerialLog::getInstance().clearCrashLogMagic(); ESP.restart(); });
                 request->send(200, "text/plain", "Entering offline mode. Rebooting...");
-                delay(1000);
-                SerialLog::getInstance().clearCrashLogMagic();
-                ESP.restart();
                 return;
               }
 
@@ -673,15 +669,11 @@ void ClockWebServer::begin()
               return;
             }
 
-            time_t epoch = (time_t)doc["epoch"].as<unsigned long>();
-
-            // Sanity check: year must be 2024-2040
-            struct tm check_tm;
-            gmtime_r(&epoch, &check_tm);
-            int year = check_tm.tm_year + 1900;
-            if (year < 2024 || year > 2040)
+            uint32_t rawEpoch = doc["epoch"].as<unsigned long>();
+            DateTime time_to_set(rawEpoch);
+            if (time_to_set.year() < 2024 || time_to_set.year() > 2099)
             {
-              request->send(400, "application/json", "{\"success\":false,\"message\":\"Epoch out of valid range (2024-2040)\"}");
+              request->send(400, "application/json", "{\"success\":false,\"message\":\"Epoch out of valid range (2024-2099)\"}");
               return;
             }
 
@@ -689,40 +681,41 @@ void ClockWebServer::begin()
 
             // Log the old RTC time for drift diagnostics
             DateTime oldRtcTime = TimeManager::getInstance().getRTCTime();
-            int32_t drift = 0;
+            int64_t drift = 0;
             if (oldRtcTime.isValid() && oldRtcTime.year() >= 2024)
             {
-              drift = (int32_t)oldRtcTime.unixtime() - (int32_t)epoch;
-              logger.printf("Browser time sync: RTC was %s by %ld seconds\n",
+              drift = (int64_t)oldRtcTime.unixtime() - (int64_t)rawEpoch;
+              logger.printf("Browser time sync: RTC was %s by %lld seconds\n",
                             drift > 0 ? "ahead" : "behind",
-                            (long)abs(drift));
+                            (long long)abs(drift));
             }
 
             // Write to hardware RTC (UTC)
-            DateTime time_to_set(
-                check_tm.tm_year + 1900,
-                check_tm.tm_mon + 1,
-                check_tm.tm_mday,
-                check_tm.tm_hour,
-                check_tm.tm_min,
-                check_tm.tm_sec);
             TimeManager::getInstance().adjustRTC(time_to_set);
 
             // Verify the write
             DateTime readback = TimeManager::getInstance().getRTCTime();
-            int32_t writeError = abs((int32_t)readback.unixtime() - (int32_t)epoch);
+            int64_t writeError = abs((int64_t)readback.unixtime() - (int64_t)rawEpoch);
             if (writeError > 2)
             {
-              logger.printf("WARNING: Browser sync RTC write verification failed! delta=%ld\n", (long)writeError);
+              logger.printf("WARNING: Browser sync RTC write verification failed! delta=%lld\n", (long long)writeError);
               request->send(500, "application/json", "{\"success\":false,\"message\":\"RTC write verification failed\"}");
               return;
             }
 
             // Update the system clock
             struct timeval tv;
-            tv.tv_sec = epoch;
+            tv.tv_sec = rawEpoch;
             tv.tv_usec = 0;
             settimeofday(&tv, nullptr);
+
+            // Immediately evaluate DST transition for the new time
+            TimeManager::getInstance().checkDST();
+
+            // Check for missed alarms across the sync jump and re-arm RTC hardware alarms
+            time_t oldEpoch = (time_t)oldRtcTime.unixtime();
+            TimeManager::getInstance().checkMissedAlarmsWindow(oldEpoch, rawEpoch);
+            TimeManager::getInstance().setNextAlarms();
 
             logger.printf("Browser time sync complete: %04d-%02d-%02d %02d:%02d:%02d UTC\n",
                           time_to_set.year(), time_to_set.month(), time_to_set.day(),
@@ -941,10 +934,8 @@ void ClockWebServer::begin()
           {
             if (UpdateManager::getInstance().endUpdate())
             {
+              request->onDisconnect([](){ SerialLog::getInstance().clearCrashLogMagic(); ESP.restart(); });
               request->send(200, "text/plain", "Update successful! Rebooting...");
-              delay(1000); // Give client time to receive response
-              SerialLog::getInstance().clearCrashLogMagic();
-              ESP.restart();
             }
             else
             {
@@ -1207,10 +1198,10 @@ void ClockWebServer::onWifiSaveRequest(AsyncWebServerRequest *request)
   else
   {
     // If not in captive portal, just save, reboot, and apply the new settings.
+    request->onDisconnect([ssid, password]() {
+      WiFiManager::getInstance().saveCredentialsAndReboot(ssid, password);
+    });
     request->send(200, "text/plain", "Credentials saved. Rebooting to connect...");
-    // Add a small delay to ensure the response is sent before rebooting.
-    delay(500);
-    wifiManager.saveCredentialsAndReboot(ssid, password);
   }
 }
 
@@ -1251,14 +1242,11 @@ void ClockWebServer::onWifiStatusRequest(AsyncWebServerRequest *request)
     request->send(202, "text/plain", "testing");
     break;
   case WiFiManager::TEST_SUCCESS:
-    request->send(200, "text/plain", "success");
-    // Check if a reboot is pending *after* sending the success response.
     if (wifiManager.isPendingReboot())
     {
-      delay(500); // Give the client a moment to receive the response
-      SerialLog::getInstance().clearCrashLogMagic();
-      ESP.restart();
+      request->onDisconnect([](){ SerialLog::getInstance().clearCrashLogMagic(); ESP.restart(); });
     }
+    request->send(200, "text/plain", "success");
     wifiManager.resetConnectionTestStatus();
     break;
   case WiFiManager::TEST_FAILED:

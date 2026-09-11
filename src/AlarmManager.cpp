@@ -56,16 +56,32 @@ void AlarmManager::begin()
  */
 void AlarmManager::update()
 {
-  RecursiveLockGuard lock(_mutex);
+  bool shouldResume = false;
+  uint8_t resumeId = 0;
+  uint32_t resumeTs = 0;
 
-  // --- Handle deferred resume first ---
-  // To ensure the system is fully stable, especially the display driver,
-  // the deferred resume operation is delayed for a few seconds after boot.
-  if (_resumeAlarmOnBoot && millis() > ALARM_RESUME_DELAY_MS)
   {
-    resume(_pendingResumeAlarmId, _pendingResumeTimestamp);
-    _resumeAlarmOnBoot = false; // Clear the flag
+    RecursiveLockGuard lock(_mutex);
+    // --- Handle deferred resume first ---
+    // To ensure the system is fully stable, especially the display driver,
+    // the deferred resume operation is delayed for a few seconds after boot.
+    if (_resumeAlarmOnBoot && millis() > ALARM_RESUME_DELAY_MS)
+    {
+      shouldResume = true;
+      resumeId = _pendingResumeAlarmId;
+      resumeTs = _pendingResumeTimestamp;
+      _resumeAlarmOnBoot = false; // Clear the flag
+    }
   }
+
+  if (shouldResume)
+  {
+    time_t nowT = time(nullptr);
+    uint32_t currentEpoch = (nowT > 100000) ? (uint32_t)nowT : TimeManager::getInstance().getRTCTime().unixtime();
+    resume(resumeId, resumeTs, currentEpoch);
+  }
+
+  RecursiveLockGuard lock(_mutex);
 
   if (!_isRinging)
   {
@@ -231,8 +247,14 @@ int AlarmManager::getActiveAlarmId() const
  *
  * @param alarmId The ID of the alarm to trigger.
  */
-bool AlarmManager::trigger(uint8_t alarmId)
+bool AlarmManager::trigger(uint8_t alarmId, uint32_t currentEpoch)
 {
+  if (currentEpoch == 0)
+  {
+    time_t nowT = time(nullptr);
+    currentEpoch = (nowT > 100000) ? (uint32_t)nowT : TimeManager::getInstance().getRTCTime().unixtime();
+  }
+
   uint32_t alarmStartTs = 0;
   {
     RecursiveLockGuard lock(_mutex);
@@ -242,7 +264,7 @@ bool AlarmManager::trigger(uint8_t alarmId)
     SerialLog::getInstance().printf("Triggering alarm ID %d\n", alarmId);
 
     // --- Initialize the ramping alarm state ---
-    _alarmStartTimestamp = TimeManager::getInstance().getRTCTime().unixtime();
+    _alarmStartTimestamp = currentEpoch;
     alarmStartTs = _alarmStartTimestamp;
     _alarmStartMillis = millis();
     _resumeElapsedSeconds = 0;
@@ -278,9 +300,16 @@ bool AlarmManager::trigger(uint8_t alarmId)
  *
  * @param alarmId The ID of the alarm to resume.
  * @param startTimestamp The original Unix timestamp when the alarm started.
+ * @param currentEpoch The current UTC epoch timestamp (fetched outside mutex).
  */
-void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
+void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp, uint32_t currentEpoch)
 {
+  if (currentEpoch == 0)
+  {
+    time_t nowT = time(nullptr);
+    currentEpoch = (nowT > 100000) ? (uint32_t)nowT : TimeManager::getInstance().getRTCTime().unixtime();
+  }
+
   RecursiveLockGuard lock(_mutex);
   if (_isRinging)
     return;
@@ -295,12 +324,12 @@ void AlarmManager::resume(uint8_t alarmId, uint32_t startTimestamp)
   _lastBeepTime = millis();
 
   // Re-evaluate the ramp stage based on how long it's been ringing.
-  uint32_t now = TimeManager::getInstance().getRTCTime().unixtime();
+  uint32_t now = currentEpoch;
   
   // Guard: if RTC lost power and returned epoch 0, elapsed time wraps.
   // In this case, start fresh from STAGE_SLOW_BEEP to be safe.
   uint32_t alarmElapsedSeconds = 0;
-  if (!TimeManager::getInstance().isTimeSet() || now < _alarmStartTimestamp) {
+  if (now < 1704067200 || now < _alarmStartTimestamp) { // 1704067200 = 2024-01-01
     SerialLog::getInstance().print("AlarmManager: RTC time invalid at resume, starting from STAGE_SLOW_BEEP.\n");
     _rampStage = STAGE_SLOW_BEEP;
     _resumeElapsedSeconds = 0;

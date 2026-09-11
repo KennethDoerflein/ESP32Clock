@@ -105,6 +105,7 @@ void updateAlarmState(bool anySnoozed)
     // When returning to IDLE, re-attach it.
     if (newState == IDLE)
     {
+      snoozeButton.clearNewPress(); // Discard button press generated during alarm silencing/snoozing
       snoozeButton.attach();
     }
     else
@@ -242,10 +243,8 @@ void enterSafeMode()
           {
             // Reset boot counter so the new firmware boots normally
             resetBootCounter();
+            request->onDisconnect([](){ SerialLog::getInstance().clearCrashLogMagic(); ESP.restart(); });
             request->send(200, "text/plain", "Update successful! Rebooting...");
-            delay(1000);
-            SerialLog::getInstance().clearCrashLogMagic();
-            ESP.restart();
           }
           else
           {
@@ -325,7 +324,7 @@ void handleBootButton()
     }
     else if (millis() - g_bootButtonPressTime > FACTORY_RESET_HOLD_TIME)
     {
-      // Button has been held for 30 seconds
+      // Button has been held for 10 seconds
       triggerFactoryReset("boot button", false);
     }
   }
@@ -333,7 +332,7 @@ void handleBootButton()
   {
     if (g_bootButtonPressTime > 0)
     {
-      // Button was released before the 60-second mark
+      // Button was released before the 10-second mark
       SerialLog::getInstance().print("Boot button released. Factory reset cancelled.\n");
       g_bootButtonPressTime = 0;
     }
@@ -633,7 +632,7 @@ void setup()
     timeManager.seedSystemClockFromRTC();
     initNtp(); // Sets TZ environment variable and calls tzset()
     timeManager.checkDST();
-    display.drawMultiLineStatusMessage("Offline Mode", "AP: Clock-Setup");
+    display.drawMultiLineStatusMessage("Offline Mode", "Network Down");
     delay(OFFLINE_MODE_MESSAGE_DELAY); // Show the message for 5 seconds.
     displayManager.setPage(ConfigManager::getInstance().getDefaultPage());
   }
@@ -816,6 +815,7 @@ void loop()
       // Always reset the button timer and action flag on release.
       s_alarmButtonPressTime = 0;
       s_actionTaken = false;
+      snoozeButton.clearNewPress();
     }
     break;
 
@@ -834,14 +834,15 @@ void loop()
       else if (!s_actionTaken)
       {
         // Update the progress bar while the button is held
-        float progress = (float)(currentMillis - s_alarmButtonPressTime) / 3000.0f;
+        unsigned long dismissDurationMs = config.getDismissDuration() * 1000;
+        float progress = (float)(currentMillis - s_alarmButtonPressTime) / (float)dismissDurationMs;
         displayManager.setDismissProgress(progress);
         displayManager.update();
       }
 
       // If the button is held long enough, end the snooze for all snoozed alarms
-      if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > SNOOZE_DISMISS_HOLD_TIME)
-      { // 3-second hold
+      if (!s_actionTaken && currentMillis - s_alarmButtonPressTime > (config.getDismissDuration() * 1000))
+      {
         SerialLog::getInstance().print("Snooze active: Button held. Ending snooze.\n");
         // Use a fresh copy here since we need to mutate and save
         std::vector<Alarm> snoozedAlarms = config.getAllAlarms();
@@ -859,6 +860,7 @@ void loop()
         displayManager.update();
 
         s_actionTaken = true; // Ensure action is only called once
+        snoozeButton.clearNewPress();
       }
     }
     else
@@ -870,6 +872,8 @@ void loop()
         displayManager.setDismissProgress(0.0f);
         displayManager.update();
         s_alarmButtonPressTime = 0;
+        s_actionTaken = false;
+        snoozeButton.clearNewPress();
       }
     }
     break;
