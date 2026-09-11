@@ -16,6 +16,7 @@
 #include "LockGuard.h"
 #include "UpdateManager.h"
 #include "TimeManager.h"
+#include <LittleFS.h>
 
 /**
  * @brief Private constructor to enforce the singleton pattern.
@@ -678,6 +679,16 @@ void ConfigManager::factoryReset()
     SerialLog::getInstance().print("Error erasing NVS.\n");
   }
 
+  SerialLog::getInstance().print("Formatting LittleFS...\n");
+  if (LittleFS.format())
+  {
+    SerialLog::getInstance().print("LittleFS formatted successfully.\n");
+  }
+  else
+  {
+    SerialLog::getInstance().print("Error formatting LittleFS.\n");
+  }
+
   // After erasing, the NVS needs to be re-initialized for the next boot.
   err = nvs_flash_init();
   if (err == ESP_OK)
@@ -716,6 +727,16 @@ void ConfigManager::factoryResetExceptWiFi()
   setWifiSSID(ssid);
   setWifiPassword(password);
   setWifiCredsValid(credsValid);
+
+  SerialLog::getInstance().print("Formatting LittleFS...\n");
+  if (LittleFS.format())
+  {
+    SerialLog::getInstance().print("LittleFS formatted successfully.\n");
+  }
+  else
+  {
+    SerialLog::getInstance().print("Error formatting LittleFS.\n");
+  }
 
   save();
 }

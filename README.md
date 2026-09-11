@@ -82,7 +82,7 @@ This repository contains the firmware for a feature-rich, Wi-Fi connected smart 
   - RTC-backed crash log capturing panic and exception traces across unexpected reboots.
   - Core dump support stored in a dedicated flash partition (`coredump.bin`) with web download and erase tools.
   - Real-time WebSocket live logging and persistent rotating log files (`system.log`).
-- **Hardware & Web Factory Reset**: Multiple reset mechanisms (Web UI, runtime BOOT button 10s hold, or power-on Snooze button hold) with options to keep or clear WiFi credentials. System and crash logs persist across factory resets.
+- **Hardware & Web Factory Reset**: Multiple reset mechanisms (Web UI, runtime BOOT button 10s hold, or power-on Snooze button hold) with options to keep or clear WiFi credentials. LittleFS is formatted during factory reset, wiping system logs so the device is like brand new.
 
 ## Hardware Requirements
 
@@ -296,8 +296,8 @@ The firmware includes multi-stage boot protection to prevent bricking if an erro
 There are three ways to perform a factory reset:
 
 1.  **Via the Web Interface**: Navigate to the "System" page and click either:
-    - **Factory Reset**: Erases all stored settings (including WiFi credentials, alarms, and display preferences) and reboots the device into setup mode. System and crash logs persist across factory resets.
-    - **Factory Reset (Keep WiFi)**: Erases all alarms, colors, and display settings, but preserves saved WiFi credentials. System and crash logs persist across factory resets.
+    - **Factory Reset**: Erases all stored settings (including WiFi credentials, alarms, and display preferences), formats LittleFS, and reboots the device into setup mode.
+    - **Factory Reset (Keep WiFi)**: Erases all alarms, colors, and display settings, formats LittleFS, but preserves saved WiFi credentials.
 2.  **Boot-Time Reset (Physical)**:
     - Disconnect the clock from power.
     - Press and hold the **Snooze button** (GPIO 5).
