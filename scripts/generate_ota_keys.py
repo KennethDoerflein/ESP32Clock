@@ -20,13 +20,15 @@ import sys
 try:
     import nacl.signing
 except ImportError:
-    print("ERROR: PyNaCl library not installed.")
-    print("Install with: pip install pynacl")
-    sys.exit(1)
+    nacl = None
 
 
 def generate_keypair():
     """Generate a new Ed25519 signing keypair."""
+    if nacl is None:
+        print("ERROR: PyNaCl library not installed.")
+        print("Install with: pip install pynacl")
+        sys.exit(1)
     signing_key = nacl.signing.SigningKey.generate()
     verify_key = signing_key.verify_key
     return signing_key, verify_key

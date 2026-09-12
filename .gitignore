@@ -5,3 +5,6 @@
 .vscode/ipch
 include/version.h
 coredump.bin
+__pycache__/
+*.pyc
+

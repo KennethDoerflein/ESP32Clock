@@ -166,6 +166,68 @@ public:
   void getFormattedSeconds(char *buf, size_t bufSize) const;
   void getFormattedSeconds(char *buf, size_t bufSize, const DateTime &now) const;
 
+  // Pure formatting helpers suitable for zero-dependency testing and display formatting
+  static void formatTime(char *buf, size_t bufSize, const DateTime &now, bool is24Hour)
+  {
+    if (is24Hour)
+    {
+      snprintf(buf, bufSize, "%02d:%02d", now.hour(), now.minute());
+    }
+    else
+    {
+      int hour12 = now.hour() % 12;
+      if (hour12 == 0)
+        hour12 = 12;
+      snprintf(buf, bufSize, "%d:%02d", hour12, now.minute());
+    }
+  }
+
+  static void formatDate(char *buf, size_t bufSize, const DateTime &now)
+  {
+    static const char *monthNames[] = {
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+    if (now.month() >= 1 && now.month() <= 12)
+    {
+      snprintf(buf, bufSize, "%s %d", monthNames[now.month() - 1], now.day());
+    }
+    else
+    {
+      snprintf(buf, bufSize, "UNK %d", now.day());
+    }
+  }
+
+  static void formatDayOfWeek(char *buf, size_t bufSize, const DateTime &now)
+  {
+    static const char *dayNames[] = {
+        "SUN", "MON", "TUE", "WED",
+        "THU", "FRI", "SAT"};
+    if (now.dayOfTheWeek() <= 6)
+    {
+      snprintf(buf, bufSize, "%s", dayNames[now.dayOfTheWeek()]);
+    }
+    else
+    {
+      snprintf(buf, bufSize, "UNK");
+    }
+  }
+
+  static void formatTOD(char *buf, size_t bufSize, const DateTime &now, bool is24Hour)
+  {
+    if (is24Hour)
+    {
+      if (bufSize > 0)
+        buf[0] = '\0';
+      return;
+    }
+    snprintf(buf, bufSize, "%s", (now.hour() < 12) ? "AM" : "PM");
+  }
+
+  static void formatSeconds(char *buf, size_t bufSize, const DateTime &now)
+  {
+    snprintf(buf, bufSize, "%02d", now.second());
+  }
+
   /**
    * @brief Gets the cached time snapshot from the last update() call.
    * @details This returns the time that was captured when the second changed,

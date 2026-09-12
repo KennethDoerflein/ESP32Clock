@@ -44,98 +44,6 @@ static const unsigned long WEATHER_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minut
 static const uint32_t MIN_CONTIGUOUS_HEAP_FOR_TLS = 38000; // Minimum contiguous heap (bytes) to attempt TLS
 static const uint8_t MAX_CONSECUTIVE_FAILURES = 6; // Invalidate stale data after this many failures
 
-// Helper to convert WMO Weather Codes to String Condition
-const char *WeatherService::getConditionFromWMO(int code)
-{
-  switch (code)
-  {
-  case 0:
-    return "Clear";
-  case 1:
-    return "Mainly Clear";
-  case 2:
-    return "Partly Cloudy";
-  case 3:
-    return "Overcast";
-  case 45:
-  case 48:
-    return "Fog";
-  case 51:
-  case 53:
-  case 55:
-    return "Drizzle";
-  case 56:
-  case 57:
-    return "Freezing Drizzle";
-  case 61:
-  case 63:
-  case 65:
-    return "Rain";
-  case 66:
-  case 67:
-    return "Freezing Rain";
-  case 71:
-  case 73:
-  case 75:
-    return "Snow";
-  case 77:
-    return "Snow Grains";
-  case 80:
-  case 81:
-  case 82:
-    return "Rain Showers";
-  case 85:
-  case 86:
-    return "Snow Showers";
-  case 95:
-  case 96:
-  case 99:
-    return "Thunderstorm";
-  default:
-    return "Unknown";
-  }
-}
-
-// Helper to URL encode a string
-String urlEncode(String str)
-{
-  String encodedString;
-  encodedString.reserve(str.length() * 3); // Worst case: every char encoded
-  char c;
-  char code0;
-  char code1;
-  for (int i = 0; i < str.length(); i++)
-  {
-    c = str.charAt(i);
-    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
-    {
-      encodedString += c;
-    }
-    else if (c == ' ')
-    {
-      encodedString += '+';
-    }
-    else
-    {
-      code1 = (c & 0xf) + '0';
-      if ((c & 0xf) > 9)
-      {
-        code1 = (c & 0xf) - 10 + 'A';
-      }
-      c = (c >> 4) & 0xf;
-      code0 = (c) + '0';
-      if (c > 9)
-      {
-        code0 = (c)-10 + 'A';
-      }
-      encodedString += '%';
-      encodedString += code0;
-      encodedString += code1;
-    }
-  }
-  return encodedString;
-}
-
 WeatherService::WeatherService() : _lastUpdate(0), _weatherTaskHandle(NULL)
 {
   _mutex = xSemaphoreCreateMutex();
@@ -298,15 +206,6 @@ void WeatherService::forceUpdate()
   xSemaphoreGive(_wakeSignal); // Wake the persistent task immediately
 }
 
-String WeatherService::getWindDirectionStr(int degrees)
-{
-  const char *directions[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
-  // Clamp to [0, 360) to prevent negative modulo giving a negative array index.
-  degrees = ((degrees % 360) + 360) % 360;
-  int index = (int)((degrees + 22.5) / 45.0) % 8;
-  return directions[index];
-}
-
 WeatherData WeatherService::getCurrentWeather() const
 {
   LockGuard lock(_mutex);
@@ -321,20 +220,6 @@ struct StateMap
 
 const StateMap US_STATES[] = {
     {"alabama", "al"}, {"alaska", "ak"}, {"arizona", "az"}, {"arkansas", "ar"}, {"california", "ca"}, {"colorado", "co"}, {"connecticut", "ct"}, {"delaware", "de"}, {"florida", "fl"}, {"georgia", "ga"}, {"hawaii", "hi"}, {"idaho", "id"}, {"illinois", "il"}, {"indiana", "in"}, {"iowa", "ia"}, {"kansas", "ks"}, {"kentucky", "ky"}, {"louisiana", "la"}, {"maine", "me"}, {"maryland", "md"}, {"massachusetts", "ma"}, {"michigan", "mi"}, {"minnesota", "mn"}, {"mississippi", "ms"}, {"missouri", "mo"}, {"montana", "mt"}, {"nebraska", "ne"}, {"nevada", "nv"}, {"new hampshire", "nh"}, {"new jersey", "nj"}, {"new mexico", "nm"}, {"new york", "ny"}, {"north carolina", "nc"}, {"north dakota", "nd"}, {"ohio", "oh"}, {"oklahoma", "ok"}, {"oregon", "or"}, {"pennsylvania", "pa"}, {"rhode island", "ri"}, {"south carolina", "sc"}, {"south dakota", "sd"}, {"tennessee", "tn"}, {"texas", "tx"}, {"utah", "ut"}, {"vermont", "vt"}, {"virginia", "va"}, {"washington", "wa"}, {"west virginia", "wv"}, {"wisconsin", "wi"}, {"wyoming", "wy"}, {"district of columbia", "dc"}};
-
-// Check if a word exists in text as a whole word
-bool checkWordPresence(const String &text, const String &word)
-{
-  int index = -1;
-  while ((index = text.indexOf(word, index + 1)) != -1)
-  {
-    bool startOk = (index == 0) || !isAlphaNumeric(text.charAt(index - 1));
-    bool endOk = (index + word.length() == text.length()) || !isAlphaNumeric(text.charAt(index + word.length()));
-    if (startOk && endOk)
-      return true;
-  }
-  return false;
-}
 
 // Helper function for the search logic
 bool performGeocodingSearch(String url, String context, String &resolvedAddress, float &lat, float &lon)

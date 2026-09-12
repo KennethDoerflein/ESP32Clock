@@ -336,17 +336,7 @@ void TimeManager::getFormattedTime(char *buf, size_t bufSize) const
 
 void TimeManager::getFormattedTime(char *buf, size_t bufSize, const DateTime &now) const
 {
-  if (is24HourFormat())
-  {
-    snprintf(buf, bufSize, "%02d:%02d", now.hour(), now.minute());
-  }
-  else
-  {
-    int hour12 = now.hour() % 12;
-    if (hour12 == 0)
-      hour12 = 12;
-    snprintf(buf, bufSize, "%d:%02d", hour12, now.minute());
-  }
+  formatTime(buf, bufSize, now, is24HourFormat());
 }
 
 String TimeManager::getFormattedTime() const
@@ -367,7 +357,7 @@ void TimeManager::getFormattedSeconds(char *buf, size_t bufSize) const
 
 void TimeManager::getFormattedSeconds(char *buf, size_t bufSize, const DateTime &now) const
 {
-  snprintf(buf, bufSize, "%02d", now.second());
+  formatSeconds(buf, bufSize, now);
 }
 
 String TimeManager::getFormattedSeconds() const
@@ -388,10 +378,7 @@ void TimeManager::getFormattedDate(char *buf, size_t bufSize) const
 
 void TimeManager::getFormattedDate(char *buf, size_t bufSize, const DateTime &now) const
 {
-  static const char *monthNames[] = {
-      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
-  snprintf(buf, bufSize, "%s %d", monthNames[now.month() - 1], now.day());
+  formatDate(buf, bufSize, now);
 }
 
 String TimeManager::getFormattedDate() const
@@ -412,12 +399,7 @@ void TimeManager::getTOD(char *buf, size_t bufSize) const
 
 void TimeManager::getTOD(char *buf, size_t bufSize, const DateTime &now) const
 {
-  if (is24HourFormat())
-  {
-    buf[0] = '\0';
-    return;
-  }
-  snprintf(buf, bufSize, "%s", (now.hour() < 12) ? "AM" : "PM");
+  formatTOD(buf, bufSize, now, is24HourFormat());
 }
 
 String TimeManager::getTOD() const
@@ -438,10 +420,7 @@ void TimeManager::getDayOfWeek(char *buf, size_t bufSize) const
 
 void TimeManager::getDayOfWeek(char *buf, size_t bufSize, const DateTime &now) const
 {
-  static const char *dayNames[] = {
-      "SUN", "MON", "TUE", "WED",
-      "THU", "FRI", "SAT"};
-  snprintf(buf, bufSize, "%s", dayNames[now.dayOfTheWeek()]);
+  formatDayOfWeek(buf, bufSize, now);
 }
 
 String TimeManager::getDayOfWeek() const
