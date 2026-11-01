@@ -473,7 +473,10 @@ void ClockWebServer::begin()
               config.setCelsius(doc["useCelsius"]);
               config.setScreenFlipped(doc["screenFlipped"]);
               config.setInvertColors(doc["invertColors"]);
-              config.setTimezone(doc["timezone"]);
+              if (doc["timezone"].is<const char *>())
+              {
+                config.setTimezone(doc["timezone"]);
+              }
               if (doc["offlineMode"].is<bool>())
               {
                 config.setOfflineMode(doc["offlineMode"]);

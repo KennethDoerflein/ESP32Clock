@@ -325,8 +325,10 @@ public:
 
   /**
    * @brief Checks for missed alarms within a specific time window.
+   * @param skippedHourOnly If true, only alarms inside a local-time gap (DST spring
+   *        forward) are considered; alarms at times that actually elapsed are ignored.
    */
-  void checkMissedAlarmsWindow(time_t startEpoch, time_t endEpoch);
+  void checkMissedAlarmsWindow(time_t startEpoch, time_t endEpoch, bool skippedHourOnly = false);
 
   /**
    * @brief Dismisses an alarm (disables if one-time, updates dismiss day if recurring).

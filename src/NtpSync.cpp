@@ -219,7 +219,10 @@ bool getNTPData(struct tm &timeinfo)
   // the incorrect drifted time because we seeded the system clock from the RTC at boot.
   if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED)
   {
-    return getLocalTime(&timeinfo, 0); // 0 timeout means don't block
+    // Convert under the TimeManager mutex so a concurrent TZ change cannot be observed mid-update.
+    time_t now = time(nullptr);
+    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+    return localtime_r(&now, &timeinfo) != nullptr;
   }
   return false;
 }

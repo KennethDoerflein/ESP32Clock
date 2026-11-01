@@ -100,8 +100,11 @@ void ConfigManager::setDefaults()
   screenFlipped = DEFAULT_SCREEN_FLIPPED;
   invertColors = DEFAULT_INVERT_COLORS;
   timezone = DEFAULT_TIMEZONE;
-  setenv("TZ", timezone.c_str(), 1);
-  tzset();
+  {
+    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+    setenv("TZ", timezone.c_str(), 1);
+    tzset();
+  }
   isDst = DEFAULT_IS_DST;
   snoozeDuration = DEFAULT_SNOOZE_DURATION;
   dismissDuration = DEFAULT_DISMISS_DURATION;
@@ -184,8 +187,11 @@ void ConfigManager::load()
   screenFlipped = _preferences.getBool("screenFlip", DEFAULT_SCREEN_FLIPPED);
   invertColors = _preferences.getBool("invertColors", DEFAULT_INVERT_COLORS);
   timezone = _preferences.getString("timezone", DEFAULT_TIMEZONE);
-  setenv("TZ", timezone.c_str(), 1);
-  tzset();
+  {
+    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+    setenv("TZ", timezone.c_str(), 1);
+    tzset();
+  }
   isDst = _preferences.getBool("isDst", DEFAULT_IS_DST);
   snoozeDuration = _preferences.getUChar("snoozeDur", DEFAULT_SNOOZE_DURATION);
   dismissDuration = _preferences.getUChar("dismissDur", DEFAULT_DISMISS_DURATION);
@@ -794,7 +800,16 @@ void ConfigManager::resetGeneralSettingsToDefaults()
     screenFlipped = DEFAULT_SCREEN_FLIPPED;
     invertColors = DEFAULT_INVERT_COLORS;
     timezone = DEFAULT_TIMEZONE;
-    isDst = DEFAULT_IS_DST;
+    // isDst is derived from the active timezone by TimeManager::checkDST(); it is
+    // intentionally not reset here, otherwise it would produce a false transition.
+    {
+
+      {
+    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+    setenv("TZ", timezone.c_str(), 1);
+        tzset();
+  }
+    }
     lastAutoCalStatus = "Never";
     tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
     autoTempCalibration = DEFAULT_AUTO_TEMP_CALIBRATION;
@@ -811,6 +826,8 @@ void ConfigManager::resetGeneralSettingsToDefaults()
     lon = DEFAULT_LON;
     _isDirty = true;
   }
+  // The timezone may have changed; re-evaluate DST against the newly applied zone.
+  TimeManager::getInstance().checkDST();
   scheduleSave();
 }
 
@@ -1470,9 +1487,12 @@ void ConfigManager::setTimezone(const String &tz)
     {
       timezone = tz;
       {
-        RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
-        setenv("TZ", timezone.c_str(), 1);
-        tzset();
+  
+        {
+    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+    setenv("TZ", timezone.c_str(), 1);
+          tzset();
+  }
       }
       _isDirty = true;
     }

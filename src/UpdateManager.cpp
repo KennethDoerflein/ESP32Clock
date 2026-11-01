@@ -15,6 +15,8 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include "NtpSync.h"
+#include "TimeManager.h"
+#include "LockGuard.h"
 #include "SerialLog.h"
 #if __has_include("version.h")
 #include "version.h"
@@ -254,7 +256,10 @@ String UpdateManager::handleGithubUpdate()
     
     char timeStr[64];
     struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
+    {
+        RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+        localtime_r(&now, &timeinfo);
+    }
     strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
     SerialLog::getInstance().printf("System time: %s\n", timeStr);
 

@@ -199,7 +199,10 @@ static void getTimestamp(char* buf, size_t maxLen)
 {
   time_t now = time(nullptr);
   struct tm t;
-  localtime_r(&now, &t);
+  {
+    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+    localtime_r(&now, &t);
+  }
 
   // Retrieve current task name safely
   const char *taskName = "unknown";

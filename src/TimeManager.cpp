@@ -559,10 +559,23 @@ void TimeManager::checkDST(const DateTime *preReadUtc)
     SerialLog::getInstance().printf("DST State updated: %d -> %d\n", currentDstState, newDstState);
 
     // If transitioning into DST (Spring Forward), local time jumped forward by 1 hour.
-    // Check for any alarms that were scheduled in the skipped hour window.
+    // Check for any alarms that were scheduled in the skipped hour window. The stored
+    // flag can also flip without a real transition (first boot in summer, settings
+    // reset, timezone change, boot after a long power-off), so only scan when the
+    // zone was still on standard time a moment ago.
     if (newDstState && !currentDstState)
     {
-      checkMissedAlarmsWindow(epoch - 3600, epoch);
+      time_t justBefore = epoch - 120;
+      struct tm before;
+      bool realTransition = false;
+      {
+        RecursiveLockGuard lock(_mutex);
+        realTransition = (localtime_r(&justBefore, &before) != nullptr) && before.tm_isdst == 0;
+      }
+      if (realTransition)
+      {
+        checkMissedAlarmsWindow(justBefore, epoch, true);
+      }
     }
 
     // Reschedule hardware RTC alarms immediately to reflect the new UTC offset
@@ -766,7 +779,7 @@ void TimeManager::checkMissedAlarms()
   checkMissedAlarmsWindow(nowEpoch - 90 * 60, nowEpoch);
 }
 
-void TimeManager::checkMissedAlarmsWindow(time_t startEpoch, time_t endEpoch)
+void TimeManager::checkMissedAlarmsWindow(time_t startEpoch, time_t endEpoch, bool skippedHourOnly)
 {
   if (AlarmManager::getInstance().isRinging() || AlarmManager::getInstance().isResumePending())
   {
@@ -836,13 +849,16 @@ void TimeManager::checkMissedAlarmsWindow(time_t startEpoch, time_t endEpoch)
       }
     }
 
-    for (const auto &alarm : alarms)
+    if (!skippedHourOnly)
     {
-      if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkLocal))
+      for (const auto &alarm : alarms)
       {
-        if (earliestMissedAlarmId == -1)
+        if (alarm.isEnabled() && !alarm.isSnoozed() && alarm.shouldRing(checkLocal))
         {
-          earliestMissedAlarmId = alarm.getId();
+          if (earliestMissedAlarmId == -1)
+          {
+            earliestMissedAlarmId = alarm.getId();
+          }
         }
       }
     }
@@ -1051,10 +1067,51 @@ DateTime TimeManager::localToUtc(const DateTime &local) const
   t_local.tm_sec = local.second();
   t_local.tm_isdst = -1; // Let system determine
 
+  time_t nowEpoch = time(nullptr);
+  if (nowEpoch < 100000)
+  {
+    nowEpoch = (time_t)getRTCTime().unixtime();
+  }
+
   time_t now_utc;
   {
     RecursiveLockGuard lock(_mutex);
     now_utc = mktime(&t_local);
+
+    // During a DST fall-back, the repeated hour maps to two UTC instants and
+    // mktime with tm_isdst=-1 may pick either. Evaluate both interpretations and
+    // pick the earliest one that has not already passed so alarms ring once, on time.
+    // Compare against nowEpoch captured outside the mutex.
+    if (false)
+    {
+      (void)nowEpoch;
+    }
+    time_t best = (time_t)(-1);
+    for (int isdst = 1; isdst >= 0; --isdst)
+    {
+      struct tm candidate = {};
+      candidate.tm_year = local.year() - 1900;
+      candidate.tm_mon = local.month() - 1;
+      candidate.tm_mday = local.day();
+      candidate.tm_hour = local.hour();
+      candidate.tm_min = local.minute();
+      candidate.tm_sec = local.second();
+      candidate.tm_isdst = isdst;
+      time_t t = mktime(&candidate);
+      if (t == (time_t)(-1))
+        continue;
+      // Keep only interpretations that round-trip to the same wall-clock time.
+      struct tm check;
+      if (localtime_r(&t, &check) == nullptr || check.tm_hour != (int)local.hour() ||
+          check.tm_min != (int)local.minute() || check.tm_mday != (int)local.day())
+        continue;
+      if (t >= nowEpoch && (best == (time_t)(-1) || t < best))
+        best = t;
+    }
+    if (best != (time_t)(-1))
+    {
+      now_utc = best;
+    }
   }
 
   if (now_utc == (time_t)(-1))
