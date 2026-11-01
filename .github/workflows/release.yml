@@ -3,6 +3,7 @@
 name: Create Release and Upload Signed Firmware
 
 # This action runs on every push to a tag that starts with "v" (e.g., v1.0.0, v2.1.3)
+# or manually via workflow_dispatch with a specified tag.
 on:
   push:
     tags:
@@ -22,29 +23,48 @@ jobs:
       contents: write
 
     steps:
-      # 1. Checkout the repository code
+      # 1. Checkout the repository code (with full history and tags)
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
-      # 2. Set up Python, which is a dependency for PlatformIO and signing
+      # 2. If triggered manually for an existing tag (e.g. rebuilding a prior tag),
+      #    check out that tag and ensure platformio.ini pins espressif32 @ ~6.12.0.
+      - name: Prepare target ref
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            git fetch --tags --force
+            if git rev-parse -q --verify "refs/tags/$INPUT_TAG" >/dev/null 2>&1; then
+              echo "Tag $INPUT_TAG already exists; checking out refs/tags/$INPUT_TAG..."
+              git checkout "refs/tags/$INPUT_TAG"
+              sed -i 's/^platform = espressif32$/platform = espressif32 @ ~6.12.0/' platformio.ini
+            else
+              echo "Tag $INPUT_TAG does not exist yet; building current branch HEAD (${GITHUB_SHA})."
+            fi
+          fi
+
+      # 3. Set up Python, which is a dependency for PlatformIO and signing
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
 
-      # 3. Install PlatformIO Core and cryptography library for signing
+      # 4. Install PlatformIO Core and cryptography library for signing
       - name: Install dependencies
         run: |
           pip install -U platformio
           pip install pynacl
 
-      # 4. Compile the project. This will generate the .bin file.
+      # 5. Compile the project. This will generate the .bin file.
       - name: Build PlatformIO Project
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: pio run
 
-      # 5. Sign the firmware binary
+      # 6. Sign the firmware binary
       - name: Sign Firmware
         env:
           OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
@@ -109,16 +129,48 @@ jobs:
           print(f"Signature written to {sig_path}")
           EOF
 
-      # 6. Create a GitHub Release and upload firmware with signature
-      - name: Create Release and Upload Firmware
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          files: |
-            .pio/build/esp32s3_n16r8/firmware.bin
-            .pio/build/esp32s3_n16r8/firmware.sig
-            .pio/build/esp32s3_n16r8/firmware.sha256
-          name: Release ${{ inputs.tag || github.ref_name }}
-          draft: true
-          prerelease: false
-          fail_on_unmatched_files: false
+      # 7. Create/Push Git Tag and Create/Update GitHub Release
+      - name: Create Tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "ERROR: No release tag specified."
+            exit 1
+          fi
+
+          # Create and push the git tag if it does not already exist on origin
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Creating and pushing new git tag: $RELEASE_TAG"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+          else
+            echo "Git tag $RELEASE_TAG already exists on origin."
+          fi
+
+          FILES=(".pio/build/esp32s3_n16r8/firmware.bin")
+          if [ -f ".pio/build/esp32s3_n16r8/firmware.sig" ]; then
+            FILES+=(".pio/build/esp32s3_n16r8/firmware.sig")
+          fi
+          if [ -f ".pio/build/esp32s3_n16r8/firmware.sha256" ]; then
+            FILES+=(".pio/build/esp32s3_n16r8/firmware.sha256")
+          fi
+
+          # Look up an existing release (including drafts) strictly matching tag_name == RELEASE_TAG
+          EXISTING_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\") | .id" | head -n 1)
+
+          if [ -n "$EXISTING_ID" ]; then
+            echo "Updating existing release for tag $RELEASE_TAG (id: $EXISTING_ID)"
+            gh release edit "$RELEASE_TAG" --title "Release $RELEASE_TAG"
+            gh release upload "$RELEASE_TAG" "${FILES[@]}" --clobber
+          else
+            echo "Creating new draft release for tag $RELEASE_TAG"
+            gh release create "$RELEASE_TAG" "${FILES[@]}" \
+              --title "Release $RELEASE_TAG" \
+              --notes "" \
+              --draft \
+              --verify-tag
+          fi
