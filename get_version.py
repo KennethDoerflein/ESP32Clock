@@ -26,20 +26,25 @@ def run_script(pio_env=None):
     version = ""
 
     if is_ci:
-        print("CI environment detected. Getting version from git tag.")
-        try:
-            version = get_git_tag_version()
-        except subprocess.CalledProcessError as e:
-            print(f"Error: Not on a git tag. 'git describe' failed: {e}")
-            print("CI builds must be performed on a commit with a version tag.")
-            if pio_env:
-                pio_env.Exit(1)
-            return
-        except FileNotFoundError:
-            print("Error: git command not found. Is git installed and in the PATH?")
-            if pio_env:
-                pio_env.Exit(1)
-            return
+        release_tag = os.getenv("RELEASE_TAG", "").strip()
+        if release_tag:
+            print(f"CI environment detected. Using RELEASE_TAG: {release_tag}")
+            version = release_tag
+        else:
+            print("CI environment detected. Getting version from git tag.")
+            try:
+                version = get_git_tag_version()
+            except subprocess.CalledProcessError as e:
+                print(f"Error: Not on a git tag. 'git describe' failed: {e}")
+                print("CI builds must be performed on a commit with a version tag.")
+                if pio_env:
+                    pio_env.Exit(1)
+                return
+            except FileNotFoundError:
+                print("Error: git command not found. Is git installed and in the PATH?")
+                if pio_env:
+                    pio_env.Exit(1)
+                return
     else:
         print("Local build detected. Creating dev version string.")
         version = generate_dev_version()
@@ -65,5 +70,3 @@ try:
     run_script(env)
 except NameError:
     pass
-
-

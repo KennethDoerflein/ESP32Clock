@@ -7,6 +7,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g., v1.0.0)"
+        required: true
+        type: string
 
 jobs:
   build-and-release:
@@ -34,6 +40,8 @@ jobs:
 
       # 4. Compile the project. This will generate the .bin file.
       - name: Build PlatformIO Project
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: pio run
 
       # 5. Sign the firmware binary
@@ -105,11 +113,12 @@ jobs:
       - name: Create Release and Upload Firmware
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
             .pio/build/esp32s3_n16r8/firmware.bin
             .pio/build/esp32s3_n16r8/firmware.sig
             .pio/build/esp32s3_n16r8/firmware.sha256
-          name: Release ${{ github.ref_name }}
+          name: Release ${{ inputs.tag || github.ref_name }}
           draft: true
           prerelease: false
           fail_on_unmatched_files: false
