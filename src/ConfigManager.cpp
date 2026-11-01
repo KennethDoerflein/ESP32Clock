@@ -804,11 +804,9 @@ void ConfigManager::resetGeneralSettingsToDefaults()
     // intentionally not reset here, otherwise it would produce a false transition.
     {
 
-      {
-    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
-    setenv("TZ", timezone.c_str(), 1);
-        tzset();
-  }
+      RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+      setenv("TZ", timezone.c_str(), 1);
+      tzset();
     }
     lastAutoCalStatus = "Never";
     tempCorrectionEnabled = DEFAULT_TEMP_CORRECTION_ENABLED;
@@ -1488,11 +1486,9 @@ void ConfigManager::setTimezone(const String &tz)
       timezone = tz;
       {
   
-        {
-    RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
-    setenv("TZ", timezone.c_str(), 1);
-          tzset();
-  }
+        RecursiveLockGuard timeLock(TimeManager::getInstance().getStateMutex());
+      setenv("TZ", timezone.c_str(), 1);
+        tzset();
       }
       _isDirty = true;
     }

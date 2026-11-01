@@ -120,7 +120,7 @@ static void _processSuccessfulNtpSync()
   // --- Layer 3: Three-Source Diagnostic Dashboard ---
   // Back-calculate what each clock read at the moment the sync started,
   // using the elapsed time to compensate for network latency.
-  if (millisAtSyncStart > 0 && sysTimeAtSyncStart > 0)
+  if (sysTimeAtSyncStart > 0)
   {
     unsigned long elapsedMs = millis() - millisAtSyncStart;
     time_t ntpTimeAtStart = (time_t)time_to_set.unixtime() - (time_t)(elapsedMs / 1000);
@@ -280,7 +280,7 @@ NtpSyncState updateNtpSync()
 
   unsigned long currentMillis = millis();
   // Check if it's time for the next attempt
-  if (lastSyncAttemptMs != 0 && currentMillis - lastSyncAttemptMs < targetWaitDelay)
+  if (currentMillis - lastSyncAttemptMs < targetWaitDelay)
   {
     return NTP_SYNC_IN_PROGRESS; // Not time yet, still in progress
   }

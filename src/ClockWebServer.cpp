@@ -29,6 +29,7 @@
 #include <sys/time.h>
 #include "esp_core_dump.h"
 #include "esp_partition.h"
+#include <esp_timer.h>
 
 #if __has_include("version.h")
 // This file exists, so we'll include it.
@@ -631,7 +632,7 @@ void ClockWebServer::begin()
               {
       JsonDocument doc;
       doc["freeHeap"] = ESP.getFreeHeap();
-      doc["uptime"] = millis();
+      doc["uptime"] = (uint64_t)(esp_timer_get_time() / 1000ULL);
       doc["rssi"] = WiFi.RSSI();
       doc["coreTemp"] = String(getCoreTemperature(), 1);
       doc["unit"] = ConfigManager::getInstance().isCelsius() ? "C" : "F";

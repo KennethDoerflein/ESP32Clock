@@ -2498,11 +2498,11 @@ const char SYSTEM_PAGE_HTML[] PROGMEM = R"rawliteral(
                     freeRamEl.textContent = 'N/A';
                 }
 
-                if (data.uptime) {
-                    const uptime = new Date(data.uptime);
-                    const days = Math.floor(data.uptime / (1000 * 60 * 60 * 24));
-                    const hours = uptime.getUTCHours();
-                    const minutes = uptime.getUTCMinutes();
+                if (data.uptime !== undefined && data.uptime !== null) {
+                    const totalMinutes = Math.floor(data.uptime / (1000 * 60));
+                    const days = Math.floor(totalMinutes / (60 * 24));
+                    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+                    const minutes = totalMinutes % 60;
                     uptimeEl.textContent = `${days}d ${hours}h ${minutes}m`;
                 } else {
                     uptimeEl.textContent = 'N/A';

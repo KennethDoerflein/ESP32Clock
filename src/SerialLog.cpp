@@ -13,6 +13,7 @@
 #include "LockGuard.h"
 #include <esp_attr.h>
 #include <esp_system.h>
+#include <esp_timer.h>
 #include <time.h>
 #include <freertos/task.h>
 
@@ -215,7 +216,7 @@ static void getTimestamp(char* buf, size_t maxLen)
   // If year is before 2021 the clock hasn't been synced yet — show uptime.
   if (t.tm_year + 1900 < 2021)
   {
-    snprintf(buf, maxLen, "[+%lums] [%s] ", (unsigned long)millis(), taskName);
+    snprintf(buf, maxLen, "[+%llums] [%s] ", (unsigned long long)(esp_timer_get_time() / 1000ULL), taskName);
   }
   else
   {

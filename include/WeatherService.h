@@ -201,6 +201,7 @@ private:
   // Weather state
   WeatherData _currentWeather;
   unsigned long _lastUpdate = 0;
+  bool _initialUpdateDone = false;
   uint8_t _failureCount = 0; ///< Number of consecutive failed updates
 
   mutable SemaphoreHandle_t _mutex;

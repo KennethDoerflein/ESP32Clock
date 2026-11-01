@@ -90,7 +90,7 @@ void WeatherService::weatherTaskEntry(void *parameter)
     // WDT is enrolled unconditionally around each wake cycle so that any
     // code path that runs network I/O is covered without leaving orphaned
     // enrollments if WiFi state changes mid-execution.
-    xSemaphoreTake(service->_wakeSignal, pdMS_TO_TICKS(WEATHER_UPDATE_INTERVAL + 30000));
+    xSemaphoreTake(service->_wakeSignal, portMAX_DELAY);
 
     esp_task_wdt_add(NULL);
 
@@ -157,6 +157,11 @@ void WeatherService::weatherTaskEntry(void *parameter)
       // 2. Regular weather update
       SerialLog::getInstance().print("Weather task: starting weather update...\n");
       service->updateWeather();
+      {
+        LockGuard lock(service->_mutex);
+        service->_lastUpdate = millis();
+        service->_initialUpdateDone = true;
+      }
     }
     else
     {
@@ -188,12 +193,13 @@ void WeatherService::loop()
   if (_failureCount > 0)
   {
     // Exponential backoff: 1 fail = 10m, 2 = 20m, 3 = 40m, max 2 hours
-    interval = (uint32_t)WEATHER_UPDATE_INTERVAL * (1 << (std::min((int)_failureCount, 4)));
+    interval = (uint32_t)WEATHER_UPDATE_INTERVAL * (1 << (std::min((int)_failureCount, 5) - 1));
     if (interval > 2 * 60 * 60 * 1000) interval = 2 * 60 * 60 * 1000;
   }
 
-  if (now - _lastUpdate > interval || _lastUpdate == 0)
+  if (!_initialUpdateDone || now - _lastUpdate > interval)
   {
+    _initialUpdateDone = true;
     _lastUpdate = now;
     xSemaphoreGive(_wakeSignal); // Wake the persistent task
   }
@@ -202,7 +208,7 @@ void WeatherService::loop()
 void WeatherService::forceUpdate()
 {
   LockGuard lock(_mutex);
-  _lastUpdate = 0;
+  _initialUpdateDone = false;
   xSemaphoreGive(_wakeSignal); // Wake the persistent task immediately
 }
 

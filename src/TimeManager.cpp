@@ -1067,25 +1067,23 @@ DateTime TimeManager::localToUtc(const DateTime &local) const
   t_local.tm_sec = local.second();
   t_local.tm_isdst = -1; // Let system determine
 
-  time_t nowEpoch = time(nullptr);
-  if (nowEpoch < 100000)
-  {
-    nowEpoch = (time_t)getRTCTime().unixtime();
-  }
-
   time_t now_utc;
   {
     RecursiveLockGuard lock(_mutex);
     now_utc = mktime(&t_local);
+  }
+  time_t nowEpoch = time(nullptr);
 
     // During a DST fall-back, the repeated hour maps to two UTC instants and
     // mktime with tm_isdst=-1 may pick either. Evaluate both interpretations and
     // pick the earliest one that has not already passed so alarms ring once, on time.
     // Compare against nowEpoch captured outside the mutex.
-    if (false)
+    if (nowEpoch < 100000)
     {
-      (void)nowEpoch;
+      nowEpoch = (time_t)getRTCTime().unixtime();
     }
+  {
+    RecursiveLockGuard lock(_mutex);
     time_t best = (time_t)(-1);
     for (int isdst = 1; isdst >= 0; --isdst)
     {
